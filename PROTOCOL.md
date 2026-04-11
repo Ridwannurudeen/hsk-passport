@@ -1,0 +1,207 @@
+# HSK Passport Protocol Specification
+
+**Version**: 1.0.0
+**Status**: Draft
+**Chain**: HashKey Chain (OP Stack L2, Chain ID 177/133)
+**ZK Backend**: Semaphore v4 (Groth16 proofs, bn128 curve)
+
+---
+
+## 1. Overview
+
+HSK Passport is a privacy-preserving credential verification protocol for HashKey Chain. It enables users to prove they hold credentials (KYC verification, accredited investor status, residency) without revealing any personal information.
+
+The protocol separates three roles:
+
+- **Issuers**: Trusted entities (e.g., HashKey Exchange) that verify users off-chain and issue on-chain credentials
+- **Holders**: Users who store credentials and generate zero-knowledge proofs
+- **Verifiers**: dApps that verify proofs on-chain to gate access to services
+
+---
+
+## 2. Architecture
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                      HSK Passport Protocol                       │
+│                                                                  │
+│  ┌─────────────────┐    ┌──────────────────┐    ┌────────────┐  │
+│  │ Credential       │    │ HSKPassport       │    │ Semaphore  │  │
+│  │ Registry         │───>│ (Group Manager)   │───>│ v4 Core    │  │
+│  │                  │    │                   │    │            │  │
+│  │ Schema types     │    │ Credential groups │    │ Merkle     │  │
+│  │ Revocation state │    │ Issuer management │    │ trees      │  │
+│  │ Schema URIs      │    │ Delegate system   │    │ ZK verify  │  │
+│  └─────────────────┘    └──────────────────┘    └────────────┘  │
+│                                                                  │
+│  ┌─────────────────┐    ┌──────────────────┐                    │
+│  │ HSKPassport      │    │ DemoIssuer       │                    │
+│  │ Verifier         │    │ (Self-service)    │                    │
+│  │                  │    │                   │                    │
+│  │ Base contract    │    │ For testing &     │                    │
+│  │ for dApps        │    │ hackathon demos   │                    │
+│  └─────────────────┘    └──────────────────┘                    │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 3. Credential Lifecycle
+
+### 3.1 Schema Registration
+
+An issuer registers a credential type in the CredentialRegistry:
+
+```
+registerSchema(schemaHash, schemaURI, revocable)
+```
+
+- `schemaHash`: Keccak256 of the canonical JSON schema
+- `schemaURI`: IPFS or HTTPS URI to the W3C VC-aligned JSON-LD schema
+- `revocable`: Whether individual credentials can be revoked
+
+### 3.2 Group Creation
+
+The issuer creates a Semaphore group linked to the schema:
+
+```
+createCredentialGroup(name, schemaHash) → groupId
+```
+
+Each group is a Merkle tree of identity commitments. The group admin is the HSKPassport contract, with issuance delegated to approved issuers.
+
+### 3.3 Credential Issuance
+
+After off-chain verification, the issuer adds the user's identity commitment:
+
+```
+issueCredential(groupId, identityCommitment)
+```
+
+The identity commitment is a hash of the user's EdDSA public key (Semaphore v4). It reveals nothing about the user's identity.
+
+### 3.4 Proof Generation (Client-Side)
+
+The user generates a Groth16 zero-knowledge proof in their browser:
+
+1. Reconstruct the group's Merkle tree from on-chain events
+2. Compute a Merkle inclusion proof for their commitment
+3. Generate a Groth16 proof using snarkjs WASM
+
+The proof demonstrates: "I know a private key whose commitment is a leaf in this Merkle tree" — without revealing which leaf.
+
+**Proof parameters:**
+- `message`: Arbitrary signal bound to the proof (e.g., action identifier)
+- `scope`: Nullifier scope for sybil resistance (unique per action)
+- `nullifier`: Deterministic from identity + scope (prevents double-proving per scope)
+
+### 3.5 On-Chain Verification
+
+A dApp verifies the proof by calling:
+
+```solidity
+// Read-only verification (can reuse proof)
+passport.verifyCredential(groupId, proof) → bool
+
+// Validation with nullifier tracking (prevents reuse per scope)
+passport.validateCredential(groupId, proof)
+```
+
+Verification uses the bn128/alt_bn128 elliptic curve precompiles (ecAdd, ecMul, ecPairing) at addresses 0x06, 0x07, 0x08. Gas cost: ~241,000 per verification.
+
+### 3.6 Revocation
+
+An issuer can revoke a credential:
+
+```
+// Remove from Semaphore group (future proofs fail)
+revokeCredential(groupId, identityCommitment, merkleProofSiblings)
+
+// Mark as revoked in registry (metadata tracking)
+registry.revokeCredential(schemaHash, identityCommitment)
+```
+
+After revocation, the user's commitment is removed from the Merkle tree. Any proof generated against the old tree root will expire based on the group's `merkleTreeDuration` (default: 1 hour).
+
+---
+
+## 4. Privacy Guarantees
+
+### What the protocol reveals:
+- A valid proof exists for the specified group
+- The Merkle tree root used in the proof
+- The nullifier hash (deterministic per identity + scope)
+- That the proof was submitted by a specific wallet address
+
+### What the protocol does NOT reveal:
+- Which group member generated the proof
+- The user's identity commitment
+- The user's EdDSA private key
+- Any personal information (name, documents, address)
+- The link between the wallet submitting the proof and the credential holder
+
+### Unlinkability:
+- Different scopes produce different nullifiers from the same identity
+- A verifier cannot link two proofs from the same user across different scopes
+- The same user can prove credentials to multiple dApps without cross-dApp tracking
+
+### Limitations:
+- Same scope + same identity = same nullifier (linkable within a scope)
+- Group membership changes are visible on-chain (add/remove events)
+- The total number of group members is public
+
+---
+
+## 5. Compliance Model
+
+HSK Passport is designed for HashKey Chain's compliance-first architecture.
+
+### Aggregate Reporting (Privacy-Preserving)
+- Total KYC-verified users: `credentialGroups[groupId].memberCount`
+- Total verifications: count of `CredentialVerified` events
+- Credential types: queryable from CredentialRegistry
+- Revocation status: `registry.isRevoked(schemaHash, commitment)`
+
+### Regulatory Compatibility
+- **Issuers retain off-chain KYC records** — the protocol does not replace KYC, it bridges it to on-chain verification
+- **Revocation is immediate** — regulators can require an issuer to revoke a credential, and all future proofs fail
+- **Audit trail** — all issuance and revocation events are on-chain and timestamped
+- **Jurisdiction-scoped groups** — separate groups for different jurisdictions (e.g., HK_RESIDENT)
+
+### Integration with HashKey DID (Future)
+HSK Passport is designed to compose with HashKey's existing DID system:
+
+1. User registers a HashKey DID (`alice.key`) with KYC
+2. HashKey's KYC service (as an approved issuer) adds the user's Semaphore commitment to the KYC_VERIFIED group
+3. The user's DID and Semaphore identity are linked off-chain but unlinkable on-chain
+4. dApps verify KYC status without knowing which DID the proof belongs to
+
+---
+
+## 6. Security Considerations
+
+### Trusted Setup
+Semaphore v4 uses a Groth16 trusted setup ceremony conducted by the Privacy & Scaling Explorations (PSE) team at Ethereum Foundation. The ceremony parameters are publicly verifiable.
+
+### Precompile Dependency
+Proof verification depends on the bn128 elliptic curve precompiles (EIP-196, EIP-197). These are available on HashKey Chain as an OP Stack L2.
+
+### Issuer Trust
+The protocol's security depends on issuers correctly verifying credentials off-chain. A compromised issuer could add unauthorized identity commitments. Mitigation: multi-sig issuer addresses, issuer reputation tracking, auditable issuance logs.
+
+### Front-Running
+Proofs are bound to a `message` parameter. dApps should include the caller's address in the message to prevent front-running.
+
+---
+
+## 7. Contract Addresses (HashKey Chain Testnet)
+
+| Contract | Address |
+|----------|---------|
+| SemaphoreVerifier | `0xe874E5DE61fa40dAf82e8916489d1B7071aC3b9A` |
+| PoseidonT3 | `0x3B574ED5c34F8CE27E1D6960b69dec3003071301` |
+| Semaphore | `0xd09e8Aec6B6A36588E7A105f606A9fe9a134CFE9` |
+| CredentialRegistry | `0x20265dAe4711B3CeF88D7078bf1290f815279De1` |
+| HSKPassport | `0x728bB8D8269a826b54a45385cF87ebDD785Ed1D6` |
+| DemoIssuer | `0x0a1dcaC5735312f469E77E4a13D6B3E9AC666632` |
+| GatedRWA (hSILVER) | `0xF7E07555Ebf79c1B344c8E36c7393316714762dB` |

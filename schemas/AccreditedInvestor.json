@@ -1,0 +1,49 @@
+{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1",
+    "https://hskpassport.gudman.xyz/schemas/v1"
+  ],
+  "type": ["VerifiableCredential", "AccreditedInvestorCredential"],
+  "credentialSchema": {
+    "id": "https://hskpassport.gudman.xyz/schemas/accredited-investor.json",
+    "type": "JsonSchema"
+  },
+  "description": "Attests that the holder is an accredited or professional investor per applicable regulatory standards.",
+  "properties": {
+    "credentialSubject": {
+      "type": "object",
+      "properties": {
+        "identityCommitment": {
+          "type": "string",
+          "description": "Semaphore v4 identity commitment"
+        },
+        "investorType": {
+          "type": "string",
+          "enum": ["individual", "institutional", "professional"],
+          "description": "Type of accredited investor classification"
+        },
+        "regulatoryFramework": {
+          "type": "string",
+          "description": "Regulatory framework (e.g., 'SFC-HK', 'SEC-US', 'MAS-SG')"
+        },
+        "verifiedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Accreditation expiry date"
+        }
+      },
+      "required": ["identityCommitment", "investorType"]
+    }
+  },
+  "proof": {
+    "type": "Semaphore2024",
+    "verificationMethod": "on-chain via HSKPassport.verifyCredential()"
+  },
+  "groupId": 4,
+  "schemaHash": "0xfdeeeabd6695af1fc710fa447307b6b27fb84e3bd81204bc627ce7545a7b1199",
+  "revocable": true
+}

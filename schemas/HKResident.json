@@ -1,0 +1,40 @@
+{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1",
+    "https://hskpassport.gudman.xyz/schemas/v1"
+  ],
+  "type": ["VerifiableCredential", "HKResidentCredential"],
+  "credentialSchema": {
+    "id": "https://hskpassport.gudman.xyz/schemas/hk-resident.json",
+    "type": "JsonSchema"
+  },
+  "description": "Attests that the holder is a resident of Hong Kong SAR.",
+  "properties": {
+    "credentialSubject": {
+      "type": "object",
+      "properties": {
+        "identityCommitment": {
+          "type": "string",
+          "description": "Semaphore v4 identity commitment"
+        },
+        "residencyType": {
+          "type": "string",
+          "enum": ["permanent", "temporary", "work-visa"],
+          "description": "Type of Hong Kong residency"
+        },
+        "verifiedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["identityCommitment", "residencyType"]
+    }
+  },
+  "proof": {
+    "type": "Semaphore2024",
+    "verificationMethod": "on-chain via HSKPassport.verifyCredential()"
+  },
+  "groupId": 5,
+  "schemaHash": "0xe49766c8e874727c72a45f7ac33ee994bce5554e0db27e7d2118b33c67e85086",
+  "revocable": true
+}

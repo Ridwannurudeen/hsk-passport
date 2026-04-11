@@ -1,0 +1,46 @@
+{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1",
+    "https://hskpassport.gudman.xyz/schemas/v1"
+  ],
+  "type": ["VerifiableCredential", "KYCVerifiedCredential"],
+  "credentialSchema": {
+    "id": "https://hskpassport.gudman.xyz/schemas/kyc-verified.json",
+    "type": "JsonSchema"
+  },
+  "description": "Attests that the holder has completed standard KYC (Know Your Customer) verification through an approved issuer.",
+  "properties": {
+    "credentialSubject": {
+      "type": "object",
+      "properties": {
+        "identityCommitment": {
+          "type": "string",
+          "description": "Semaphore v4 identity commitment (EdDSA public key hash)"
+        },
+        "kycLevel": {
+          "type": "integer",
+          "enum": [1, 2, 3],
+          "description": "KYC verification level: 1=Basic, 2=Enhanced, 3=Institutional"
+        },
+        "jurisdiction": {
+          "type": "string",
+          "description": "ISO 3166-1 alpha-2 country code of KYC jurisdiction"
+        },
+        "verifiedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of verification"
+        }
+      },
+      "required": ["identityCommitment", "kycLevel"]
+    }
+  },
+  "proof": {
+    "type": "Semaphore2024",
+    "description": "Groth16 zero-knowledge proof of group membership via Semaphore v4",
+    "verificationMethod": "on-chain via HSKPassport.verifyCredential()"
+  },
+  "groupId": 3,
+  "schemaHash": "0x0de0b2954ed1a4df080c7ae29b127f7ee31f057d4263cdcee99e60248dbc5ad5",
+  "revocable": true
+}

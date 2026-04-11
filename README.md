@@ -1,126 +1,198 @@
 # HSK Passport
 
-**Privacy-preserving KYC credentials for HashKey Chain.**
+**Privacy-preserving ZK credential verification protocol for HashKey Chain.**
 
 Built for the [HashKey Chain Horizon Hackathon 2026](https://dorahacks.io/hackathon/2045) — ZKID Track.
 
 **Live Demo**: [https://hskpassport.gudman.xyz](https://hskpassport.gudman.xyz)
+**Protocol Spec**: [PROTOCOL.md](PROTOCOL.md)
 
-## What is HSK Passport?
+---
 
-HSK Passport enables zero-knowledge credential verification on HashKey Chain. Users prove they hold a KYC credential without revealing any personal information.
+## The Problem
 
-- **Issuers** (e.g., HashKey Exchange) verify users off-chain and add their cryptographic identity to credential groups on-chain
-- **Users** generate Groth16 zero-knowledge proofs in their browser proving group membership
-- **dApps** call `verifyCredential()` — get a boolean, see zero personal data
+HashKey Chain is compliance-first. Every RWA project, DeFi protocol, and institutional product needs KYC. But current approaches either:
+- Expose personal data on-chain (privacy violation)
+- Require each dApp to run its own KYC (expensive, fragmented)
+- Use centralized whitelists (single point of failure)
+
+## The Solution
+
+HSK Passport uses **Semaphore v4 zero-knowledge proofs** to let users prove credentials without revealing identity. One credential check. Zero personal data on-chain. Full compliance.
+
+```
+Issuer verifies KYC off-chain → adds commitment to group on-chain
+User generates Groth16 ZK proof in browser → proves group membership
+dApp calls verifyCredential() → gets true/false, sees zero personal data
+```
+
+---
 
 ## Architecture
 
 ```
-  Issuer (KYC Provider)          HSK Passport Contract          dApp (RWA, DeFi, etc.)
-  ┌───────────────────┐         ┌──────────────────────┐        ┌──────────────────┐
-  │  Off-chain KYC    │────────>│  Semaphore Groups     │<───────│  verifyProof()   │
-  │  verification     │  issue  │  (Merkle trees of    │ verify │  => true/false   │
-  │                   │  cred   │   identity commits)  │        │                  │
-  └───────────────────┘         └──────────┬───────────┘        └──────────────────┘
-                                           │ ZK proof
-                                ┌──────────┴───────────┐
-                                │     User Browser      │
-                                │  Semaphore Identity    │
-                                │  + Proof Generation    │
-                                │  (WASM, client-side)   │
-                                └───────────────────────┘
+┌─────────────────┐    ┌──────────────────┐    ┌────────────┐
+│ Credential       │    │ HSKPassport       │    │ Semaphore  │
+│ Registry         │───>│ (Group Manager)   │───>│ v4 Core    │
+│                  │    │                   │    │            │
+│ Schema types     │    │ Credential groups │    │ Merkle     │
+│ Revocation state │    │ Issuer/delegate   │    │ trees      │
+│ W3C VC aligned   │    │ management        │    │ ZK verify  │
+└─────────────────┘    └──────────────────┘    └────────────┘
+
+┌─────────────────┐    ┌──────────────────┐
+│ HSKPassport      │    │ @hsk-passport/   │
+│ Verifier         │    │ sdk              │
+│                  │    │                  │
+│ Base contract    │    │ TypeScript SDK   │
+│ for dApps        │    │ + React hooks    │
+└─────────────────┘    └──────────────────┘
 ```
+
+---
 
 ## Deployed Contracts (HashKey Chain Testnet)
 
-| Contract | Address |
-|----------|---------|
-| SemaphoreVerifier | [`0xe874E5DE61fa40dAf82e8916489d1B7071aC3b9A`](https://hashkey-testnet.blockscout.com/address/0xe874E5DE61fa40dAf82e8916489d1B7071aC3b9A) |
-| PoseidonT3 | [`0x3B574ED5c34F8CE27E1D6960b69dec3003071301`](https://hashkey-testnet.blockscout.com/address/0x3B574ED5c34F8CE27E1D6960b69dec3003071301) |
-| Semaphore | [`0xd09e8Aec6B6A36588E7A105f606A9fe9a134CFE9`](https://hashkey-testnet.blockscout.com/address/0xd09e8Aec6B6A36588E7A105f606A9fe9a134CFE9) |
-| HSKPassport | [`0x8D379176A95B962687e2edD8AF1f86e1280F4c3C`](https://hashkey-testnet.blockscout.com/address/0x8D379176A95B962687e2edD8AF1f86e1280F4c3C) |
-| GatedRWA (hSILVER) | [`0xa36c64bb8E063042a0467Da12ed4cD51F71bAE59`](https://hashkey-testnet.blockscout.com/address/0xa36c64bb8E063042a0467Da12ed4cD51F71bAE59) |
+| Contract | Address | Explorer |
+|----------|---------|----------|
+| SemaphoreVerifier | `0xe874E5...aC3b9A` | [View](https://hashkey-testnet.blockscout.com/address/0xe874E5DE61fa40dAf82e8916489d1B7071aC3b9A) |
+| Semaphore | `0xd09e8A...34CFE9` | [View](https://hashkey-testnet.blockscout.com/address/0xd09e8Aec6B6A36588E7A105f606A9fe9a134CFE9) |
+| CredentialRegistry | `0x20265d...79De1` | [View](https://hashkey-testnet.blockscout.com/address/0x20265dAe4711B3CeF88D7078bf1290f815279De1) |
+| HSKPassport | `0x728bB8...Ed1D6` | [View](https://hashkey-testnet.blockscout.com/address/0x728bB8D8269a826b54a45385cF87ebDD785Ed1D6) |
+| DemoIssuer | `0x0a1dca...6632` | [View](https://hashkey-testnet.blockscout.com/address/0x0a1dcaC5735312f469E77E4a13D6B3E9AC666632) |
+| GatedRWA (hSILVER) | `0xF7E075...762dB` | [View](https://hashkey-testnet.blockscout.com/address/0xF7E07555Ebf79c1B344c8E36c7393316714762dB) |
 
-**Credential Groups:**
-- Group 0: `KYC_VERIFIED` — Standard KYC verification
-- Group 1: `ACCREDITED_INVESTOR` — Professional/accredited investor status
-- Group 2: `HK_RESIDENT` — Hong Kong residency
+**Credential Groups**: KYC_VERIFIED (3), ACCREDITED_INVESTOR (4), HK_RESIDENT (5)
 
-## Tech Stack
+**Registered Schemas**: 3 W3C VC-aligned JSON-LD schemas in `/schemas/`
 
-- **ZK Layer**: [Semaphore v4](https://semaphore.pse.dev/) (Groth16 zero-knowledge proofs)
-- **Smart Contracts**: Solidity 0.8.23, Hardhat
-- **Frontend**: Next.js 16, TypeScript, Tailwind CSS
-- **Wallet**: ethers.js v6 + MetaMask
-- **Chain**: HashKey Chain Testnet (Chain ID 133, OP Stack L2)
-- **Proof Generation**: Client-side via WASM (no server)
+---
 
 ## Quick Integration
 
-Any dApp on HashKey Chain can gate access behind a KYC credential:
+### Solidity — Gate any function behind KYC
 
 ```solidity
-interface IHSKPassport {
-    function verifyCredential(
-        uint256 groupId,
-        ISemaphore.SemaphoreProof calldata proof
-    ) external view returns (bool);
-}
+import {HSKPassportVerifier} from "./HSKPassportVerifier.sol";
 
-contract MyDApp {
-    IHSKPassport public passport;
+contract MyDApp is HSKPassportVerifier {
+    constructor(address passport) HSKPassportVerifier(passport) {}
 
-    function kycGatedFunction(
+    function restrictedAction(
         ISemaphore.SemaphoreProof calldata proof
-    ) external {
-        require(
-            passport.verifyCredential(0, proof), // 0 = KYC_VERIFIED
-            "KYC proof required"
-        );
-        // Your logic here
+    ) external onlyCredentialHolder(3, proof) {
+        // Only KYC-verified users reach here
     }
 }
 ```
 
-## Demo
+### TypeScript SDK
 
-The demo shows a KYC-gated RWA token (hSILVER) that can only be minted by users who prove their KYC status with a zero-knowledge proof.
+```typescript
+import { HSKPassport } from "@hsk-passport/sdk";
 
-1. **Create Identity** — Sign a message to generate a deterministic Semaphore identity
-2. **Get Credential** — An issuer adds your identity commitment to the KYC_VERIFIED group
-3. **Generate Proof** — Create a Groth16 ZK proof in your browser
-4. **Mint Token** — Submit the proof to the GatedRWA contract to mint hSILVER
+const passport = HSKPassport.connect("hashkey-testnet");
+const identity = passport.createIdentity(walletSignature);
+const proof = await passport.generateProof(identity, 3, "my-action");
+const valid = await passport.verifyProof(3, proof);
+```
+
+### React Component
+
+```tsx
+import { HSKPassportGate } from "@hsk-passport/sdk/react";
+
+<HSKPassportGate
+  groupId={3}
+  scope="mint_token"
+  identitySecret={signature}
+  onVerified={(proof) => mintToken(proof)}
+>
+  Verify KYC & Mint
+</HSKPassportGate>
+```
+
+---
+
+## Protocol Features
+
+| Feature | Description |
+|---------|-------------|
+| **Credential Registry** | On-chain schema registry with W3C VC-aligned JSON-LD schemas |
+| **Multi-Group Credentials** | KYC, Accredited Investor, HK Resident — each independently managed |
+| **Delegate System** | Approved contracts (e.g., DemoIssuer) can issue credentials on behalf of issuers |
+| **Revocable Credentials** | Issuers can revoke individual credentials; proofs fail immediately |
+| **Action-Scoped Nullifiers** | Sybil resistance per action via Semaphore's scope mechanism |
+| **Root History** | Proofs against recent Merkle roots remain valid within a configurable window |
+| **Client-Side Proofs** | Groth16 proof generation runs entirely in-browser via WASM |
+| **HSKPassportVerifier** | OpenZeppelin-style base contract — one import, one modifier |
+| **TypeScript SDK** | Full SDK with React hooks for frontend integration |
+
+---
+
+## Test Results
+
+```
+21 passing (19s)
+
+✔ CredentialRegistry — schema registration, revocation, access control
+✔ HSKPassport — group management, credential issuance, batch operations
+✔ Delegate System — approve, issue via delegate, revoke
+✔ ZK Proof Verification — Groth16 proof generation + on-chain verification
+✔ DemoIssuer — self-service issuance, double-claim prevention
+✔ GatedRWA — KYC-gated ERC-20 configuration
+```
+
+---
+
+## Tech Stack
+
+- **ZK**: [Semaphore v4](https://semaphore.pse.dev/) (Groth16, EdDSA identities, LeanIMT)
+- **Contracts**: Solidity 0.8.23, Hardhat
+- **Frontend**: Next.js 16, TypeScript, Tailwind CSS
+- **SDK**: TypeScript + React
+- **Chain**: HashKey Chain Testnet (Chain ID 133, OP Stack L2)
+- **Proofs**: Client-side via snarkjs WASM (~241,000 gas to verify on-chain)
+
+---
 
 ## Development
-
-### Prerequisites
-- Node.js 18+
-- MetaMask with HashKey Chain Testnet
 
 ### Contracts
 ```bash
 cd contracts
 npm install
 npx hardhat compile
-npx hardhat run scripts/deploy.ts --network hashkey-testnet
+npx hardhat test                    # 21 tests
+npx hardhat run scripts/deploy-v2.ts --network hashkey-testnet
 ```
 
 ### Frontend
 ```bash
 cd frontend
 npm install
-npm run dev
+npm run dev     # localhost:3000
+npm run build   # production build
 ```
 
-## Why HSK Passport?
+### SDK
+```bash
+cd sdk
+npm install
+npx tsc         # build to dist/
+```
 
-HashKey Chain is a compliance-first L2. Every RWA project needs KYC. But current approaches either:
-- Expose personal data on-chain (privacy violation)
-- Require each dApp to run its own KYC (expensive, fragmented)
-- Use centralized whitelists (single point of failure)
+---
 
-HSK Passport solves this with zero-knowledge proofs: one credential, verified by any dApp, with zero personal data on-chain.
+## Credential Schemas
+
+W3C Verifiable Credential-aligned JSON-LD schemas in `/schemas/`:
+
+- `KYCVerified.json` — Standard KYC verification
+- `AccreditedInvestor.json` — Professional/accredited investor status
+- `HKResident.json` — Hong Kong residency
+
+---
 
 ## License
 
