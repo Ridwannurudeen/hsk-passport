@@ -28,13 +28,23 @@ export async function connectWallet(): Promise<{
         { chainId: HASHKEY_TESTNET.chainId },
       ]);
     } catch (switchError: unknown) {
-      const err = switchError as { code?: number };
-      if (err.code === 4902) {
+      // Handle both direct 4902 and wrapped -32603 with originalError.code 4902
+      const err = switchError as { code?: number; data?: { originalError?: { code?: number } } };
+      const isChainNotAdded =
+        err.code === 4902 ||
+        err.data?.originalError?.code === 4902 ||
+        String(switchError).includes("4902");
+      if (isChainNotAdded) {
         await provider.send("wallet_addEthereumChain", [HASHKEY_TESTNET]);
       } else {
         throw switchError;
       }
     }
+    // Re-create provider after chain switch to pick up the new chain
+    const freshProvider = new BrowserProvider(window.ethereum);
+    const signer = await freshProvider.getSigner();
+    const address = await signer.getAddress();
+    return { provider: freshProvider, signer, address };
   }
 
   const signer = await provider.getSigner();
