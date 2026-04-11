@@ -58,11 +58,11 @@ dApp calls verifyCredential() → gets true/false, sees zero personal data
 | SemaphoreVerifier | `0xe874E5...aC3b9A` | [View](https://hashkey-testnet.blockscout.com/address/0xe874E5DE61fa40dAf82e8916489d1B7071aC3b9A) |
 | Semaphore | `0xd09e8A...34CFE9` | [View](https://hashkey-testnet.blockscout.com/address/0xd09e8Aec6B6A36588E7A105f606A9fe9a134CFE9) |
 | CredentialRegistry | `0x20265d...79De1` | [View](https://hashkey-testnet.blockscout.com/address/0x20265dAe4711B3CeF88D7078bf1290f815279De1) |
-| HSKPassport | `0x728bB8...Ed1D6` | [View](https://hashkey-testnet.blockscout.com/address/0x728bB8D8269a826b54a45385cF87ebDD785Ed1D6) |
-| DemoIssuer | `0x0a1dca...6632` | [View](https://hashkey-testnet.blockscout.com/address/0x0a1dcaC5735312f469E77E4a13D6B3E9AC666632) |
-| GatedRWA (hSILVER) | `0xF7E075...762dB` | [View](https://hashkey-testnet.blockscout.com/address/0xF7E07555Ebf79c1B344c8E36c7393316714762dB) |
+| HSKPassport | `0x79A0E1...d5E6` | [View](https://hashkey-testnet.blockscout.com/address/0x79A0E1160FA829595f45f0479782095ed497d5E6) |
+| DemoIssuer | `0xD6CB33...28d1` | [View](https://hashkey-testnet.blockscout.com/address/0xD6CB3393B9e1E162ed3EF8187082511d20Be28d1) |
+| GatedRWA (hSILVER) | `0xFc6bDE...D249` | [View](https://hashkey-testnet.blockscout.com/address/0xFc6bDE32f79ad43696abc6A2a6291bfA8AF1D249) |
 
-**Credential Groups**: KYC_VERIFIED (3), ACCREDITED_INVESTOR (4), HK_RESIDENT (5)
+**Credential Groups**: KYC_VERIFIED (15), ACCREDITED_INVESTOR (16), HK_RESIDENT (17)
 
 **Registered Schemas**: 3 W3C VC-aligned JSON-LD schemas in `/schemas/`
 

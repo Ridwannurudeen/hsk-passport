@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { Contract, JsonRpcProvider } from "ethers";
 import { connectWallet, signMessage } from "@/lib/wallet";
 import {
@@ -15,9 +15,7 @@ import {
 import {
   ADDRESSES,
   DEMO_ISSUER_ABI,
-  HSK_PASSPORT_ABI,
   GATED_RWA_ABI,
-  SEMAPHORE_ABI,
   GROUPS,
   RPC_URL,
   EXPLORER_URL,
@@ -33,11 +31,19 @@ const STEPS = [
   { label: "Mint", description: "KYC-gated token mint" },
 ];
 
+function getInitialState() {
+  if (typeof window === "undefined") return { identity: null, step: 0, completed: new Set<number>() };
+  const stored = loadIdentity();
+  if (stored) return { identity: stored, step: 1, completed: new Set([0]) };
+  return { identity: null, step: 0, completed: new Set<number>() };
+}
+
 export default function DemoPage() {
   const { toast } = useToast();
-  const [currentStep, setCurrentStep] = useState(0);
-  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
-  const [identity, setIdentity] = useState<Identity | null>(null);
+  const [initial] = useState(getInitialState);
+  const [currentStep, setCurrentStep] = useState(initial.step);
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(initial.completed);
+  const [identity, setIdentity] = useState<Identity | null>(initial.identity);
   const [proof, setProof] = useState<SemaphoreProof | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingText, setLoadingText] = useState("");
@@ -45,15 +51,6 @@ export default function DemoPage() {
   const [balance, setBalance] = useState("0");
   const [groupSize, setGroupSize] = useState(0);
   const abortRef = useRef(false);
-
-  useEffect(() => {
-    const stored = loadIdentity();
-    if (stored) {
-      setIdentity(stored);
-      setCompletedSteps(new Set([0]));
-      setCurrentStep(1);
-    }
-  }, []);
 
   function completeStep(step: number) {
     setCompletedSteps((prev) => new Set([...prev, step]));
