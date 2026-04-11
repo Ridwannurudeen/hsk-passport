@@ -5,20 +5,22 @@ export const EXPLORER_URL = "https://hashkey-testnet.blockscout.com";
 export const ADDRESSES = {
   semaphoreVerifier: "0xe874E5DE61fa40dAf82e8916489d1B7071aC3b9A",
   semaphore: "0xd09e8Aec6B6A36588E7A105f606A9fe9a134CFE9",
-  hskPassport: "0x8D379176A95B962687e2edD8AF1f86e1280F4c3C",
-  gatedRWA: "0xa36c64bb8E063042a0467Da12ed4cD51F71bAE59",
+  credentialRegistry: "0x20265dAe4711B3CeF88D7078bf1290f815279De1",
+  hskPassport: "0x728bB8D8269a826b54a45385cF87ebDD785Ed1D6",
+  demoIssuer: "0x0a1dcaC5735312f469E77E4a13D6B3E9AC666632",
+  gatedRWA: "0xF7E07555Ebf79c1B344c8E36c7393316714762dB",
 };
 
 export const GROUPS = {
-  KYC_VERIFIED: 0,
-  ACCREDITED_INVESTOR: 1,
-  HK_RESIDENT: 2,
+  KYC_VERIFIED: 3,
+  ACCREDITED_INVESTOR: 4,
+  HK_RESIDENT: 5,
 };
 
 export const GROUP_NAMES: Record<number, string> = {
-  0: "KYC Verified",
-  1: "Accredited Investor",
-  2: "HK Resident",
+  3: "KYC Verified",
+  4: "Accredited Investor",
+  5: "HK Resident",
 };
 
 export const HSK_PASSPORT_ABI = [
@@ -61,6 +63,21 @@ export const GATED_RWA_ABI = [
   "function transfer(address to, uint256 value) returns (bool)",
   "event Transfer(address indexed from, address indexed to, uint256 value)",
   "event KYCMint(address indexed to, uint256 amount, uint256 nullifier)",
+] as const;
+
+export const DEMO_ISSUER_ABI = [
+  "function selfIssue(uint256 identityCommitment)",
+  "function hasClaimed(address) view returns (bool)",
+  "function totalIssued() view returns (uint256)",
+  "function kycGroupId() view returns (uint256)",
+  "event DemoCredentialIssued(address indexed claimer, uint256 identityCommitment)",
+] as const;
+
+export const CREDENTIAL_REGISTRY_ABI = [
+  "function schemas(bytes32) view returns (bytes32 schemaHash, string schemaURI, address issuer, bool revocable, uint256 createdAt, bool active)",
+  "function getSchemaCount() view returns (uint256)",
+  "function getSchemaHashes() view returns (bytes32[])",
+  "function isRevoked(bytes32 schemaHash, uint256 identityCommitment) view returns (bool)",
 ] as const;
 
 export const SEMAPHORE_ABI = [

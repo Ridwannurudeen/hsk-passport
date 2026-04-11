@@ -1,337 +1,385 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Contract, JsonRpcProvider } from "ethers";
-import { connectWallet } from "@/lib/wallet";
+import { connectWallet, signMessage } from "@/lib/wallet";
 import {
+  createIdentityFromSignature,
   loadIdentity,
+  getCommitment,
   generateCredentialProof,
   formatProofForContract,
-  getCommitment,
   Identity,
-  Group,
   type SemaphoreProof,
 } from "@/lib/semaphore";
 import {
   ADDRESSES,
+  DEMO_ISSUER_ABI,
+  HSK_PASSPORT_ABI,
   GATED_RWA_ABI,
   SEMAPHORE_ABI,
   GROUPS,
   RPC_URL,
   EXPLORER_URL,
 } from "@/lib/contracts";
+import { StepProgress } from "@/components/StepProgress";
+import { ProofCard } from "@/components/ProofCard";
+import { useToast } from "@/components/Toast";
+
+const STEPS = [
+  { label: "Connect", description: "Connect wallet and create identity" },
+  { label: "Credential", description: "Self-issue KYC credential" },
+  { label: "ZK Proof", description: "Generate zero-knowledge proof" },
+  { label: "Mint", description: "KYC-gated token mint" },
+];
 
 export default function DemoPage() {
+  const { toast } = useToast();
+  const [currentStep, setCurrentStep] = useState(0);
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [proof, setProof] = useState<SemaphoreProof | null>(null);
-  const [generating, setGenerating] = useState(false);
-  const [minting, setMinting] = useState(false);
-  const [status, setStatus] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [loadingText, setLoadingText] = useState("");
   const [txHash, setTxHash] = useState("");
   const [balance, setBalance] = useState("0");
+  const [groupSize, setGroupSize] = useState(0);
+  const abortRef = useRef(false);
 
   useEffect(() => {
     const stored = loadIdentity();
-    if (stored) setIdentity(stored);
+    if (stored) {
+      setIdentity(stored);
+      setCompletedSteps(new Set([0]));
+      setCurrentStep(1);
+    }
   }, []);
 
-  useEffect(() => {
-    if (ADDRESSES.gatedRWA) checkBalance();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [txHash]);
-
-  async function checkBalance() {
-    if (!ADDRESSES.gatedRWA) return;
-    try {
-      const { signer } = await connectWallet();
-      const addr = await signer.getAddress();
-      const rwa = new Contract(ADDRESSES.gatedRWA, GATED_RWA_ABI, signer);
-      const bal = await rwa.balanceOf(addr);
-      setBalance((Number(bal) / 1e18).toString());
-    } catch {
-      // not connected yet
-    }
+  function completeStep(step: number) {
+    setCompletedSteps((prev) => new Set([...prev, step]));
+    setCurrentStep(step + 1);
   }
 
-  async function handleGenerateProof() {
-    if (!identity) {
-      setStatus("No identity found. Go to My Credentials first.");
-      return;
-    }
-
-    setGenerating(true);
-    setStatus("Fetching group members from chain...");
-
+  // Step 1: Connect & Create Identity
+  async function handleConnect() {
+    setLoading(true);
+    setLoadingText("Connecting wallet...");
     try {
-      const provider = new JsonRpcProvider(RPC_URL);
-      const semaphore = new Contract(
-        ADDRESSES.semaphore,
-        SEMAPHORE_ABI,
-        provider
-      );
+      await connectWallet();
+      setLoadingText("Sign the message in MetaMask to create your identity...");
+      const sig = await signMessage("HSK Passport: Generate my Semaphore identity");
+      const id = createIdentityFromSignature(sig);
+      setIdentity(id);
+      completeStep(0);
+      toast("Identity created! Your cryptographic fingerprint is ready.", "success");
+    } catch (err: unknown) {
+      const msg = (err as Error).message;
+      if (msg.includes("user rejected")) {
+        toast("Signature rejected. You need to sign to create your identity.", "error");
+      } else if (msg.includes("MetaMask")) {
+        toast("MetaMask not found. Please install MetaMask.", "error");
+      } else {
+        toast(`Connection failed: ${msg}`, "error");
+      }
+    }
+    setLoading(false);
+    setLoadingText("");
+  }
 
-      const groupId = GROUPS.KYC_VERIFIED;
-      const size = await semaphore.getMerkleTreeSize(groupId);
+  // Step 2: Self-issue credential via DemoIssuer
+  async function handleIssueCredential() {
+    if (!identity) return;
+    setLoading(true);
+    setLoadingText("Issuing KYC credential on-chain...");
+    try {
+      const { signer, address } = await connectWallet();
 
-      if (size === 0n) {
-        setStatus(
-          "KYC_VERIFIED group has no members. Ask an issuer to add your credential first."
-        );
-        setGenerating(false);
+      // Check if already claimed
+      const demoIssuer = new Contract(ADDRESSES.demoIssuer, DEMO_ISSUER_ABI, signer);
+      const alreadyClaimed = await demoIssuer.hasClaimed(address);
+      if (alreadyClaimed) {
+        completeStep(1);
+        toast("Credential already issued! Moving to proof generation.", "info");
+        setLoading(false);
+        setLoadingText("");
         return;
       }
 
-      // For the demo, we need the group members to reconstruct the Merkle tree.
-      // In production, this would come from an indexer or subgraph.
-      // For now, we'll use events to get the members.
-      setStatus("Reconstructing group Merkle tree...");
+      const commitment = getCommitment(identity);
+      const tx = await demoIssuer.selfIssue(commitment);
+      setLoadingText("Waiting for transaction confirmation...");
+      await tx.wait();
+      completeStep(1);
+      toast("KYC credential issued on-chain!", "success");
+    } catch (err: unknown) {
+      const msg = (err as Error).message;
+      if (msg.includes("AlreadyClaimed")) {
+        completeStep(1);
+        toast("Credential already issued!", "info");
+      } else if (msg.includes("user rejected")) {
+        toast("Transaction rejected.", "error");
+      } else if (msg.includes("insufficient")) {
+        toast("Insufficient HSK for gas. Get testnet HSK from the faucet.", "error");
+      } else {
+        toast(`Error: ${msg.slice(0, 100)}`, "error");
+      }
+    }
+    setLoading(false);
+    setLoadingText("");
+  }
 
-      // Get all CredentialIssued events for this group from HSKPassport
+  // Step 3: Generate ZK proof
+  async function handleGenerateProof() {
+    if (!identity) return;
+    setLoading(true);
+    abortRef.current = false;
+    setLoadingText("Fetching group members from chain...");
+    try {
+      const provider = new JsonRpcProvider(RPC_URL);
+      const groupId = GROUPS.KYC_VERIFIED;
+
+      // Get group members from events
       const passport = new Contract(
         ADDRESSES.hskPassport,
-        [
-          "event CredentialIssued(uint256 indexed groupId, uint256 indexed identityCommitment)",
-        ],
+        ["event CredentialIssued(uint256 indexed groupId, uint256 indexed identityCommitment)"],
         provider
       );
       const filter = passport.filters.CredentialIssued(groupId);
       const events = await passport.queryFilter(filter, 0, "latest");
-      const members = events.map((e) => {
-        const parsed = passport.interface.parseLog({
-          topics: [...e.topics],
-          data: e.data,
-        });
-        return parsed?.args?.identityCommitment as bigint;
-      }).filter((m): m is bigint => m !== undefined);
+      const members = events
+        .map((e) => {
+          const parsed = passport.interface.parseLog({ topics: [...e.topics], data: e.data });
+          return parsed?.args?.identityCommitment as bigint;
+        })
+        .filter((m): m is bigint => m !== undefined);
 
       if (members.length === 0) {
-        setStatus("Could not fetch group members. Try again.");
-        setGenerating(false);
+        toast("No members in group. Issue a credential first.", "error");
+        setLoading(false);
+        setLoadingText("");
         return;
       }
 
+      setGroupSize(members.length);
       const myCommitment = getCommitment(identity);
       if (!members.some((m) => m === myCommitment)) {
-        setStatus(
-          "Your identity is not in the KYC_VERIFIED group. Ask an issuer first."
-        );
-        setGenerating(false);
+        toast("Your identity is not in the KYC group. Issue a credential first.", "error");
+        setLoading(false);
+        setLoadingText("");
         return;
       }
 
-      setStatus("Generating zero-knowledge proof (this may take a moment)...");
+      setLoadingText("Generating Groth16 zero-knowledge proof (10-30 seconds)...");
 
-      const scope = groupId;
-      const message = 1; // "I am KYC verified"
-
-      const zkProof = await generateCredentialProof(
-        identity,
-        members,
-        message,
-        scope
+      // Timeout wrapper
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Proof generation timed out after 60 seconds")), 60000)
       );
 
-      setProof(zkProof);
-      setStatus("Proof generated! You can now mint the RWA token.");
-    } catch (err: unknown) {
-      setStatus(`Error: ${(err as Error).message}`);
-    }
+      const proofPromise = generateCredentialProof(identity, members, 1, groupId);
+      const zkProof = await Promise.race([proofPromise, timeoutPromise]);
 
-    setGenerating(false);
+      if (abortRef.current) return;
+
+      setProof(zkProof);
+      completeStep(2);
+      toast("Zero-knowledge proof generated!", "success");
+    } catch (err: unknown) {
+      const msg = (err as Error).message;
+      if (msg.includes("timed out")) {
+        toast("Proof generation timed out. Try again.", "error");
+      } else {
+        toast(`Proof error: ${msg.slice(0, 100)}`, "error");
+      }
+    }
+    setLoading(false);
+    setLoadingText("");
   }
 
-  async function handleKycMint() {
+  // Step 4: KYC-gated mint
+  async function handleMint() {
     if (!proof) return;
-    setMinting(true);
-    setStatus("Submitting proof to GatedRWA contract...");
-    setTxHash("");
-
+    setLoading(true);
+    setLoadingText("Submitting proof to GatedRWA contract...");
     try {
-      const { signer } = await connectWallet();
+      const { signer, address } = await connectWallet();
       const rwa = new Contract(ADDRESSES.gatedRWA, GATED_RWA_ABI, signer);
-
       const formattedProof = formatProofForContract(proof);
       const tx = await rwa.kycMint(formattedProof);
       setTxHash(tx.hash);
-      setStatus("Waiting for confirmation...");
+      setLoadingText("Waiting for confirmation...");
       await tx.wait();
-      setStatus("100 hSILVER tokens minted! KYC verified on-chain with zero personal data.");
-      await checkBalance();
+
+      const bal = await rwa.balanceOf(address);
+      setBalance((Number(bal) / 1e18).toString());
+      completeStep(3);
+      toast("100 hSILVER minted! KYC verified with zero personal data on-chain.", "success");
     } catch (err: unknown) {
       const msg = (err as Error).message;
       if (msg.includes("NullifierAlreadyUsed")) {
-        setStatus("You already minted with this proof. Each proof can only be used once.");
+        toast("Already minted with this proof. Each proof scope can only be used once.", "error");
+      } else if (msg.includes("user rejected")) {
+        toast("Transaction rejected.", "error");
       } else {
-        setStatus(`Error: ${msg}`);
+        toast(`Mint error: ${msg.slice(0, 100)}`, "error");
       }
     }
-
-    setMinting(false);
+    setLoading(false);
+    setLoadingText("");
   }
+
+  const stepHandlers = [handleConnect, handleIssueCredential, handleGenerateProof, handleMint];
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-12">
-      <h1 className="text-3xl font-bold mb-2">Demo: KYC-Gated RWA Token</h1>
+      <h1 className="text-3xl font-bold mb-2">Interactive Demo</h1>
       <p className="text-gray-400 mb-8">
-        Mint a HashKey Silver Token (hSILVER) by proving your KYC status with a
-        zero-knowledge proof. No personal data touches the blockchain.
+        Experience the full HSK Passport flow: create identity, get a KYC credential, generate a ZK proof, and mint a token — all in under a minute.
       </p>
 
-      <div className="space-y-6">
-        {/* Step 1: Identity */}
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-          <div className="flex items-center gap-3 mb-3">
+      <StepProgress steps={STEPS} currentStep={currentStep} completedSteps={completedSteps} />
+
+      <div className="space-y-4">
+        {STEPS.map((step, index) => {
+          const isActive = index === currentStep;
+          const isCompleted = completedSteps.has(index);
+          const isLocked = index > currentStep && !isCompleted;
+
+          return (
             <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                identity
-                  ? "bg-green-600 text-white"
-                  : "bg-gray-700 text-gray-400"
+              key={index}
+              className={`border rounded-xl p-6 transition-all duration-300 ${
+                isActive
+                  ? "bg-gray-900 border-purple-600 shadow-lg shadow-purple-900/20"
+                  : isCompleted
+                  ? "bg-gray-900/50 border-green-800/50"
+                  : "bg-gray-900/30 border-gray-800/50 opacity-60"
               }`}
             >
-              1
-            </div>
-            <h2 className="text-lg font-semibold">Identity</h2>
-          </div>
-          {identity ? (
-            <p className="text-sm text-green-400">
-              Identity loaded. Commitment:{" "}
-              <code className="text-xs">
-                {getCommitment(identity).toString().slice(0, 20)}...
-              </code>
-            </p>
-          ) : (
-            <p className="text-sm text-gray-400">
-              No identity found.{" "}
-              <a href="/user" className="text-purple-400 hover:text-purple-300">
-                Create one first
-              </a>
-              .
-            </p>
-          )}
-        </div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                      isCompleted
+                        ? "bg-green-600 text-white"
+                        : isActive
+                        ? "bg-purple-600 text-white"
+                        : "bg-gray-800 text-gray-500"
+                    }`}
+                  >
+                    {isCompleted ? (
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      index + 1
+                    )}
+                  </div>
+                  <h3 className="font-semibold">{step.label}</h3>
+                </div>
+                {isCompleted && <span className="text-xs text-green-400 font-medium">Complete</span>}
+              </div>
 
-        {/* Step 2: Generate Proof */}
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-          <div className="flex items-center gap-3 mb-3">
-            <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                proof
-                  ? "bg-green-600 text-white"
-                  : "bg-gray-700 text-gray-400"
-              }`}
-            >
-              2
-            </div>
-            <h2 className="text-lg font-semibold">Generate ZK Proof</h2>
-          </div>
-          <p className="text-sm text-gray-400 mb-4">
-            This generates a Groth16 zero-knowledge proof in your browser
-            proving you belong to the KYC_VERIFIED group, without revealing
-            which member you are.
-          </p>
-          <button
-            onClick={handleGenerateProof}
-            disabled={!identity || generating}
-            className="px-6 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
-          >
-            {generating ? "Generating..." : "Generate Proof"}
-          </button>
-          {proof && (
-            <div className="mt-4 p-3 bg-gray-800 rounded-lg">
-              <p className="text-xs text-gray-500 mb-1">Proof Preview</p>
-              <pre className="text-xs font-mono text-gray-400 overflow-x-auto">
-                {JSON.stringify(
-                  {
-                    merkleTreeDepth: proof.merkleTreeDepth,
-                    nullifier: proof.nullifier.toString().slice(0, 20) + "...",
-                    merkleTreeRoot:
-                      proof.merkleTreeRoot.toString().slice(0, 20) + "...",
-                  },
-                  null,
-                  2
-                )}
-              </pre>
-            </div>
-          )}
-        </div>
+              <p className="text-sm text-gray-400 mb-4">{getStepDescription(index)}</p>
 
-        {/* Step 3: Mint */}
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-          <div className="flex items-center gap-3 mb-3">
-            <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                txHash
-                  ? "bg-green-600 text-white"
-                  : "bg-gray-700 text-gray-400"
-              }`}
-            >
-              3
+              {/* Step-specific content */}
+              {index === 0 && isCompleted && identity && (
+                <div className="text-xs font-mono text-purple-300 bg-gray-800/50 rounded p-2 break-all">
+                  Commitment: {getCommitment(identity).toString().slice(0, 30)}...
+                </div>
+              )}
+
+              {index === 2 && proof && (
+                <ProofCard
+                  merkleTreeDepth={proof.merkleTreeDepth}
+                  nullifier={proof.nullifier.toString()}
+                  merkleTreeRoot={proof.merkleTreeRoot.toString()}
+                  groupSize={groupSize}
+                  groupName="KYC Verified"
+                />
+              )}
+
+              {index === 3 && txHash && (
+                <div className="mt-2">
+                  <p className="text-sm text-green-400 font-semibold mb-1">
+                    {balance} hSILVER minted!
+                  </p>
+                  <a
+                    href={`${EXPLORER_URL}/tx/${txHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-400 hover:text-purple-300 text-xs font-mono"
+                  >
+                    View on Explorer
+                  </a>
+                </div>
+              )}
+
+              {/* Action button */}
+              {isActive && !isCompleted && (
+                <button
+                  onClick={stepHandlers[index]}
+                  disabled={loading || isLocked}
+                  className="mt-2 px-6 py-2.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+                >
+                  {loading && (
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                  )}
+                  {loading ? loadingText || "Processing..." : getButtonLabel(index)}
+                </button>
+              )}
             </div>
-            <h2 className="text-lg font-semibold">Mint hSILVER Token</h2>
-          </div>
-          <p className="text-sm text-gray-400 mb-4">
-            Submit your ZK proof to the GatedRWA contract. It verifies
-            on-chain that you hold a valid KYC credential, then mints 100
-            hSILVER tokens to your wallet.
-          </p>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={handleKycMint}
-              disabled={!proof || minting}
-              className="px-6 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
-            >
-              {minting ? "Minting..." : "Mint with KYC Proof"}
-            </button>
-            <span className="text-sm text-gray-500">
-              Balance: <span className="text-white font-mono">{balance}</span>{" "}
-              hSILVER
-            </span>
-          </div>
-        </div>
+          );
+        })}
+      </div>
 
-        {/* Status */}
-        {status && (
-          <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 text-sm">
-            <p className="text-gray-300">{status}</p>
-            {txHash && (
-              <a
-                href={`${EXPLORER_URL}/tx/${txHash}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-purple-400 hover:text-purple-300 text-xs font-mono mt-1 block"
-              >
-                View on Explorer: {txHash.slice(0, 10)}...{txHash.slice(-8)}
-              </a>
-            )}
-          </div>
-        )}
-
-        {/* Explanation */}
-        <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6">
-          <h2 className="text-lg font-semibold mb-3">
+      {/* Explainer */}
+      {completedSteps.size === 4 && (
+        <div className="mt-8 bg-gradient-to-br from-green-900/30 to-gray-900 border border-green-800/50 rounded-xl p-6">
+          <h2 className="text-lg font-semibold text-green-400 mb-3">
             What Just Happened?
           </h2>
           <div className="text-sm text-gray-400 space-y-2">
             <p>
-              <strong className="text-gray-300">The contract verified:</strong>{" "}
-              &quot;This user belongs to the KYC_VERIFIED group&quot;
+              <strong className="text-gray-200">The contract verified:</strong> &quot;This user belongs to the KYC_VERIFIED group&quot;
             </p>
             <p>
-              <strong className="text-gray-300">
-                The contract did NOT learn:
-              </strong>{" "}
-              which specific member you are, your name, your address, your KYC
-              documents, or any personal information.
+              <strong className="text-gray-200">The contract did NOT learn:</strong> which member you are, your name, your wallet address as an identity, or any personal data.
             </p>
             <p>
-              <strong className="text-gray-300">How:</strong> A Groth16
-              zero-knowledge proof verified against the group&apos;s Merkle root
-              on-chain. The proof proves set membership without revealing the
-              member.
+              <strong className="text-gray-200">How:</strong> A Groth16 ZK proof verified against the group&apos;s Merkle root on-chain. The proof demonstrates set membership without revealing the member. Powered by Semaphore v4 on HashKey Chain.
             </p>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
+}
+
+function getStepDescription(step: number): string {
+  switch (step) {
+    case 0:
+      return "Connect your MetaMask wallet and sign a message to generate a deterministic Semaphore identity. Your private key never leaves the device.";
+    case 1:
+      return "The DemoIssuer contract adds your identity commitment to the KYC_VERIFIED group on-chain. In production, this would follow off-chain KYC verification by a trusted issuer.";
+    case 2:
+      return "Generate a Groth16 zero-knowledge proof in your browser via WASM. This proves you're a member of the KYC group without revealing which member you are.";
+    case 3:
+      return "Submit your ZK proof to the GatedRWA contract. It verifies on-chain that you hold a valid KYC credential, then mints 100 hSILVER tokens.";
+    default:
+      return "";
+  }
+}
+
+function getButtonLabel(step: number): string {
+  switch (step) {
+    case 0: return "Connect Wallet & Create Identity";
+    case 1: return "Issue Demo KYC Credential";
+    case 2: return "Generate Zero-Knowledge Proof";
+    case 3: return "Mint hSILVER with KYC Proof";
+    default: return "Continue";
+  }
 }

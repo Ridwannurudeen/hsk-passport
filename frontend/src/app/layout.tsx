@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
+import { ToastProviderWrapper } from "@/components/ToastWrapper";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -70,7 +71,9 @@ export default function RootLayout({
             </div>
           </div>
         </nav>
-        <main className="flex-1">{children}</main>
+        <main className="flex-1">
+          <ToastProviderWrapper>{children}</ToastProviderWrapper>
+        </main>
         <footer className="border-t border-gray-800 py-6 text-center text-xs text-gray-500">
           HSK Passport — Built for the HashKey Chain Horizon Hackathon 2026
         </footer>
