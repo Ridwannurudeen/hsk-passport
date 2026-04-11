@@ -1,0 +1,23 @@
+{
+  "name": "hsk-passport-contracts",
+  "version": "1.0.0",
+  "type": "commonjs",
+  "scripts": {
+    "compile": "hardhat compile",
+    "deploy": "hardhat run scripts/deploy.ts --network hashkey-testnet",
+    "test": "hardhat test"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "hardhat": "^2.22.0",
+    "typescript": "^5.5.0",
+    "ts-node": "^10.9.0"
+  },
+  "dependencies": {
+    "@semaphore-protocol/contracts": "^4.14.2",
+    "@semaphore-protocol/group": "^4.14.2",
+    "@semaphore-protocol/identity": "^4.14.2",
+    "@semaphore-protocol/proof": "^4.14.2",
+    "dotenv": "^16.4.0"
+  }
+}

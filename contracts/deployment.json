@@ -1,0 +1,10 @@
+{
+  "network": "hashkey-testnet",
+  "chainId": 133,
+  "deployer": "0x0b17f12848e1E6FDF666A87e29A346336d7450DF",
+  "semaphoreVerifier": "0xe874E5DE61fa40dAf82e8916489d1B7071aC3b9A",
+  "semaphore": "0xd09e8Aec6B6A36588E7A105f606A9fe9a134CFE9",
+  "hskPassport": "0x8D379176A95B962687e2edD8AF1f86e1280F4c3C",
+  "gatedRWA": "0xa36c64bb8E063042a0467Da12ed4cD51F71bAE59",
+  "groups": {}
+}
