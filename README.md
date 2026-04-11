@@ -4,6 +4,8 @@
 
 Built for the [HashKey Chain Horizon Hackathon 2026](https://dorahacks.io/hackathon/2045) — ZKID Track.
 
+**Live Demo**: [https://hskpassport.gudman.xyz](https://hskpassport.gudman.xyz)
+
 ## What is HSK Passport?
 
 HSK Passport enables zero-knowledge credential verification on HashKey Chain. Users prove they hold a KYC credential without revealing any personal information.
