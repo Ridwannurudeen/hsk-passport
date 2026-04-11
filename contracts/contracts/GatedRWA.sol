@@ -30,6 +30,7 @@ contract GatedRWA {
     error InvalidProof();
     error NullifierAlreadyUsed();
     error NotOwner();
+    error ProofNotBoundToCaller();
 
     constructor(ISemaphore _semaphore, uint256 _requiredGroupId, uint256 _mintAmount) {
         semaphore = _semaphore;
@@ -39,8 +40,11 @@ contract GatedRWA {
     }
 
     /// @notice Mint tokens by proving KYC credential via ZK proof
-    /// @param proof Semaphore proof proving membership in the required KYC group
+    /// @param proof Semaphore proof proving membership in the required KYC group.
+    ///        proof.message MUST equal uint256(uint160(msg.sender)) to prevent front-running.
     function kycMint(ISemaphore.SemaphoreProof calldata proof) external {
+        // Caller binding: proof must be generated with msg.sender as message
+        if (proof.message != uint256(uint160(msg.sender))) revert ProofNotBoundToCaller();
         if (usedNullifiers[proof.nullifier]) revert NullifierAlreadyUsed();
 
         bool valid = semaphore.verifyProof(requiredGroupId, proof);

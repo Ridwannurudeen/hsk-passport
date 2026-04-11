@@ -138,20 +138,36 @@ export default function DemoPage() {
       const provider = new JsonRpcProvider(RPC_URL);
       const groupId = GROUPS.KYC_VERIFIED;
 
-      // Get group members from events
-      const passport = new Contract(
+      // Get group members from events (revocation-aware)
+      const passportEvents = new Contract(
         ADDRESSES.hskPassport,
-        ["event CredentialIssued(uint256 indexed groupId, uint256 indexed identityCommitment)"],
+        [
+          "event CredentialIssued(uint256 indexed groupId, uint256 indexed identityCommitment)",
+          "event CredentialRevoked(uint256 indexed groupId, uint256 indexed identityCommitment)",
+        ],
         provider
       );
-      const filter = passport.filters.CredentialIssued(groupId);
-      const events = await passport.queryFilter(filter, 0, "latest");
-      const members = events
+
+      const issuedFilter = passportEvents.filters.CredentialIssued(groupId);
+      const revokedFilter = passportEvents.filters.CredentialRevoked(groupId);
+      const [issuedEvents, revokedEvents] = await Promise.all([
+        passportEvents.queryFilter(issuedFilter, 0, "latest"),
+        passportEvents.queryFilter(revokedFilter, 0, "latest"),
+      ]);
+
+      const revokedSet = new Set(
+        revokedEvents.map((e) => {
+          const parsed = passportEvents.interface.parseLog({ topics: [...e.topics], data: e.data });
+          return parsed?.args?.identityCommitment?.toString();
+        }).filter(Boolean)
+      );
+
+      const members = issuedEvents
         .map((e) => {
-          const parsed = passport.interface.parseLog({ topics: [...e.topics], data: e.data });
+          const parsed = passportEvents.interface.parseLog({ topics: [...e.topics], data: e.data });
           return parsed?.args?.identityCommitment as bigint;
         })
-        .filter((m): m is bigint => m !== undefined);
+        .filter((m): m is bigint => m !== undefined && !revokedSet.has(m.toString()));
 
       if (members.length === 0) {
         toast("No members in group. Issue a credential first.", "error");
@@ -169,6 +185,10 @@ export default function DemoPage() {
         return;
       }
 
+      // Bind proof to caller's address to prevent front-running
+      const { address: callerAddress } = await connectWallet();
+      const callerAsMessage = BigInt(callerAddress);
+
       setLoadingText("Generating Groth16 zero-knowledge proof (10-30 seconds)...");
 
       // Timeout wrapper
@@ -176,7 +196,7 @@ export default function DemoPage() {
         setTimeout(() => reject(new Error("Proof generation timed out after 60 seconds")), 60000)
       );
 
-      const proofPromise = generateCredentialProof(identity, members, 1, groupId);
+      const proofPromise = generateCredentialProof(identity, members, callerAsMessage, groupId);
       const zkProof = await Promise.race([proofPromise, timeoutPromise]);
 
       if (abortRef.current) return;

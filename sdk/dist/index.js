@@ -82,11 +82,22 @@ class HSKPassport {
         }
         return results;
     }
-    /** Get all group members by querying CredentialIssued events */
+    /** Get all active group members (revocation-aware) */
     async getGroupMembers(groupId) {
-        const filter = this.passportContract.filters.CredentialIssued(groupId);
-        const events = await this.passportContract.queryFilter(filter, 0, "latest");
-        return events
+        const issuedFilter = this.passportContract.filters.CredentialIssued(groupId);
+        const revokedFilter = this.passportContract.filters.CredentialRevoked(groupId);
+        const [issuedEvents, revokedEvents] = await Promise.all([
+            this.passportContract.queryFilter(issuedFilter, 0, "latest"),
+            this.passportContract.queryFilter(revokedFilter, 0, "latest"),
+        ]);
+        const revokedSet = new Set(revokedEvents.map((e) => {
+            const parsed = this.passportContract.interface.parseLog({
+                topics: [...e.topics],
+                data: e.data,
+            });
+            return parsed?.args?.identityCommitment?.toString();
+        }).filter(Boolean));
+        return issuedEvents
             .map((e) => {
             const parsed = this.passportContract.interface.parseLog({
                 topics: [...e.topics],
@@ -94,7 +105,7 @@ class HSKPassport {
             });
             return parsed?.args?.identityCommitment;
         })
-            .filter((m) => m !== undefined);
+            .filter((m) => m !== undefined && !revokedSet.has(m.toString()));
     }
     /**
      * Generate a zero-knowledge proof of credential ownership

@@ -31,13 +31,13 @@ contract HSKPassport {
     /// @dev groupId => identityCommitment => whether issued
     mapping(uint256 => mapping(uint256 => bool)) public credentials;
 
-    /// @dev address => whether it's an approved delegate (e.g., DemoIssuer contract)
-    mapping(address => bool) public approvedDelegates;
+    /// @dev groupId => delegate address => whether approved for that group
+    mapping(uint256 => mapping(address => bool)) public groupDelegates;
 
     event IssuerApproved(address indexed issuer);
     event IssuerRevoked(address indexed issuer);
-    event DelegateApproved(address indexed delegate);
-    event DelegateRevoked(address indexed delegate);
+    event DelegateApproved(uint256 indexed groupId, address indexed delegate);
+    event DelegateRevoked(uint256 indexed groupId, address indexed delegate);
     event CredentialGroupCreated(uint256 indexed groupId, string name, address indexed issuer, bytes32 schemaHash);
     event CredentialIssued(uint256 indexed groupId, uint256 indexed identityCommitment);
     event CredentialRevoked(uint256 indexed groupId, uint256 indexed identityCommitment);
@@ -61,7 +61,7 @@ contract HSKPassport {
     }
 
     modifier onlyGroupIssuerOrDelegate(uint256 groupId) {
-        if (credentialGroups[groupId].issuer != msg.sender && !approvedDelegates[msg.sender]) {
+        if (credentialGroups[groupId].issuer != msg.sender && !groupDelegates[groupId][msg.sender]) {
             revert NotGroupIssuerOrDelegate();
         }
         _;
@@ -86,21 +86,23 @@ contract HSKPassport {
         emit IssuerRevoked(issuer);
     }
 
-    /// @notice Approve a delegate contract (e.g., DemoIssuer) to issue credentials
-    function approveDelegate(address delegate) external onlyOwner {
-        approvedDelegates[delegate] = true;
-        emit DelegateApproved(delegate);
+    /// @notice Approve a delegate contract for a specific group (issuer-scoped)
+    /// @param groupId The group to grant delegation for
+    /// @param delegate The delegate address (e.g., DemoIssuer contract)
+    function approveDelegate(uint256 groupId, address delegate) external onlyGroupIssuerOrDelegate(groupId) {
+        groupDelegates[groupId][delegate] = true;
+        emit DelegateApproved(groupId, delegate);
     }
 
-    /// @notice Revoke a delegate's approval
-    function revokeDelegate(address delegate) external onlyOwner {
-        approvedDelegates[delegate] = false;
-        emit DelegateRevoked(delegate);
+    /// @notice Revoke a delegate's approval for a specific group
+    function revokeDelegate(uint256 groupId, address delegate) external onlyGroupIssuerOrDelegate(groupId) {
+        groupDelegates[groupId][delegate] = false;
+        emit DelegateRevoked(groupId, delegate);
     }
 
-    /// @notice Create a new credential group linked to a schema
+    /// @notice Create a new credential group, optionally linked to a schema
     /// @param name Human-readable name for the credential type
-    /// @param schemaHash The schema hash from CredentialRegistry (bytes32(0) if no schema)
+    /// @param schemaHash Schema hash from CredentialRegistry (use bytes32(0) for no schema)
     /// @return groupId The Semaphore group ID created
     function createCredentialGroup(string calldata name, bytes32 schemaHash) external onlyApprovedIssuer returns (uint256 groupId) {
         groupId = semaphore.createGroup(address(this));
@@ -116,23 +118,6 @@ contract HSKPassport {
 
         groupIds.push(groupId);
         emit CredentialGroupCreated(groupId, name, msg.sender, schemaHash);
-    }
-
-    /// @notice Create a new credential group without schema (backwards compatible)
-    function createCredentialGroup(string calldata name) external onlyApprovedIssuer returns (uint256 groupId) {
-        groupId = semaphore.createGroup(address(this));
-
-        credentialGroups[groupId] = CredentialGroup({
-            name: name,
-            groupId: groupId,
-            issuer: msg.sender,
-            memberCount: 0,
-            active: true,
-            schemaHash: bytes32(0)
-        });
-
-        groupIds.push(groupId);
-        emit CredentialGroupCreated(groupId, name, msg.sender, bytes32(0));
     }
 
     /// @notice Issue a credential to a user by adding their identity commitment to a group

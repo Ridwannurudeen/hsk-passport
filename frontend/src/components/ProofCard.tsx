@@ -38,10 +38,19 @@ export function ProofCard({ merkleTreeDepth, nullifier, merkleTreeRoot, groupSiz
       </div>
 
       <div className="mt-4 pt-3 border-t border-purple-800/50">
-        <p className="text-xs text-gray-400">
-          Your identity is hidden among <span className="text-purple-300 font-semibold">{groupSize}</span> members.
-          The verifier learns nothing about which member you are.
-        </p>
+        {groupSize < 5 ? (
+          <p className="text-xs text-yellow-400">
+            Anonymity set: <span className="font-semibold">{groupSize}</span> member{groupSize === 1 ? "" : "s"}.
+            {groupSize < 3
+              ? " Warning: anonymity set is too small for meaningful privacy. In production, groups should have 10+ members."
+              : " Note: small anonymity set. Privacy improves as more members join the group."}
+          </p>
+        ) : (
+          <p className="text-xs text-gray-400">
+            Anonymity set: <span className="text-purple-300 font-semibold">{groupSize}</span> members.
+            The verifier cannot determine which member generated this proof.
+          </p>
+        )}
       </div>
     </div>
   );

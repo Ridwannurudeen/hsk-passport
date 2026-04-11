@@ -30,7 +30,7 @@ interface IHSKPassport {
 
 contract MyDApp {
     IHSKPassport public passport;
-    uint256 public constant KYC_GROUP = 0; // KYC_VERIFIED
+    uint256 public constant KYC_GROUP = 15; // KYC_VERIFIED
 
     constructor(address _passport) {
         passport = IHSKPassport(_passport);
@@ -100,9 +100,15 @@ const tx = await myDApp.kycGatedFunction(proof);`}
               </span>
             </div>
             <div className="flex justify-between">
+              <span className="text-gray-400">CredentialRegistry</span>
+              <a href="https://hashkey-testnet.blockscout.com/address/0x20265dAe4711B3CeF88D7078bf1290f815279De1" target="_blank" rel="noopener noreferrer" className="font-mono text-purple-300 text-xs hover:text-purple-200">
+                0x2026...9De1
+              </a>
+            </div>
+            <div className="flex justify-between">
               <span className="text-gray-400">HSKPassport</span>
-              <a href="https://hashkey-testnet.blockscout.com/address/0x8D379176A95B962687e2edD8AF1f86e1280F4c3C" target="_blank" rel="noopener noreferrer" className="font-mono text-purple-300 text-xs hover:text-purple-200">
-                0x8D37...4c3C
+              <a href="https://hashkey-testnet.blockscout.com/address/0x79A0E1160FA829595f45f0479782095ed497d5E6" target="_blank" rel="noopener noreferrer" className="font-mono text-purple-300 text-xs hover:text-purple-200">
+                0x79A0...d5E6
               </a>
             </div>
             <div className="flex justify-between">
@@ -112,9 +118,15 @@ const tx = await myDApp.kycGatedFunction(proof);`}
               </a>
             </div>
             <div className="flex justify-between">
+              <span className="text-gray-400">DemoIssuer</span>
+              <a href="https://hashkey-testnet.blockscout.com/address/0xD6CB3393B9e1E162ed3EF8187082511d20Be28d1" target="_blank" rel="noopener noreferrer" className="font-mono text-purple-300 text-xs hover:text-purple-200">
+                0xD6CB...28d1
+              </a>
+            </div>
+            <div className="flex justify-between">
               <span className="text-gray-400">GatedRWA (hSILVER)</span>
-              <a href="https://hashkey-testnet.blockscout.com/address/0xa36c64bb8E063042a0467Da12ed4cD51F71bAE59" target="_blank" rel="noopener noreferrer" className="font-mono text-purple-300 text-xs hover:text-purple-200">
-                0xa36c...AE59
+              <a href="https://hashkey-testnet.blockscout.com/address/0xFc6bDE32f79ad43696abc6A2a6291bfA8AF1D249" target="_blank" rel="noopener noreferrer" className="font-mono text-purple-300 text-xs hover:text-purple-200">
+                0xFc6b...D249
               </a>
             </div>
           </div>
@@ -140,14 +152,14 @@ const tx = await myDApp.kycGatedFunction(proof);`}
               </thead>
               <tbody>
                 <tr className="border-b border-gray-800/50">
-                  <td className="px-6 py-3 font-mono text-purple-300">0</td>
+                  <td className="px-6 py-3 font-mono text-purple-300">15</td>
                   <td className="px-6 py-3 font-medium">KYC_VERIFIED</td>
                   <td className="px-6 py-3 text-gray-400">
                     User has passed standard KYC verification
                   </td>
                 </tr>
                 <tr className="border-b border-gray-800/50">
-                  <td className="px-6 py-3 font-mono text-purple-300">1</td>
+                  <td className="px-6 py-3 font-mono text-purple-300">16</td>
                   <td className="px-6 py-3 font-medium">
                     ACCREDITED_INVESTOR
                   </td>
@@ -156,7 +168,7 @@ const tx = await myDApp.kycGatedFunction(proof);`}
                   </td>
                 </tr>
                 <tr>
-                  <td className="px-6 py-3 font-mono text-purple-300">2</td>
+                  <td className="px-6 py-3 font-mono text-purple-300">17</td>
                   <td className="px-6 py-3 font-medium">HK_RESIDENT</td>
                   <td className="px-6 py-3 text-gray-400">
                     User is a Hong Kong resident

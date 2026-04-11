@@ -78,7 +78,7 @@ describe("HSK Passport Protocol", function () {
 
   describe("HSKPassport — Group Management", function () {
     it("should create a credential group", async function () {
-      await passport["createCredentialGroup(string)"]("KYC_VERIFIED");
+      await passport.createCredentialGroup("KYC_VERIFIED", ethers.ZeroHash);
       const group = await passport.credentialGroups(KYC_GROUP);
       expect(group.name).to.equal("KYC_VERIFIED");
       expect(group.active).to.be.true;
@@ -91,7 +91,7 @@ describe("HSK Passport Protocol", function () {
 
     it("should reject non-issuer group creation", async function () {
       await expect(
-        passport.connect(user1)["createCredentialGroup(string)"]("INVALID")
+        passport.connect(user1).createCredentialGroup("INVALID", ethers.ZeroHash)
       ).to.be.revertedWithCustomError(passport, "NotApprovedIssuer");
     });
   });
@@ -128,19 +128,19 @@ describe("HSK Passport Protocol", function () {
   });
 
   describe("HSKPassport — Delegate System", function () {
-    it("should approve a delegate", async function () {
-      await passport.approveDelegate(user1.address);
-      expect(await passport.approvedDelegates(user1.address)).to.be.true;
+    it("should approve a delegate for a specific group", async function () {
+      await passport.approveDelegate(KYC_GROUP, user1.address);
+      expect(await passport.groupDelegates(KYC_GROUP, user1.address)).to.be.true;
     });
 
-    it("should allow delegate to issue credentials", async function () {
+    it("should allow delegate to issue credentials on approved group", async function () {
       const id = new Identity("delegate-test");
       await passport.connect(user1).issueCredential(KYC_GROUP, id.commitment);
       expect(await passport.hasCredential(KYC_GROUP, id.commitment)).to.be.true;
     });
 
-    it("should revoke delegate access", async function () {
-      await passport.revokeDelegate(user1.address);
+    it("should revoke delegate access for a group", async function () {
+      await passport.revokeDelegate(KYC_GROUP, user1.address);
       const id = new Identity("delegate-revoked");
       await expect(
         passport.connect(user1).issueCredential(KYC_GROUP, id.commitment)
@@ -222,8 +222,8 @@ describe("HSK Passport Protocol", function () {
       const DemoIssuer = await ethers.getContractFactory("DemoIssuer");
       demoIssuer = await DemoIssuer.deploy(await passport.getAddress(), KYC_GROUP);
 
-      // Approve DemoIssuer as delegate
-      await passport.approveDelegate(await demoIssuer.getAddress());
+      // Approve DemoIssuer as delegate for KYC_GROUP
+      await passport.approveDelegate(KYC_GROUP, await demoIssuer.getAddress());
     });
 
     it("should self-issue a credential", async function () {
@@ -243,7 +243,9 @@ describe("HSK Passport Protocol", function () {
     });
   });
 
-  describe("GatedRWA", function () {
+  describe("GatedRWA — Caller-Bound Proof Mint", function () {
+    const mintIdentity = new Identity("gated-rwa-minter");
+
     before(async function () {
       const GatedRWA = await ethers.getContractFactory("GatedRWA");
       gatedRWA = await GatedRWA.deploy(
@@ -251,12 +253,136 @@ describe("HSK Passport Protocol", function () {
         KYC_GROUP,
         ethers.parseEther("100")
       );
+
+      // Issue credential if not already
+      const hasCred = await passport.hasCredential(KYC_GROUP, mintIdentity.commitment);
+      if (!hasCred) {
+        await passport.issueCredential(KYC_GROUP, mintIdentity.commitment);
+      }
     });
 
     it("should have correct config", async function () {
       expect(await gatedRWA.name()).to.equal("HashKey Silver Token");
       expect(await gatedRWA.symbol()).to.equal("hSILVER");
       expect(await gatedRWA.requiredGroupId()).to.equal(KYC_GROUP);
+    });
+
+    it("should mint with caller-bound proof", async function () {
+      this.timeout(120000);
+
+      const filter = passport.filters.CredentialIssued(KYC_GROUP);
+      const events = await passport.queryFilter(filter);
+      const members = events.map((e: any) => {
+        const parsed = passport.interface.parseLog({ topics: [...e.topics], data: e.data });
+        return parsed?.args?.identityCommitment;
+      }).filter(Boolean);
+
+      const group = new Group();
+      for (const m of members) group.addMember(m);
+
+      // Bind proof to owner's address
+      const callerAddr = BigInt(owner.address);
+      const proof = await generateProof(mintIdentity, group, callerAddr, 99);
+
+      await gatedRWA.kycMint({
+        merkleTreeDepth: proof.merkleTreeDepth,
+        merkleTreeRoot: proof.merkleTreeRoot,
+        nullifier: proof.nullifier,
+        message: proof.message,
+        scope: proof.scope,
+        points: proof.points,
+      });
+
+      expect(await gatedRWA.balanceOf(owner.address)).to.equal(ethers.parseEther("100"));
+      expect(await gatedRWA.totalSupply()).to.equal(ethers.parseEther("100"));
+    });
+
+    it("should reject proof bound to different address", async function () {
+      this.timeout(120000);
+
+      const filter = passport.filters.CredentialIssued(KYC_GROUP);
+      const events = await passport.queryFilter(filter);
+      const members = events.map((e: any) => {
+        const parsed = passport.interface.parseLog({ topics: [...e.topics], data: e.data });
+        return parsed?.args?.identityCommitment;
+      }).filter(Boolean);
+
+      const group = new Group();
+      for (const m of members) group.addMember(m);
+
+      // Proof bound to user1's address, but submitted by user2
+      const proof = await generateProof(mintIdentity, group, BigInt(user1.address), 100);
+
+      await expect(
+        gatedRWA.connect(user2).kycMint({
+          merkleTreeDepth: proof.merkleTreeDepth,
+          merkleTreeRoot: proof.merkleTreeRoot,
+          nullifier: proof.nullifier,
+          message: proof.message,
+          scope: proof.scope,
+          points: proof.points,
+        })
+      ).to.be.revertedWithCustomError(gatedRWA, "ProofNotBoundToCaller");
+    });
+
+    it("should reject reused nullifier", async function () {
+      this.timeout(120000);
+
+      const filter = passport.filters.CredentialIssued(KYC_GROUP);
+      const events = await passport.queryFilter(filter);
+      const members = events.map((e: any) => {
+        const parsed = passport.interface.parseLog({ topics: [...e.topics], data: e.data });
+        return parsed?.args?.identityCommitment;
+      }).filter(Boolean);
+
+      const group = new Group();
+      for (const m of members) group.addMember(m);
+
+      // Same scope=99 as first successful mint → same nullifier
+      const proof = await generateProof(mintIdentity, group, BigInt(owner.address), 99);
+
+      await expect(
+        gatedRWA.kycMint({
+          merkleTreeDepth: proof.merkleTreeDepth,
+          merkleTreeRoot: proof.merkleTreeRoot,
+          nullifier: proof.nullifier,
+          message: proof.message,
+          scope: proof.scope,
+          points: proof.points,
+        })
+      ).to.be.revertedWithCustomError(gatedRWA, "NullifierAlreadyUsed");
+    });
+  });
+
+  describe("Per-Group Delegate Isolation", function () {
+    let secondGroup: number;
+
+    before(async function () {
+      const tx = await passport.createCredentialGroup("SECOND_GROUP", ethers.ZeroHash);
+      const receipt = await tx.wait();
+      // Group counter increments
+      secondGroup = Number(await passport.getGroupCount()) - 1;
+    });
+
+    it("should allow delegate on approved group only", async function () {
+      // Approve user1 as delegate for KYC_GROUP only
+      await passport.approveDelegate(KYC_GROUP, user1.address);
+      expect(await passport.groupDelegates(KYC_GROUP, user1.address)).to.be.true;
+
+      // user1 can issue on KYC_GROUP
+      const id = new Identity("per-group-delegate-test");
+      await passport.connect(user1).issueCredential(KYC_GROUP, id.commitment);
+      expect(await passport.hasCredential(KYC_GROUP, id.commitment)).to.be.true;
+    });
+
+    it("should reject delegate on non-approved group", async function () {
+      // user1 is NOT delegate for secondGroup
+      expect(await passport.groupDelegates(secondGroup, user1.address)).to.be.false;
+
+      const id = new Identity("isolation-test");
+      await expect(
+        passport.connect(user1).issueCredential(secondGroup, id.commitment)
+      ).to.be.revertedWithCustomError(passport, "NotGroupIssuerOrDelegate");
     });
   });
 });
