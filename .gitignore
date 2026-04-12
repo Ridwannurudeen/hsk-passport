@@ -9,3 +9,8 @@ out/
 .DS_Store
 frontend/CLAUDE.md
 frontend/AGENTS.md
+backend/node_modules/
+backend/dist/
+backend/*.db
+backend/*.db-wal
+backend/*.db-shm
