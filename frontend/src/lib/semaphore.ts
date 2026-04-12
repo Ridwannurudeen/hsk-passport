@@ -33,6 +33,27 @@ function getMerkleDepth(memberCount: number): number {
   return Math.max(1, Math.ceil(Math.log2(memberCount)));
 }
 
+// Cache artifacts across calls
+const artifactCache = new Map<number, { wasm: Uint8Array; zkey: Uint8Array }>();
+
+async function fetchArtifacts(depth: number): Promise<{ wasm: Uint8Array; zkey: Uint8Array }> {
+  if (artifactCache.has(depth)) return artifactCache.get(depth)!;
+
+  const [wasmRes, zkeyRes] = await Promise.all([
+    fetch(`/semaphore/semaphore-${depth}.wasm`),
+    fetch(`/semaphore/semaphore-${depth}.zkey`),
+  ]);
+
+  if (!wasmRes.ok) throw new Error(`Failed to load WASM: ${wasmRes.status}`);
+  if (!zkeyRes.ok) throw new Error(`Failed to load zkey: ${zkeyRes.status}`);
+
+  const wasm = new Uint8Array(await wasmRes.arrayBuffer());
+  const zkey = new Uint8Array(await zkeyRes.arrayBuffer());
+
+  artifactCache.set(depth, { wasm, zkey });
+  return { wasm, zkey };
+}
+
 export async function generateCredentialProof(
   identity: Identity,
   memberCommitments: bigint[],
@@ -44,19 +65,18 @@ export async function generateCredentialProof(
     group.addMember(commitment);
   }
 
-  // Use self-hosted artifacts to avoid external CDN fetch failures.
-  // We host artifacts for depths 1-12 in /public/semaphore/.
-  // Pick the smallest available depth >= needed.
   const needed = getMerkleDepth(memberCommitments.length);
   const available = [1, 2, 3, 4, 5, 6, 8, 10, 12];
   const depth = available.find((d) => d >= needed) ?? 12;
 
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  // Fetch artifacts as Uint8Array and pass them directly.
+  // This bypasses snarkjs/fastfile's process.browser check which fails in Next.js.
+  const { wasm, zkey } = await fetchArtifacts(depth);
 
-  const proof = await generateProof(identity, group, message, scope, depth, {
-    wasm: `${origin}/semaphore/semaphore-${depth}.wasm`,
-    zkey: `${origin}/semaphore/semaphore-${depth}.zkey`,
-  });
+  // The SnarkArtifacts type says string, but fastfile accepts Uint8Array at runtime.
+  // This is the only path that works in Next.js (bypasses broken process.browser check).
+  const artifacts = { wasm, zkey } as unknown as { wasm: string; zkey: string };
+  const proof = await generateProof(identity, group, message, scope, depth, artifacts);
   return proof;
 }
 
