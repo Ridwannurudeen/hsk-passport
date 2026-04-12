@@ -73,8 +73,9 @@ async function tryAutoApprove(wallet: Wallet, req: KYCRow) {
 }
 
 export function startAutoIssuer() {
-  const wallet = getIssuerWallet();
-  if (!wallet) return;
+  const walletOrNull = getIssuerWallet();
+  if (!walletOrNull) return;
+  const wallet: Wallet = walletOrNull;
 
   console.log(`[auto-issuer] Started. Approving wallet: ${wallet.address}`);
 
