@@ -1,26 +1,58 @@
 {
   "name": "@hsk-passport/sdk",
   "version": "1.0.0",
-  "description": "SDK for HSK Passport — privacy-preserving ZK credentials on HashKey Chain",
+  "description": "TypeScript SDK for HSK Passport — privacy-preserving ZK credentials on HashKey Chain. Add KYC verification to your dApp without exposing personal data on-chain.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
   ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "default": "./dist/react.js"
+    }
+  },
   "scripts": {
     "build": "tsc",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Ridwannurudeen/hsk-passport.git",
+    "directory": "sdk"
+  },
+  "homepage": "https://hskpassport.gudman.xyz",
+  "bugs": {
+    "url": "https://github.com/Ridwannurudeen/hsk-passport/issues"
   },
   "keywords": [
     "zk",
     "zero-knowledge",
+    "zkp",
     "credentials",
-    "hashkey",
-    "semaphore",
+    "kyc",
     "privacy",
-    "kyc"
+    "hashkey",
+    "hashkey-chain",
+    "semaphore",
+    "groth16",
+    "ethereum",
+    "compliance",
+    "rwa",
+    "identity",
+    "verifiable-credentials"
   ],
   "license": "MIT",
+  "author": "HSK Passport Team",
   "dependencies": {
     "@semaphore-protocol/group": "^4.14.2",
     "@semaphore-protocol/identity": "^4.14.2",
