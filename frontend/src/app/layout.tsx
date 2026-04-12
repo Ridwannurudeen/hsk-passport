@@ -38,12 +38,13 @@ export default function RootLayout({
                 <Link href="/" className="text-xl font-bold text-white">
                   HSK<span className="text-purple-400">Passport</span>
                 </Link>
-                <div className="hidden sm:flex items-center gap-6">
+                <div className="hidden md:flex items-center gap-5">
                   <Link href="/kyc" className="text-sm text-gray-400 hover:text-white transition-colors">Get Verified</Link>
+                  <Link href="/bridge" className="text-sm text-gray-400 hover:text-white transition-colors">Bridge</Link>
                   <Link href="/ecosystem" className="text-sm text-gray-400 hover:text-white transition-colors">Ecosystem</Link>
                   <Link href="/demo" className="text-sm text-gray-400 hover:text-white transition-colors">Demo</Link>
                   <Link href="/developers" className="text-sm text-gray-400 hover:text-white transition-colors">Developers</Link>
-                  <Link href="/issuer" className="text-sm text-gray-400 hover:text-white transition-colors">Issuer</Link>
+                  <Link href="/governance" className="text-sm text-gray-400 hover:text-white transition-colors">Governance</Link>
                 </div>
               </div>
               <div className="text-xs text-gray-500 font-mono">

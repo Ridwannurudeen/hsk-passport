@@ -1,0 +1,19 @@
+{
+  "credentialExpiry": "0x11fF27Bf3F0Bbf45a5dC43210359c56E45E97770",
+  "credentialReputation": "0x39cc2a483Cc22Cf7B461759404642Fa528df96D7",
+  "jurisdictionSetVerifier": "0x12B644146d1c227a6FD34423dAAa6D37427AbE13",
+  "jurisdictionGatedPool": "0x38284a274c1999e5271e62f63e5e443B9A1fc1dc",
+  "mockHashKeyDID": "0x398684D25337BB0DF1B03f3A1f7b0deA7654F8f5",
+  "hashKeyDIDBridge": "0x37e855626a5cF51e808F96efe4455Dc225724472",
+  "mockKYCSoulbound": "0xfC981C8F4Ca8592f7f73d84f02fB3344f6e09eBf",
+  "hashKeyKYCImporter": "0x01fF7BFba82820a2595467a554678DB672eEa54f",
+  "issuerRegistry": "0x79682C30670f374BD13F40C78c828a32F47582b3",
+  "timelock": "0x27a145f5Ed0332Bb8a3D82Bf4B95A33B39523ef6",
+  "groups": {
+    "KYC_VERIFIED": 15,
+    "ACCREDITED_INVESTOR": 16,
+    "HK_RESIDENT": 17,
+    "SG_RESIDENT": 18,
+    "AE_RESIDENT": 19
+  }
+}

@@ -53,6 +53,17 @@ const APPS: EcosystemApp[] = [
     action: "borrowAccredited(amount, proof)",
     color: "from-green-900 to-emerald-700",
   },
+  {
+    name: "Multi-Jurisdiction Pool",
+    symbol: "—",
+    tag: "Selective Disclosure",
+    description: "Users from ANY of [HK, SG, AE] can deposit. The pool doesn't learn which jurisdiction — only that it's in the allowed set. Demonstrates privacy-preserving jurisdiction filtering.",
+    address: ADDRESSES.jurisdictionGatedPool,
+    requiredCredential: "HK, SG, or AE Resident",
+    requiredGroupId: GROUPS.HK_RESIDENT,
+    action: "deposit(proof)",
+    color: "from-blue-900 to-cyan-700",
+  },
 ];
 
 export default function EcosystemPage() {
