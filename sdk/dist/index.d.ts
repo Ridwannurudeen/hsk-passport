@@ -67,6 +67,7 @@ export declare class HSKPassport {
             readonly demoIssuer: "0xD6CB3393B9e1E162ed3EF8187082511d20Be28d1";
             readonly gatedRWA: "0xFc6bDE32f79ad43696abc6A2a6291bfA8AF1D249";
         };
+        readonly deployBlock: 26371173;
         readonly groups: {
             readonly KYC_VERIFIED: 15;
             readonly ACCREDITED_INVESTOR: 16;

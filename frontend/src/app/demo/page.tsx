@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import * as ethers from "ethers";
 import { Contract, JsonRpcProvider } from "ethers";
 import { connectWallet, signMessage } from "@/lib/wallet";
 import {
@@ -19,6 +20,7 @@ import {
   GROUPS,
   RPC_URL,
   EXPLORER_URL,
+  HSK_PASSPORT_DEPLOY_BLOCK,
 } from "@/lib/contracts";
 import { StepProgress } from "@/components/StepProgress";
 import { ProofCard } from "@/components/ProofCard";
@@ -140,7 +142,9 @@ export default function DemoPage() {
       const provider = new JsonRpcProvider(RPC_URL);
       const groupId = GROUPS.KYC_VERIFIED;
 
-      // Get group members from events (revocation-aware)
+      // Get group members from events (revocation-aware).
+      // Query from the contract deployment block to avoid RPC timeouts on full-range scans.
+      // Chunk into 5000-block ranges as fallback for stricter RPCs.
       const passportEvents = new Contract(
         ADDRESSES.hskPassport,
         [
@@ -152,9 +156,28 @@ export default function DemoPage() {
 
       const issuedFilter = passportEvents.filters.CredentialIssued(groupId);
       const revokedFilter = passportEvents.filters.CredentialRevoked(groupId);
+      const latestBlock = await provider.getBlockNumber();
+
+      async function queryChunked(filter: ethers.DeferredTopicFilter): Promise<ethers.EventLog[] | ethers.Log[]> {
+        // Try one shot first
+        try {
+          return await passportEvents.queryFilter(filter, HSK_PASSPORT_DEPLOY_BLOCK, latestBlock);
+        } catch {
+          // Fallback: chunk queries in 5000-block ranges
+          const chunkSize = 5000;
+          const results: (ethers.EventLog | ethers.Log)[] = [];
+          for (let from = HSK_PASSPORT_DEPLOY_BLOCK; from <= latestBlock; from += chunkSize) {
+            const to = Math.min(from + chunkSize - 1, latestBlock);
+            const chunk = await passportEvents.queryFilter(filter, from, to);
+            results.push(...chunk);
+          }
+          return results;
+        }
+      }
+
       const [issuedEvents, revokedEvents] = await Promise.all([
-        passportEvents.queryFilter(issuedFilter, 0, "latest"),
-        passportEvents.queryFilter(revokedFilter, 0, "latest"),
+        queryChunked(issuedFilter),
+        queryChunked(revokedFilter),
       ]);
 
       const revokedSet = new Set(

@@ -138,10 +138,11 @@ export class HSKPassport {
   async getGroupMembers(groupId: number): Promise<bigint[]> {
     const issuedFilter = this.passportContract.filters.CredentialIssued(groupId);
     const revokedFilter = this.passportContract.filters.CredentialRevoked(groupId);
+    const fromBlock = DEPLOYMENTS[this.network].deployBlock;
 
     const [issuedEvents, revokedEvents] = await Promise.all([
-      this.passportContract.queryFilter(issuedFilter, 0, "latest"),
-      this.passportContract.queryFilter(revokedFilter, 0, "latest"),
+      this.passportContract.queryFilter(issuedFilter, fromBlock, "latest"),
+      this.passportContract.queryFilter(revokedFilter, fromBlock, "latest"),
     ]);
 
     const revokedSet = new Set(

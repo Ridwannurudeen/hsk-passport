@@ -14,6 +14,7 @@ exports.DEPLOYMENTS = {
             demoIssuer: "0xD6CB3393B9e1E162ed3EF8187082511d20Be28d1",
             gatedRWA: "0xFc6bDE32f79ad43696abc6A2a6291bfA8AF1D249",
         },
+        deployBlock: 26371173,
         groups: {
             KYC_VERIFIED: 15,
             ACCREDITED_INVESTOR: 16,

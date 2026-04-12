@@ -11,6 +11,10 @@ export const ADDRESSES = {
   gatedRWA: "0xFc6bDE32f79ad43696abc6A2a6291bfA8AF1D249",
 };
 
+// Block where HSKPassport was deployed — use as fromBlock for event queries
+// to avoid expensive full-range scans that cause RPC timeouts.
+export const HSK_PASSPORT_DEPLOY_BLOCK = 26371173;
+
 export const GROUPS = {
   KYC_VERIFIED: 15,
   ACCREDITED_INVESTOR: 16,
