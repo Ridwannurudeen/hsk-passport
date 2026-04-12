@@ -84,6 +84,11 @@ export const GATED_RWA_ABI = [
   "function transfer(address to, uint256 value) returns (bool)",
   "event Transfer(address indexed from, address indexed to, uint256 value)",
   "event KYCMint(address indexed to, uint256 amount, uint256 nullifier)",
+  // Custom errors — required for ethers to decode reverts
+  "error InvalidProof()",
+  "error NullifierAlreadyUsed()",
+  "error NotOwner()",
+  "error ProofNotBoundToCaller()",
 ] as const;
 
 export const DEMO_ISSUER_ABI = [

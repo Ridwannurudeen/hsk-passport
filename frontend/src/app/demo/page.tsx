@@ -57,6 +57,22 @@ export default function DemoPage() {
       setCompletedSteps(new Set([0]));
       setCurrentStep(1);
     }
+
+    // Check if user already has a hSILVER balance (means they already minted)
+    (async () => {
+      try {
+        if (typeof window === "undefined" || !window.ethereum) return;
+        const { signer, address } = await connectWallet();
+        const rwa = new Contract(ADDRESSES.gatedRWA, GATED_RWA_ABI, signer);
+        const bal = await rwa.balanceOf(address);
+        const balFloat = Number(bal) / 1e18;
+        if (balFloat > 0) {
+          setBalance(balFloat.toString());
+        }
+      } catch {
+        // ignore — user may not be connected
+      }
+    })();
   }, []);
 
   function completeStep(step: number) {
@@ -233,10 +249,25 @@ export default function DemoPage() {
   async function handleMint() {
     if (!proof) return;
     setLoading(true);
-    setLoadingText("Submitting proof to GatedRWA contract...");
+    setLoadingText("Checking if you've already minted...");
     try {
       const { signer, address } = await connectWallet();
       const rwa = new Contract(ADDRESSES.gatedRWA, GATED_RWA_ABI, signer);
+
+      // Pre-flight check: has this nullifier already been used?
+      const alreadyUsed = await rwa.usedNullifiers(proof.nullifier);
+      if (alreadyUsed) {
+        const bal = await rwa.balanceOf(address);
+        const balHSK = Number(bal) / 1e18;
+        setBalance(balHSK.toString());
+        completeStep(3); // mark as done — they already minted
+        toast(`Already minted — you hold ${balHSK} hSILVER. One credential = one mint.`, "info");
+        setLoading(false);
+        setLoadingText("");
+        return;
+      }
+
+      setLoadingText("Submitting proof to GatedRWA contract...");
       const formattedProof = formatProofForContract(proof);
       const tx = await rwa.kycMint(formattedProof);
       setTxHash(tx.hash);
@@ -248,13 +279,26 @@ export default function DemoPage() {
       completeStep(3);
       toast("100 hSILVER minted! KYC verified with zero personal data on-chain.", "success");
     } catch (err: unknown) {
-      const msg = (err as Error).message;
-      if (msg.includes("NullifierAlreadyUsed")) {
-        toast("Already minted with this proof. Each proof scope can only be used once.", "error");
-      } else if (msg.includes("user rejected")) {
-        toast("Transaction rejected.", "error");
+      const e = err as { code?: string; shortMessage?: string; message?: string; reason?: string; data?: string };
+      const msg = (e.shortMessage || e.reason || e.message || "").toString();
+      console.error("[demo] mint error:", err);
+
+      // Decode custom error from raw data if present
+      const raw = typeof e.data === "string" ? e.data : "";
+
+      if (msg.includes("NullifierAlreadyUsed") || raw.startsWith("0xcad2ae02")) {
+        toast("You've already minted with this credential. One credential = one mint.", "info");
+        completeStep(3); // advance so the user isn't stuck
+      } else if (msg.includes("ProofNotBoundToCaller") || raw.startsWith("0xecd29ac3")) {
+        toast("Proof was bound to a different wallet. Regenerate proof with current wallet.", "error");
+      } else if (msg.includes("InvalidProof") || raw.startsWith("0x09bde339")) {
+        toast("Proof verification failed on-chain. Regenerate the proof.", "error");
+      } else if (msg.includes("user rejected") || e.code === "ACTION_REJECTED") {
+        toast("Transaction cancelled.", "info");
+      } else if (msg.includes("insufficient")) {
+        toast("Insufficient HSK for gas. Fund wallet from faucet.", "error");
       } else {
-        toast(`Mint error: ${msg.slice(0, 100)}`, "error");
+        toast(`Mint error: ${msg.slice(0, 150)}`, "error");
       }
     }
     setLoading(false);
@@ -266,9 +310,39 @@ export default function DemoPage() {
   return (
     <div className="max-w-3xl mx-auto px-4 py-12">
       <h1 className="text-3xl font-bold mb-2">Interactive Demo</h1>
-      <p className="text-gray-400 mb-8">
+      <p className="text-gray-400 mb-6">
         Experience the full HSK Passport flow: create identity, get a KYC credential, generate a ZK proof, and mint a token — all in under a minute.
       </p>
+
+      {/* Balance banner — shown if user already minted */}
+      {Number(balance) > 0 && (
+        <div className="mb-6 bg-gradient-to-br from-green-950/40 to-gray-900 border border-green-800/50 rounded-xl p-4 text-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-green-400 font-semibold">✓ You already hold {balance} hSILVER</div>
+              <div className="text-xs text-gray-400 mt-1">
+                One credential = one mint. Each Semaphore identity can only mint once (nullifier tracked on-chain).
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <a
+                href={`${EXPLORER_URL}/address/${ADDRESSES.gatedRWA}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-xs text-white rounded"
+              >
+                View Contract
+              </a>
+              <a
+                href="/ecosystem"
+                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-xs text-white rounded text-center"
+              >
+                Try Other dApps
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
 
       <StepProgress steps={STEPS} currentStep={currentStep} completedSteps={completedSteps} />
 
