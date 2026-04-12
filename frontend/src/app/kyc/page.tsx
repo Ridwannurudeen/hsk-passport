@@ -635,33 +635,176 @@ export default function KYCPage() {
 
       {/* Stage 6: Submitted */}
       {stage === "submitted" && kycStatus && (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center">
-              <div className="w-3 h-3 rounded-full bg-yellow-400 animate-pulse" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold">
-                {kycStatus.status === "approved" ? "Approved!" : kycStatus.status === "rejected" ? "Rejected" : "Under Review"}
-              </h2>
-              <p className="text-xs text-gray-500">Submitted {new Date(kycStatus.submitted_at).toLocaleString()}</p>
-            </div>
-          </div>
-
-          <dl className="space-y-2 text-sm mb-6">
-            <div className="flex justify-between"><dt className="text-gray-500">Request ID</dt><dd className="font-mono text-xs">{kycStatus.id?.slice(0, 8)}...</dd></div>
-            <div className="flex justify-between"><dt className="text-gray-500">Credential</dt><dd>{kycStatus.credential_type}</dd></div>
-            <div className="flex justify-between"><dt className="text-gray-500">Jurisdiction</dt><dd>{kycStatus.jurisdiction}</dd></div>
-          </dl>
-
-          <button
-            onClick={() => identity && checkStatus(identity)}
-            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm rounded-lg"
-          >
-            Check Status
-          </button>
-        </div>
+        <SubmittedView
+          kycStatus={kycStatus}
+          onRefresh={() => identity && checkStatus(identity)}
+        />
       )}
+    </div>
+  );
+}
+
+function SubmittedView({
+  kycStatus,
+  onRefresh,
+}: {
+  kycStatus: KYCRequest;
+  onRefresh: () => void;
+}) {
+  const [secondsElapsed, setSecondsElapsed] = useState(
+    Math.floor((Date.now() - kycStatus.submitted_at) / 1000)
+  );
+
+  // Auto-poll every 5 seconds while pending
+  useEffect(() => {
+    if (kycStatus.status !== "pending") return;
+    const interval = setInterval(() => {
+      onRefresh();
+      setSecondsElapsed(Math.floor((Date.now() - kycStatus.submitted_at) / 1000));
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [kycStatus.status, kycStatus.submitted_at, onRefresh]);
+
+  // Update elapsed timer every second
+  useEffect(() => {
+    if (kycStatus.status !== "pending") return;
+    const timer = setInterval(() => {
+      setSecondsElapsed(Math.floor((Date.now() - kycStatus.submitted_at) / 1000));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [kycStatus.status, kycStatus.submitted_at]);
+
+  const expectedReviewSec = 45;
+  const progress = Math.min(100, (secondsElapsed / expectedReviewSec) * 100);
+
+  if (kycStatus.status === "approved") {
+    return (
+      <div className="bg-gradient-to-br from-green-950/40 to-gray-900 border border-green-700 rounded-xl p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center text-xl">
+            ✓
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-green-400">Credential Issued On-Chain</h2>
+            <p className="text-xs text-gray-500">
+              Approved {kycStatus.reviewed_at ? new Date(kycStatus.reviewed_at).toLocaleString() : ""}
+            </p>
+          </div>
+        </div>
+
+        <dl className="space-y-2 text-sm mb-5">
+          <div className="flex justify-between"><dt className="text-gray-500">Credential</dt><dd>{kycStatus.credential_type}</dd></div>
+          <div className="flex justify-between"><dt className="text-gray-500">Jurisdiction</dt><dd>{kycStatus.jurisdiction}</dd></div>
+          {kycStatus.tx_hash && (
+            <div className="flex justify-between items-center">
+              <dt className="text-gray-500">On-chain tx</dt>
+              <dd>
+                <a
+                  href={`https://hashkey-testnet.blockscout.com/tx/${kycStatus.tx_hash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono text-xs text-purple-300 hover:text-purple-200"
+                >
+                  {kycStatus.tx_hash.slice(0, 10)}...{kycStatus.tx_hash.slice(-6)}
+                </a>
+              </dd>
+            </div>
+          )}
+        </dl>
+
+        <p className="text-sm text-gray-300 mb-5">
+          Your credential is live on HashKey Chain. You can now use it to prove your status to any integrated dApp — without revealing your identity.
+        </p>
+
+        <div className="flex flex-wrap gap-3">
+          <a
+            href="/demo"
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg"
+          >
+            Try the Demo →
+          </a>
+          <a
+            href="/ecosystem"
+            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 text-sm rounded-lg"
+          >
+            Browse Ecosystem
+          </a>
+          <a
+            href="/user"
+            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 text-sm rounded-lg"
+          >
+            My Credentials
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  if (kycStatus.status === "rejected") {
+    return (
+      <div className="bg-red-950/30 border border-red-800/50 rounded-xl p-6">
+        <h2 className="text-lg font-semibold text-red-400 mb-2">Submission Rejected</h2>
+        {kycStatus.rejection_reason && (
+          <p className="text-sm text-red-300 mb-4">Reason: {kycStatus.rejection_reason}</p>
+        )}
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm rounded-lg"
+        >
+          Start New Submission
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center">
+          <div className="w-3 h-3 rounded-full bg-yellow-400 animate-pulse" />
+        </div>
+        <div>
+          <h2 className="text-lg font-semibold">Under Review</h2>
+          <p className="text-xs text-gray-500">
+            Automated review in progress — usually takes 30-45 seconds
+          </p>
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div className="mb-5">
+        <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
+          <span>Review progress</span>
+          <span className="font-mono">{secondsElapsed}s elapsed</span>
+        </div>
+        <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-yellow-500 to-green-500 transition-all duration-1000"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        <p className="text-xs text-gray-500 mt-1.5">
+          {secondsElapsed < 30
+            ? "Issuer bot is verifying your submission..."
+            : secondsElapsed < 60
+            ? "Issuing credential on-chain..."
+            : "Still waiting — try refreshing. Check /issuer page if you're the approved issuer."}
+        </p>
+      </div>
+
+      <dl className="space-y-2 text-sm mb-6">
+        <div className="flex justify-between"><dt className="text-gray-500">Request ID</dt><dd className="font-mono text-xs">{kycStatus.id?.slice(0, 8)}...</dd></div>
+        <div className="flex justify-between"><dt className="text-gray-500">Credential</dt><dd>{kycStatus.credential_type}</dd></div>
+        <div className="flex justify-between"><dt className="text-gray-500">Jurisdiction</dt><dd>{kycStatus.jurisdiction}</dd></div>
+        <div className="flex justify-between"><dt className="text-gray-500">Auto-refresh</dt><dd className="text-green-400 text-xs">every 5s</dd></div>
+      </dl>
+
+      <button
+        onClick={onRefresh}
+        className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm rounded-lg"
+      >
+        Refresh Now
+      </button>
     </div>
   );
 }

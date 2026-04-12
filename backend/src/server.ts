@@ -14,6 +14,7 @@ import {
   updateKYCStatus,
 } from "./db.js";
 import { startIndexer } from "./indexer.js";
+import { startAutoIssuer } from "./auto-issuer.js";
 
 const app = Fastify({ logger: { level: "info" } });
 
@@ -150,3 +151,4 @@ await app.listen({ port, host: "0.0.0.0" });
 console.log(`[server] HSK Passport API listening on :${port}`);
 
 startIndexer();
+startAutoIssuer();
