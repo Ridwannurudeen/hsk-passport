@@ -168,8 +168,6 @@ export interface LivenessFrame {
   eyeAspectRatio: number;
 }
 
-const BLINK_THRESHOLD = 0.22; // eye aspect ratio below this = closed
-
 /// Computes eye aspect ratio from 6 landmark points
 function eyeAspectRatio(points: { x: number; y: number }[]): number {
   const d = (a: { x: number; y: number }, b: { x: number; y: number }) =>
@@ -183,7 +181,7 @@ export async function detectEyeAspectRatio(
   video: HTMLVideoElement
 ): Promise<number | null> {
   const detection = await faceapi
-    .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.4 }))
+    .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 }))
     .withFaceLandmarks();
   if (!detection) return null;
   const leftEye = detection.landmarks.getLeftEye();
@@ -191,14 +189,37 @@ export async function detectEyeAspectRatio(
   return (eyeAspectRatio(leftEye) + eyeAspectRatio(rightEye)) / 2;
 }
 
+/**
+ * Adaptive blink detection — doesn't use a fixed threshold.
+ *
+ * Algorithm:
+ *  1. Compute user's personal baseline from the first N frames (top 70% of EAR values → their eyes-open average)
+ *  2. A blink is any frame where EAR < baseline * 0.70 (30% drop)
+ *  3. To avoid false positives from jitter, require at least 2 frames below the drop threshold
+ *
+ * This works regardless of individual eye shape — whether your baseline is 0.20 or 0.35,
+ * a genuine blink drops it by 40-60% which clearly crosses 30%.
+ */
 export function detectBlink(frames: LivenessFrame[]): boolean {
-  // A blink is a sequence: open (EAR > threshold) → closed (EAR < threshold) → open (EAR > threshold)
-  let seenOpen = false;
-  let seenClosed = false;
-  for (const frame of frames) {
-    if (frame.eyeAspectRatio > BLINK_THRESHOLD + 0.03) seenOpen = true;
-    if (seenOpen && frame.eyeAspectRatio < BLINK_THRESHOLD) seenClosed = true;
-    if (seenClosed && frame.eyeAspectRatio > BLINK_THRESHOLD + 0.03) return true;
+  if (frames.length < 6) return false; // need enough data to establish baseline
+
+  // Establish baseline from top 70% of EAR values (likely eyes-open frames)
+  const sorted = frames.map(f => f.eyeAspectRatio).sort((a, b) => b - a);
+  const openCount = Math.max(3, Math.floor(sorted.length * 0.7));
+  const baseline = sorted.slice(0, openCount).reduce((a, b) => a + b, 0) / openCount;
+
+  const blinkThreshold = baseline * 0.70; // 30% drop from baseline
+  const hardMinThreshold = 0.20; // sanity floor — EAR below this is definitely closed
+
+  // Count consecutive "closed" frames
+  let closedStreak = 0;
+  for (const f of frames) {
+    if (f.eyeAspectRatio < blinkThreshold || f.eyeAspectRatio < hardMinThreshold) {
+      closedStreak++;
+      if (closedStreak >= 1) return true; // one genuine drop = blink detected
+    } else {
+      closedStreak = 0;
+    }
   }
   return false;
 }

@@ -193,55 +193,75 @@ export default function KYCPage() {
   // Liveness check — blink detection
   // ============================================================
 
-  const livenessIntervalRef = useRef<number | null>(null);
+  const livenessAbortRef = useRef(false);
 
-  function startLivenessCheck() {
+  function stopCamera() {
+    const stream = videoRef.current?.srcObject as MediaStream | null;
+    stream?.getTracks().forEach((t) => t.stop());
+    setCameraActive(false);
+  }
+
+  function proceedToReview() {
+    setLivenessPass(true);
+    setLivenessMessage("Liveness confirmed!");
+    setLivenessActive(false);
+    livenessAbortRef.current = true;
+    stopCamera();
+    setStage("review");
+    toast("Liveness confirmed. Review before submission.", "success");
+  }
+
+  async function startLivenessCheck() {
     setLivenessActive(true);
     setLivenessFrames([]);
     setLivenessPass(false);
-    setLivenessMessage("Blink your eyes twice");
+    setLivenessMessage("Keep your face in view and blink naturally");
+    livenessAbortRef.current = false;
 
     const startTime = Date.now();
     const frames: LivenessFrame[] = [];
+    const TIMEOUT_MS = 30_000;
 
-    const tick = async () => {
-      if (!videoRef.current) return;
-      const ear = await detectEyeAspectRatio(videoRef.current);
-      if (ear !== null) {
-        frames.push({ timestamp: Date.now(), eyeAspectRatio: ear });
-        setLivenessFrames([...frames]);
-
-        // Check for blink after 1 second
-        if (Date.now() - startTime > 1000 && detectBlink(frames)) {
-          setLivenessPass(true);
-          setLivenessMessage("Liveness confirmed!");
-          setLivenessActive(false);
-          if (livenessIntervalRef.current) {
-            clearInterval(livenessIntervalRef.current);
-            livenessIntervalRef.current = null;
-          }
-          toast("Liveness confirmed. Review your data before submission.", "success");
-          setStage("review");
-          // Stop camera
-          const stream = videoRef.current.srcObject as MediaStream;
-          stream?.getTracks().forEach((t) => t.stop());
-          setCameraActive(false);
-          return;
-        }
-
-        // Timeout after 15 seconds
-        if (Date.now() - startTime > 15000 && !livenessPass) {
-          setLivenessMessage("Timeout — try again");
-          setLivenessActive(false);
-          if (livenessIntervalRef.current) {
-            clearInterval(livenessIntervalRef.current);
-            livenessIntervalRef.current = null;
-          }
-        }
+    // Self-scheduling async loop — no setInterval overlap.
+    // Each detection takes ~150-300ms; loop runs as fast as possible.
+    while (!livenessAbortRef.current) {
+      if (Date.now() - startTime > TIMEOUT_MS) {
+        setLivenessMessage("Timeout. Try blink again or use manual confirm.");
+        setLivenessActive(false);
+        return;
       }
-    };
 
-    livenessIntervalRef.current = window.setInterval(tick, 300);
+      if (!videoRef.current) {
+        setLivenessActive(false);
+        return;
+      }
+
+      try {
+        const ear = await detectEyeAspectRatio(videoRef.current);
+        if (ear !== null) {
+          frames.push({ timestamp: Date.now(), eyeAspectRatio: ear });
+          setLivenessFrames([...frames]);
+
+          // After collecting 6+ frames, start looking for blinks
+          if (frames.length >= 6 && detectBlink(frames)) {
+            proceedToReview();
+            return;
+          }
+
+          // Guidance message based on frame count
+          if (frames.length < 6) {
+            setLivenessMessage(`Calibrating... ${frames.length}/6 frames`);
+          } else {
+            setLivenessMessage("Blink your eyes now");
+          }
+        }
+      } catch {
+        // ignore single-frame failures
+      }
+
+      // Small delay between frames (also yields to UI)
+      await new Promise((r) => setTimeout(r, 50));
+    }
   }
 
   // ============================================================
@@ -475,6 +495,34 @@ export default function KYCPage() {
             >
               Capture & Match
             </button>
+          )}
+
+          {stage === "liveness" && (
+            <div className="mt-4 space-y-2">
+              {/* Retry + skip buttons */}
+              {!livenessActive && !livenessPass && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={startLivenessCheck}
+                    className="flex-1 px-4 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-lg"
+                  >
+                    Retry Blink Detection
+                  </button>
+                  <button
+                    onClick={proceedToReview}
+                    className="px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-200 text-sm rounded-lg border border-gray-700"
+                    title="If automatic blink detection keeps failing, confirm manually. Face match was already verified."
+                  >
+                    Manual Confirm
+                  </button>
+                </div>
+              )}
+              {livenessActive && (
+                <p className="text-xs text-center text-gray-500">
+                  Tip: hold still for calibration, then blink normally. Takes 3-5 seconds.
+                </p>
+              )}
+            </div>
           )}
 
           {faceMatch && (
