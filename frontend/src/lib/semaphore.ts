@@ -36,19 +36,29 @@ function getMerkleDepth(memberCount: number): number {
 // Cache artifacts across calls
 const artifactCache = new Map<number, { wasm: Uint8Array; zkey: Uint8Array }>();
 
+async function fetchOne(url: string, label: string): Promise<Uint8Array> {
+  let res: Response;
+  try {
+    res = await fetch(url, { cache: "force-cache" });
+  } catch (e) {
+    const msg = (e as Error).message || String(e);
+    throw new Error(`${label} fetch failed: ${msg} (url: ${url})`);
+  }
+  if (!res.ok) throw new Error(`${label} returned ${res.status} from ${url}`);
+  try {
+    const buf = await res.arrayBuffer();
+    return new Uint8Array(buf);
+  } catch (e) {
+    const msg = (e as Error).message || String(e);
+    throw new Error(`${label} read body failed: ${msg}`);
+  }
+}
+
 async function fetchArtifacts(depth: number): Promise<{ wasm: Uint8Array; zkey: Uint8Array }> {
   if (artifactCache.has(depth)) return artifactCache.get(depth)!;
 
-  const [wasmRes, zkeyRes] = await Promise.all([
-    fetch(`/semaphore/semaphore-${depth}.wasm`),
-    fetch(`/semaphore/semaphore-${depth}.zkey`),
-  ]);
-
-  if (!wasmRes.ok) throw new Error(`Failed to load WASM: ${wasmRes.status}`);
-  if (!zkeyRes.ok) throw new Error(`Failed to load zkey: ${zkeyRes.status}`);
-
-  const wasm = new Uint8Array(await wasmRes.arrayBuffer());
-  const zkey = new Uint8Array(await zkeyRes.arrayBuffer());
+  const wasm = await fetchOne(`/semaphore/semaphore-${depth}.wasm`, "WASM");
+  const zkey = await fetchOne(`/semaphore/semaphore-${depth}.zkey`, "zkey");
 
   artifactCache.set(depth, { wasm, zkey });
   return { wasm, zkey };

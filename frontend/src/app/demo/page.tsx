@@ -214,10 +214,11 @@ export default function DemoPage() {
       toast("Zero-knowledge proof generated!", "success");
     } catch (err: unknown) {
       const msg = (err as Error).message;
+      console.error("[HSK Passport] Proof generation error:", err);
       if (msg.includes("timed out")) {
         toast("Proof generation timed out. Try again.", "error");
       } else {
-        toast(`Proof error: ${msg.slice(0, 100)}`, "error");
+        toast(`Proof error: ${msg.slice(0, 200)}`, "error");
       }
     }
     setLoading(false);
