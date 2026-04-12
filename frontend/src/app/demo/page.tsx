@@ -186,11 +186,22 @@ export default function DemoPage() {
       const { address: callerAddress } = await connectWallet();
       const callerAsMessage = BigInt(callerAddress);
 
-      setLoadingText("Generating Groth16 zero-knowledge proof (10-30 seconds)...");
+      // Warm up the cache: preload WASM + zkey artifacts before proof gen
+      setLoadingText("Loading ZK circuit artifacts (~3.6 MB)...");
+      try {
+        await Promise.all([
+          fetch("/semaphore/semaphore-4.wasm", { cache: "force-cache" }),
+          fetch("/semaphore/semaphore-4.zkey", { cache: "force-cache" }),
+        ]);
+      } catch {
+        // continue anyway, snarkjs will fetch if needed
+      }
 
-      // Timeout wrapper
+      setLoadingText("Generating Groth16 zero-knowledge proof (20-60 seconds)...");
+
+      // Timeout wrapper — 3 minutes for slow connections
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Proof generation timed out after 60 seconds")), 60000)
+        setTimeout(() => reject(new Error("Proof generation timed out after 180 seconds")), 180000)
       );
 
       const proofPromise = generateCredentialProof(identity, members, callerAsMessage, groupId);
