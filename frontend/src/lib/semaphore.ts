@@ -28,11 +28,6 @@ export function getCommitment(identity: Identity): bigint {
   return identity.commitment;
 }
 
-function getMerkleDepth(memberCount: number): number {
-  if (memberCount <= 2) return 1;
-  return Math.max(1, Math.ceil(Math.log2(memberCount)));
-}
-
 // Cache artifacts across calls
 const artifactCache = new Map<number, { wasm: Uint8Array; zkey: Uint8Array }>();
 
@@ -75,16 +70,21 @@ export async function generateCredentialProof(
     group.addMember(commitment);
   }
 
-  const needed = getMerkleDepth(memberCommitments.length);
-  const available = [1, 2, 3, 4, 5, 6, 8, 10, 12];
-  const depth = available.find((d) => d >= needed) ?? 12;
+  // LeanIMT depth is computed from actual siblings, not member count ceiling.
+  // Generate the Merkle proof first to find the EXACT depth needed.
+  const leafIndex = group.indexOf(identity.commitment);
+  if (leafIndex === -1) throw new Error("Identity not in group");
+  const merkleProof = group.generateMerkleProof(leafIndex);
+  const actualDepth = merkleProof.siblings.length || 1;
 
-  // Fetch artifacts as Uint8Array and pass them directly.
-  // This bypasses snarkjs/fastfile's process.browser check which fails in Next.js.
+  // Available pre-hosted artifact depths; pick smallest >= actual.
+  const available = [1, 2, 3, 4, 5, 6, 8, 10, 12];
+  const depth = available.find((d) => d >= actualDepth) ?? 12;
+
+  // Fetch artifacts as Uint8Array (bypasses snarkjs/fastfile's broken process.browser check).
   const { wasm, zkey } = await fetchArtifacts(depth);
 
   // The SnarkArtifacts type says string, but fastfile accepts Uint8Array at runtime.
-  // This is the only path that works in Next.js (bypasses broken process.browser check).
   const artifacts = { wasm, zkey } as unknown as { wasm: string; zkey: string };
   const proof = await generateProof(identity, group, message, scope, depth, artifacts);
   return proof;
