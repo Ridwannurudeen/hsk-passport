@@ -9,6 +9,8 @@ export const ADDRESSES = {
   hskPassport: "0x79A0E1160FA829595f45f0479782095ed497d5E6",
   demoIssuer: "0xD6CB3393B9e1E162ed3EF8187082511d20Be28d1",
   gatedRWA: "0xFc6bDE32f79ad43696abc6A2a6291bfA8AF1D249",
+  kycGatedAirdrop: "0x02F84538E05b66FD207923675f48B70541bBb01c",
+  kycGatedLending: "0x5430c4A4180492D5D0ce059355e82176F8AF9A20",
 };
 
 // Block where HSKPassport was deployed — use as fromBlock for event queries

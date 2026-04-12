@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import * as ethers from "ethers";
 import { Contract, JsonRpcProvider } from "ethers";
 import { connectWallet, signMessage } from "@/lib/wallet";
 import {
@@ -22,6 +21,7 @@ import {
   EXPLORER_URL,
   HSK_PASSPORT_DEPLOY_BLOCK,
 } from "@/lib/contracts";
+import { apiGetGroupMembers } from "@/lib/api";
 import { StepProgress } from "@/components/StepProgress";
 import { ProofCard } from "@/components/ProofCard";
 import { useToast } from "@/components/Toast";
@@ -142,57 +142,44 @@ export default function DemoPage() {
       const provider = new JsonRpcProvider(RPC_URL);
       const groupId = GROUPS.KYC_VERIFIED;
 
-      // Get group members from events (revocation-aware).
-      // Query from the contract deployment block to avoid RPC timeouts on full-range scans.
-      // Chunk into 5000-block ranges as fallback for stricter RPCs.
-      const passportEvents = new Contract(
-        ADDRESSES.hskPassport,
-        [
-          "event CredentialIssued(uint256 indexed groupId, uint256 indexed identityCommitment)",
-          "event CredentialRevoked(uint256 indexed groupId, uint256 indexed identityCommitment)",
-        ],
-        provider
-      );
-
-      const issuedFilter = passportEvents.filters.CredentialIssued(groupId);
-      const revokedFilter = passportEvents.filters.CredentialRevoked(groupId);
-      const latestBlock = await provider.getBlockNumber();
-
-      async function queryChunked(filter: ethers.DeferredTopicFilter): Promise<ethers.EventLog[] | ethers.Log[]> {
-        // Try one shot first
-        try {
-          return await passportEvents.queryFilter(filter, HSK_PASSPORT_DEPLOY_BLOCK, latestBlock);
-        } catch {
-          // Fallback: chunk queries in 5000-block ranges
-          const chunkSize = 5000;
-          const results: (ethers.EventLog | ethers.Log)[] = [];
-          for (let from = HSK_PASSPORT_DEPLOY_BLOCK; from <= latestBlock; from += chunkSize) {
-            const to = Math.min(from + chunkSize - 1, latestBlock);
-            const chunk = await passportEvents.queryFilter(filter, from, to);
-            results.push(...chunk);
-          }
-          return results;
-        }
-      }
-
-      const [issuedEvents, revokedEvents] = await Promise.all([
-        queryChunked(issuedFilter),
-        queryChunked(revokedFilter),
-      ]);
-
-      const revokedSet = new Set(
-        revokedEvents.map((e) => {
+      // Primary path: query the indexer API (fast, always up to date).
+      // Fallback path: query events from deployment block directly if API is down.
+      let members: bigint[] = [];
+      try {
+        setLoadingText("Fetching group members from indexer...");
+        members = await apiGetGroupMembers(groupId);
+      } catch (apiErr) {
+        console.warn("[demo] indexer API unavailable, falling back to RPC", apiErr);
+        setLoadingText("Indexer unavailable, querying chain directly...");
+        const passportEvents = new Contract(
+          ADDRESSES.hskPassport,
+          [
+            "event CredentialIssued(uint256 indexed groupId, uint256 indexed identityCommitment)",
+            "event CredentialRevoked(uint256 indexed groupId, uint256 indexed identityCommitment)",
+          ],
+          provider
+        );
+        const issuedEvents = await passportEvents.queryFilter(
+          passportEvents.filters.CredentialIssued(groupId),
+          HSK_PASSPORT_DEPLOY_BLOCK,
+          "latest"
+        );
+        const revokedEvents = await passportEvents.queryFilter(
+          passportEvents.filters.CredentialRevoked(groupId),
+          HSK_PASSPORT_DEPLOY_BLOCK,
+          "latest"
+        );
+        const revokedSet = new Set(revokedEvents.map((e) => {
           const parsed = passportEvents.interface.parseLog({ topics: [...e.topics], data: e.data });
           return parsed?.args?.identityCommitment?.toString();
-        }).filter(Boolean)
-      );
-
-      const members = issuedEvents
-        .map((e) => {
-          const parsed = passportEvents.interface.parseLog({ topics: [...e.topics], data: e.data });
-          return parsed?.args?.identityCommitment as bigint;
-        })
-        .filter((m): m is bigint => m !== undefined && !revokedSet.has(m.toString()));
+        }).filter(Boolean));
+        members = issuedEvents
+          .map((e) => {
+            const parsed = passportEvents.interface.parseLog({ topics: [...e.topics], data: e.data });
+            return parsed?.args?.identityCommitment as bigint;
+          })
+          .filter((m): m is bigint => m !== undefined && !revokedSet.has(m.toString()));
+      }
 
       if (members.length === 0) {
         toast("No members in group. Issue a credential first.", "error");

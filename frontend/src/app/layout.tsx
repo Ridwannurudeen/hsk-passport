@@ -39,30 +39,11 @@ export default function RootLayout({
                   HSK<span className="text-purple-400">Passport</span>
                 </Link>
                 <div className="hidden sm:flex items-center gap-6">
-                  <Link
-                    href="/issuer"
-                    className="text-sm text-gray-400 hover:text-white transition-colors"
-                  >
-                    Issuer
-                  </Link>
-                  <Link
-                    href="/user"
-                    className="text-sm text-gray-400 hover:text-white transition-colors"
-                  >
-                    My Credentials
-                  </Link>
-                  <Link
-                    href="/demo"
-                    className="text-sm text-gray-400 hover:text-white transition-colors"
-                  >
-                    Demo
-                  </Link>
-                  <Link
-                    href="/docs"
-                    className="text-sm text-gray-400 hover:text-white transition-colors"
-                  >
-                    Integrate
-                  </Link>
+                  <Link href="/kyc" className="text-sm text-gray-400 hover:text-white transition-colors">Get Verified</Link>
+                  <Link href="/ecosystem" className="text-sm text-gray-400 hover:text-white transition-colors">Ecosystem</Link>
+                  <Link href="/demo" className="text-sm text-gray-400 hover:text-white transition-colors">Demo</Link>
+                  <Link href="/developers" className="text-sm text-gray-400 hover:text-white transition-colors">Developers</Link>
+                  <Link href="/issuer" className="text-sm text-gray-400 hover:text-white transition-colors">Issuer</Link>
                 </div>
               </div>
               <div className="text-xs text-gray-500 font-mono">
