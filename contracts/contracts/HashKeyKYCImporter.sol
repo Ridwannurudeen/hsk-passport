@@ -34,18 +34,24 @@ contract HashKeyKYCImporter {
     uint256 public accreditedInvestorGroup;
     uint256 public hkResidentGroup;
 
-    /// @dev Track whether a user has imported their SBT to prevent double-imports
-    mapping(address => mapping(uint256 => bool)) public imported; // user => commitment => imported
+    /// @dev One wallet can bind to at most ONE identity commitment. This is the core
+    ///      anti-sybil invariant: one KYC'd human → one private credential.
+    ///      Revocation (via HashKey Exchange revoking the SBT) requires re-importing.
+    mapping(address => uint256) public boundCommitment; // wallet => commitment (0 = unbound)
+    mapping(uint256 => address) public commitmentSource; // commitment => source wallet (prevents the same commitment from being re-used by multiple wallets)
 
     event KYCSbtUpdated(address indexed newAddress);
     event GroupsConfigured(uint256 kyc, uint256 accredited, uint256 hk);
     event KYCImported(address indexed user, uint256 indexed identityCommitment, uint8 level);
+    event BindingReleased(address indexed user, uint256 indexed commitment);
 
     error NotOwner();
     error NoKYCSBT();
-    error AlreadyImported();
+    error WalletAlreadyBound();
+    error CommitmentAlreadyClaimed();
     error InvalidLevel();
     error NotConfigured();
+    error KYCStillValid();
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();
@@ -78,16 +84,30 @@ contract HashKeyKYCImporter {
     }
 
     /// @notice Import the caller's HashKey Exchange KYC status into HSK Passport.
+    /// @dev Anti-sybil invariants:
+    ///      - A given wallet can bind to at most ONE identity commitment (forever, unless released).
+    ///      - A given commitment can be claimed by at most ONE source wallet.
+    ///      - These bindings persist even if the user re-imports, preventing one KYC'd human
+    ///        from minting multiple anonymous Semaphore identities.
     /// @param identityCommitment The user's Semaphore identity commitment
     function importKYC(uint256 identityCommitment) external {
         if (address(kycSbt) == address(0)) revert NotConfigured();
         if (!kycSbt.hasKYC(msg.sender)) revert NoKYCSBT();
-        if (imported[msg.sender][identityCommitment]) revert AlreadyImported();
+
+        // Wallet can only bind once. Must call releaseBinding() first to re-bind.
+        if (boundCommitment[msg.sender] != 0 && boundCommitment[msg.sender] != identityCommitment) {
+            revert WalletAlreadyBound();
+        }
+        // Commitment can only be claimed by one wallet, ever.
+        if (commitmentSource[identityCommitment] != address(0) && commitmentSource[identityCommitment] != msg.sender) {
+            revert CommitmentAlreadyClaimed();
+        }
 
         uint8 level = kycSbt.kycLevelOf(msg.sender);
         if (level == 0 || level > 3) revert InvalidLevel();
 
-        imported[msg.sender][identityCommitment] = true;
+        boundCommitment[msg.sender] = identityCommitment;
+        commitmentSource[identityCommitment] = msg.sender;
 
         // Level 1+: KYC_VERIFIED
         if (!passport.hasCredential(kycVerifiedGroup, identityCommitment)) {
@@ -100,6 +120,18 @@ contract HashKeyKYCImporter {
         }
 
         emit KYCImported(msg.sender, identityCommitment, level);
+    }
+
+    /// @notice Release the wallet-to-commitment binding. Only works if the user's
+    ///         KYC SBT has been revoked by HashKey Exchange (otherwise they'd just re-import).
+    /// @dev This lets users re-bind if their SBT is revoked and re-issued later.
+    function releaseBinding() external {
+        if (kycSbt.hasKYC(msg.sender)) revert KYCStillValid();
+        uint256 commitment = boundCommitment[msg.sender];
+        if (commitment == 0) revert NotConfigured();
+        boundCommitment[msg.sender] = 0;
+        commitmentSource[commitment] = address(0);
+        emit BindingReleased(msg.sender, commitment);
     }
 
     function transferOwnership(address newOwner) external onlyOwner {

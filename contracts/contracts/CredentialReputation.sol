@@ -10,11 +10,20 @@ interface IHSKPassport {
     ) external view returns (bool);
 }
 
-/// @title CredentialReputation — Cross-credential reputation scoring for HSK Passport
-/// @notice Each credential issuance contributes reputation points to the user's identity.
-///         Users prove reputation thresholds without revealing individual credentials.
-/// @dev Reputation is stored per identity commitment. Points are configured per group.
-///      Threshold proofs use Semaphore proof with the reputation score encoded in message.
+/// @title CredentialReputation — ROADMAP FEATURE, NOT PRODUCTION-READY
+/// @notice Cross-credential reputation scoring. Tracks on-chain reputation per identity commitment.
+/// @dev !!! AUDIT FINDING (April 2026): verifyReputationThreshold does NOT cryptographically
+///      bind the caller's ZK proof to the identityCommitment being checked. Any member of the
+///      group can present someone else's high-reputation commitment and pass.
+///      Additionally, revealing the commitment breaks the privacy claim.
+///
+///      DO NOT use verifyReputationThreshold in production. The correct design requires a
+///      dedicated circuit that proves knowledge of the identity secret AND that its commitment
+///      has reputation >= threshold, WITHOUT revealing which commitment. This is on the
+///      Q3 2026 roadmap pending circuit work.
+///
+///      For now this contract is deployed for tracking/analytics only. Reputation scores are
+///      public on-chain data; no private threshold proof is currently supported.
 contract CredentialReputation {
     IHSKPassport public immutable passport;
     address public owner;

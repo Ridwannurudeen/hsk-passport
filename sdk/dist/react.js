@@ -30,7 +30,12 @@ function HSKPassportGate({ network = "hashkey-testnet", groupId, scope, signer, 
         try {
             const passport = index_1.HSKPassport.connect(network, signer);
             const identity = passport.createIdentity(identitySecret);
-            const proof = await passport.generateProof(identity, groupId, scope);
+            // Bind proof to caller to prevent front-running
+            if (!signer) {
+                throw new Error("HSKPassportGate requires a signer to bind proofs to the caller address");
+            }
+            const callerAddress = await signer.getAddress();
+            const proof = await passport.generateProof(identity, groupId, scope, BigInt(callerAddress));
             setStatus("Proof generated! Verifying...");
             const valid = await passport.verifyProof(groupId, proof);
             if (!valid) {
@@ -61,12 +66,12 @@ function useHSKPassport(network = "hashkey-testnet") {
     const [loading, setLoading] = (0, react_1.useState)(false);
     const [error, setError] = (0, react_1.useState)(null);
     const passport = index_1.HSKPassport.connect(network);
-    const generateProofForGroup = (0, react_1.useCallback)(async (identitySecret, groupId, scope) => {
+    const generateProofForGroup = (0, react_1.useCallback)(async (identitySecret, groupId, scope, callerAddress) => {
         setLoading(true);
         setError(null);
         try {
             const identity = passport.createIdentity(identitySecret);
-            const proof = await passport.generateProof(identity, groupId, scope);
+            const proof = await passport.generateProof(identity, groupId, scope, BigInt(callerAddress));
             return proof;
         }
         catch (err) {

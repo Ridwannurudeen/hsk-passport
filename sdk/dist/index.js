@@ -114,9 +114,18 @@ class HSKPassport {
      * @param identity - The user's Semaphore identity
      * @param groupId - The credential group to prove membership in
      * @param scope - Action scope (unique per action for sybil resistance)
-     * @param message - Optional message to bind to the proof (default: 1)
+     * @param message - REQUIRED. Bind the proof to prevent front-running.
+     *                  Pass `BigInt(callerAddress)` where callerAddress is the msg.sender
+     *                  that will submit the proof on-chain. The dApp's verifier contract
+     *                  MUST check that `proof.message == uint256(uint160(msg.sender))`.
+     *                  Passing arbitrary values (like 1) leaves the proof vulnerable
+     *                  to front-running.
      */
-    async generateProof(identity, groupId, scope, message = 1) {
+    async generateProof(identity, groupId, scope, message) {
+        if (message === undefined || message === null) {
+            throw new Error("generateProof: 'message' is required and should be the caller's address as a bigint. " +
+                "Pass BigInt(await signer.getAddress()) to prevent front-running.");
+        }
         const members = await this.getGroupMembers(groupId);
         if (members.length === 0) {
             throw new Error("Group has no members");

@@ -60,8 +60,26 @@ contract HSKPassport {
         _;
     }
 
+    /// @dev Strict: only the group's original issuer, AND they must still be an approved issuer.
+    ///      Use for admin operations like deactivating the group, granting delegates, etc.
+    modifier onlyGroupIssuer(uint256 groupId) {
+        address groupIssuer = credentialGroups[groupId].issuer;
+        if (groupIssuer != msg.sender) revert NotGroupIssuerOrDelegate();
+        if (!approvedIssuers[msg.sender]) revert NotApprovedIssuer();
+        _;
+    }
+
+    /// @dev Loose: group issuer (if still approved) OR an approved delegate for that group.
+    ///      Use for issuance/revocation of credentials only. Delegates cannot escalate privileges.
+    ///      When an issuer is revoked via revokeIssuer(), all their groups freeze automatically —
+    ///      their own calls fail the approvedIssuers check; delegate calls fail the same check
+    ///      on the group's stored issuer (see below).
     modifier onlyGroupIssuerOrDelegate(uint256 groupId) {
-        if (credentialGroups[groupId].issuer != msg.sender && !groupDelegates[groupId][msg.sender]) {
+        address groupIssuer = credentialGroups[groupId].issuer;
+        // The group issuer must still be approved — if they're revoked, the entire group freezes,
+        // including any delegates they previously approved.
+        if (!approvedIssuers[groupIssuer]) revert NotApprovedIssuer();
+        if (groupIssuer != msg.sender && !groupDelegates[groupId][msg.sender]) {
             revert NotGroupIssuerOrDelegate();
         }
         _;
@@ -86,16 +104,19 @@ contract HSKPassport {
         emit IssuerRevoked(issuer);
     }
 
-    /// @notice Approve a delegate contract for a specific group (issuer-scoped)
-    /// @param groupId The group to grant delegation for
-    /// @param delegate The delegate address (e.g., DemoIssuer contract)
-    function approveDelegate(uint256 groupId, address delegate) external onlyGroupIssuerOrDelegate(groupId) {
+    /// @notice Approve a delegate contract for a specific group
+    /// @dev Only the group's original issuer (still approved) can grant delegates.
+    ///      Delegates cannot grant more delegates — prevents privilege escalation.
+    function approveDelegate(uint256 groupId, address delegate) external onlyGroupIssuer(groupId) {
         groupDelegates[groupId][delegate] = true;
         emit DelegateApproved(groupId, delegate);
     }
 
     /// @notice Revoke a delegate's approval for a specific group
-    function revokeDelegate(uint256 groupId, address delegate) external onlyGroupIssuerOrDelegate(groupId) {
+    /// @dev Owner can also revoke as emergency offboarding; delegates cannot revoke themselves or others.
+    function revokeDelegate(uint256 groupId, address delegate) external {
+        address groupIssuer = credentialGroups[groupId].issuer;
+        if (msg.sender != groupIssuer && msg.sender != owner) revert NotGroupIssuerOrDelegate();
         groupDelegates[groupId][delegate] = false;
         emit DelegateRevoked(groupId, delegate);
     }
@@ -201,8 +222,13 @@ contract HSKPassport {
         emit CredentialVerified(groupId, msg.sender);
     }
 
-    /// @notice Deactivate a credential group
-    function deactivateGroup(uint256 groupId) external onlyGroupIssuerOrDelegate(groupId) {
+    /// @notice Deactivate a credential group. Only the issuer (still approved) or protocol owner.
+    /// @dev Delegates cannot deactivate. Owner can deactivate for emergency offboarding even
+    ///      after revoking the issuer.
+    function deactivateGroup(uint256 groupId) external {
+        address groupIssuer = credentialGroups[groupId].issuer;
+        bool isAuthorizedIssuer = (msg.sender == groupIssuer) && approvedIssuers[msg.sender];
+        if (!isAuthorizedIssuer && msg.sender != owner) revert NotGroupIssuerOrDelegate();
         credentialGroups[groupId].active = false;
     }
 

@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { randomUUID } from "crypto";
+import { verifyMessage, JsonRpcProvider, Contract } from "ethers";
 import { CONFIG } from "./config.js";
 import {
   getActiveMembers,
@@ -108,21 +109,77 @@ app.get("/api/kyc/request/:id", async (request) => {
   return req || { error: "not found" };
 });
 
+// ================================================================
+// Authenticated review — requires wallet-signed message from approved issuer
+// ================================================================
+
+const PASSPORT_READ_ABI = [
+  "function approvedIssuers(address) view returns (bool)",
+];
+
+async function verifyIssuerSignature(
+  reviewer: string,
+  requestId: string,
+  action: string,
+  signature: string,
+  nonce: number
+): Promise<boolean> {
+  // Signature payload must match exactly what the reviewer signed on the client.
+  // Include a nonce (timestamp) to prevent replay.
+  const age = Date.now() - nonce;
+  if (age < 0 || age > 5 * 60_000) return false; // 5 minute window
+
+  const message = `HSK Passport review: ${action} request ${requestId} at ${nonce}`;
+  try {
+    const recovered = verifyMessage(message, signature);
+    if (recovered.toLowerCase() !== reviewer.toLowerCase()) return false;
+  } catch {
+    return false;
+  }
+
+  // Verify recovered address is an approved issuer on-chain
+  const provider = new JsonRpcProvider(CONFIG.rpcUrl);
+  const passport = new Contract(CONFIG.hskPassport, PASSPORT_READ_ABI, provider);
+  try {
+    const isApproved = await passport.approvedIssuers(reviewer);
+    return isApproved;
+  } catch {
+    return false;
+  }
+}
+
 app.post("/api/kyc/review", async (request, reply) => {
   const body = request.body as {
     id?: string;
     reviewer?: string;
     action?: "approve" | "reject";
+    signature?: string;
+    nonce?: number;
     txHash?: string;
     rejectionReason?: string;
   };
 
-  if (!body.id || !body.reviewer || !body.action) {
+  if (!body.id || !body.reviewer || !body.action || !body.signature || !body.nonce) {
     reply.code(400);
-    return { error: "missing required fields: id, reviewer, action" };
+    return {
+      error: "missing required fields: id, reviewer, action, signature, nonce. Reviewer must sign: 'HSK Passport review: <action> request <id> at <nonce>'",
+    };
   }
 
-  const req = getKYCRequest(body.id) as any;
+  // Reject untrusted signatures
+  const ok = await verifyIssuerSignature(
+    body.reviewer,
+    body.id,
+    body.action,
+    body.signature,
+    body.nonce
+  );
+  if (!ok) {
+    reply.code(401);
+    return { error: "invalid signature or reviewer is not an approved issuer" };
+  }
+
+  const req = getKYCRequest(body.id) as { status?: string } | undefined;
   if (!req) {
     reply.code(404);
     return { error: "request not found" };

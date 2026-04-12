@@ -47,6 +47,11 @@ contract HashKeyDIDBridge {
     /// @dev commitment => didTokenId used (prevents a single DID claiming multiple commitments)
     mapping(uint256 => uint256) public commitmentToDid;
 
+    /// @dev Per-DeedGrain-token anti-sybil: one (wallet, deedGrainId) can claim only ONE commitment.
+    ///      Prevents one SBT holder from minting many anonymous Semaphore identities.
+    mapping(address => mapping(uint256 => uint256)) public deedGrainBinding; // wallet => deedGrainId => commitment
+    mapping(uint256 => mapping(uint256 => address)) public deedGrainCommitmentSource; // deedGrainId => commitment => source wallet
+
     event HashKeyDIDUpdated(address indexed newAddress);
     event DeedGrainUpdated(address indexed newAddress);
     event GroupConfigured(uint256 indexed groupId);
@@ -60,6 +65,8 @@ contract HashKeyDIDBridge {
     error CommitmentAlreadyBridged();
     error NoDeedGrainBalance();
     error NotConfigured();
+    error DeedGrainAlreadyBridged();
+    error DeedGrainCommitmentClaimed();
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();
@@ -120,6 +127,8 @@ contract HashKeyDIDBridge {
 
     /// @notice User with a HashKey DeedGrain credential mints HSK Passport credential.
     ///         E.g., KYC level 2 DeedGrain → KYC_VERIFIED group.
+    /// @dev Anti-sybil: each (wallet, deedGrainId) can bind to ONE commitment only.
+    ///      A given commitment can be claimed by ONE source per DeedGrain type.
     /// @param deedGrainId DeedGrain token ID the user holds
     /// @param identityCommitment User's Semaphore identity commitment
     function bridgeDeedGrain(uint256 deedGrainId, uint256 identityCommitment) external {
@@ -127,9 +136,21 @@ contract HashKeyDIDBridge {
         uint256 groupId = deedGrainToGroup[deedGrainId];
         if (groupId == 0) revert NotConfigured();
         if (deedGrain.balanceOf(msg.sender, deedGrainId) == 0) revert NoDeedGrainBalance();
-        if (passport.hasCredential(groupId, identityCommitment)) revert CommitmentAlreadyBridged();
 
-        passport.issueCredential(groupId, identityCommitment);
+        // Anti-sybil: wallet can only bind once per DeedGrain ID
+        uint256 existingBinding = deedGrainBinding[msg.sender][deedGrainId];
+        if (existingBinding != 0 && existingBinding != identityCommitment) revert DeedGrainAlreadyBridged();
+
+        // Anti-sybil: commitment can only be claimed by one source per DeedGrain type
+        address existingSource = deedGrainCommitmentSource[deedGrainId][identityCommitment];
+        if (existingSource != address(0) && existingSource != msg.sender) revert DeedGrainCommitmentClaimed();
+
+        deedGrainBinding[msg.sender][deedGrainId] = identityCommitment;
+        deedGrainCommitmentSource[deedGrainId][identityCommitment] = msg.sender;
+
+        if (!passport.hasCredential(groupId, identityCommitment)) {
+            passport.issueCredential(groupId, identityCommitment);
+        }
         emit DeedGrainCredentialIssued(deedGrainId, groupId, identityCommitment);
     }
 

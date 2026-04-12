@@ -39,6 +39,11 @@ contract MyDApp {
     function kycGatedFunction(
         ISemaphore.SemaphoreProof calldata proof
     ) external {
+        // REQUIRED: bind proof to caller to prevent front-running attacks
+        require(
+            proof.message == uint256(uint160(msg.sender)),
+            "proof must be bound to caller"
+        );
         require(
             passport.verifyCredential(KYC_GROUP, proof),
             "KYC proof required"
@@ -73,15 +78,16 @@ for (const member of groupMembers) {
   group.addMember(member);
 }
 
-// 3. Generate ZK proof
+// 3. Generate ZK proof — MUST bind proof to caller (prevents front-running)
+const callerAddress = await signer.getAddress();
 const proof = await generateProof(
   identity,
   group,
-  1,  // message (arbitrary signal)
-  0   // scope (group ID for KYC_VERIFIED)
+  BigInt(callerAddress),  // message = caller — REQUIRED to prevent front-running
+  "mint-silver-v1"        // scope — unique per action for sybil resistance
 );
 
-// 4. Submit to your contract
+// 4. Submit to your contract (which must also verify proof.message == msg.sender)
 const tx = await myDApp.kycGatedFunction(proof);`}
             </pre>
           </div>

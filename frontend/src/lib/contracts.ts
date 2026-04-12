@@ -2,46 +2,47 @@ export const CHAIN_ID = 133;
 export const RPC_URL = "https://testnet.hsk.xyz";
 export const EXPLORER_URL = "https://hashkey-testnet.blockscout.com";
 
+// V4 addresses — post-audit deployment with issuer offboarding + anti-sybil bridges + delegate split
 export const ADDRESSES = {
   semaphoreVerifier: "0xe874E5DE61fa40dAf82e8916489d1B7071aC3b9A",
   semaphore: "0xd09e8Aec6B6A36588E7A105f606A9fe9a134CFE9",
   credentialRegistry: "0x20265dAe4711B3CeF88D7078bf1290f815279De1",
-  hskPassport: "0x79A0E1160FA829595f45f0479782095ed497d5E6",
-  demoIssuer: "0xD6CB3393B9e1E162ed3EF8187082511d20Be28d1",
-  gatedRWA: "0xFc6bDE32f79ad43696abc6A2a6291bfA8AF1D249",
-  kycGatedAirdrop: "0x02F84538E05b66FD207923675f48B70541bBb01c",
-  kycGatedLending: "0x5430c4A4180492D5D0ce059355e82176F8AF9A20",
-  // Phase A+B+C: Technical novelty + HashKey integration + governance
-  credentialExpiry: "0x11fF27Bf3F0Bbf45a5dC43210359c56E45E97770",
-  credentialReputation: "0x39cc2a483Cc22Cf7B461759404642Fa528df96D7",
-  jurisdictionSetVerifier: "0x12B644146d1c227a6FD34423dAAa6D37427AbE13",
-  jurisdictionGatedPool: "0x38284a274c1999e5271e62f63e5e443B9A1fc1dc",
-  mockHashKeyDID: "0x398684D25337BB0DF1B03f3A1f7b0deA7654F8f5",
-  hashKeyDIDBridge: "0x37e855626a5cF51e808F96efe4455Dc225724472",
-  mockKYCSoulbound: "0xfC981C8F4Ca8592f7f73d84f02fB3344f6e09eBf",
-  hashKeyKYCImporter: "0x01fF7BFba82820a2595467a554678DB672eEa54f",
-  issuerRegistry: "0x79682C30670f374BD13F40C78c828a32F47582b3",
-  timelock: "0x27a145f5Ed0332Bb8a3D82Bf4B95A33B39523ef6",
+  hskPassport: "0xb430F30376344303560c0554DC94766D780a5c64",
+  demoIssuer: "0x77bE0CD574a3602923E2a0C3B42F01C11112A170",
+  gatedRWA: "0x5f7274C64C63Ea73144cf539aBF2504eB3208f25",
+  kycGatedAirdrop: "0xdf399c83cc316b518836df37F7aB54e2b2ada9f9",
+  kycGatedLending: "0x5B3107e67B6439A22dDC21e547f75855A3e70deD",
+  jurisdictionSetVerifier: "0x450Dbd60aC27B7bf0131c2b25451380552dd4fBb",
+  jurisdictionGatedPool: "0xA7C937D3D269267590bF9d411B066C57AC8462ec",
+  mockHashKeyDID: "0x39931820e457949b724d28C585F821005fcaB409",
+  hashKeyDIDBridge: "0x0cB4c519F984A2f43c1ca217CDB5095dB3b3A2a5",
+  mockKYCSoulbound: "0x195572EaE140f53CcBA065751C92659935D075E9",
+  hashKeyKYCImporter: "0x7A40694Eda3046706Fe89db771e88Cf3A979A117",
+  // Roadmap scaffolding — deployed but NOT production-enforced (see SECURITY.md)
+  credentialExpiry: "0xBB47Eb4104E8f77243B445AAE4925c74A839A924",
+  credentialReputation: "0x15b29aFeABb1d4C31A0BF6C87f0ae1d357D55D71",
+  issuerRegistry: "0x5BbAe6e90b82c7c51EbA9cA6D844D698dE2eb504",
+  timelock: "0xb07Bc78559CbDe44c047b1dC3028d13c4f863D8A",
 };
 
 // Block where HSKPassport was deployed — use as fromBlock for event queries
 // to avoid expensive full-range scans that cause RPC timeouts.
-export const HSK_PASSPORT_DEPLOY_BLOCK = 26371173;
+export const HSK_PASSPORT_DEPLOY_BLOCK = 26410000;
 
 export const GROUPS = {
-  KYC_VERIFIED: 15,
-  ACCREDITED_INVESTOR: 16,
-  HK_RESIDENT: 17,
-  SG_RESIDENT: 18,
-  AE_RESIDENT: 19,
+  KYC_VERIFIED: 20,
+  ACCREDITED_INVESTOR: 21,
+  HK_RESIDENT: 22,
+  SG_RESIDENT: 23,
+  AE_RESIDENT: 24,
 };
 
 export const GROUP_NAMES: Record<number, string> = {
-  15: "KYC Verified",
-  16: "Accredited Investor",
-  17: "HK Resident",
-  18: "SG Resident",
-  19: "AE Resident",
+  20: "KYC Verified",
+  21: "Accredited Investor",
+  22: "HK Resident",
+  23: "SG Resident",
+  24: "AE Resident",
 };
 
 export const HSK_PASSPORT_ABI = [

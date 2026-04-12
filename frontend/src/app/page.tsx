@@ -22,17 +22,17 @@ export default function Home() {
 
         <div className="relative max-w-6xl mx-auto px-4 py-20 text-center">
           <div className="inline-block px-3 py-1 mb-6 text-xs font-mono text-purple-400 border border-purple-800 rounded-full bg-purple-950/30">
-            Privacy-preserving compliance infrastructure
+            Compliance layer for HashKey regulated RWA + institutional DeFi
           </div>
           <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight mb-6">
-            The privacy layer for
+            Verify once.
             <br />
             <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-              HashKey Chain compliance
+              Prove anywhere. Reveal nothing.
             </span>
           </h1>
           <p className="text-lg sm:text-xl text-gray-400 max-w-2xl mx-auto mb-10">
-            HSK Passport lets users prove KYC status, accreditation, or residency without revealing their identity. Built for regulated RWA, DeFi, and institutional use cases on HashKey Chain.
+            Every regulated product on HashKey needs compliance, but today that means leaking identity or rebuilding KYC for every app. HSK Passport is a reusable privacy layer: extend HashKey&apos;s KYC + DID stack, verify once, prove anywhere on-chain, reveal nothing.
           </p>
           <div className="flex flex-wrap gap-3 justify-center mb-12">
             <Link

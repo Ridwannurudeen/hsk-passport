@@ -1,12 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.23 <0.9.0;
 
-/// @title CredentialExpiry — On-chain expiry tracking for HSK Passport credentials
-/// @notice Layers on top of HSKPassport to enforce time-bounded credentials.
-///         Issuers call markIssued() alongside HSKPassport.issueCredential() to record timestamp.
-///         dApps call isValid() or verifyWithExpiry() to check both validity and expiry.
-/// @dev Decoupled from HSKPassport core so existing credentials remain unaffected.
-///      Per-group validity period (in seconds). 0 = never expires.
+/// @title CredentialExpiry — ROADMAP FEATURE, NOT YET INTEGRATED INTO VERIFY PATH
+/// @notice Tracks per-credential issuance timestamps; exposes isExpired/expiresAt lookups.
+/// @dev !!! AUDIT FINDING (April 2026): This contract stores timestamps but
+///      HSKPassport.verifyCredential does NOT consult this contract. Expiry is not enforced
+///      on-chain in the current release. Additionally, privately binding an identity
+///      commitment to a ZK proof for expiry lookup requires a circuit extension.
+///
+///      Current behavior: lookups (isExpired, expiresAt, timeUntilExpiry) return data,
+///      but a dApp must integrate them explicitly to honor expiry. The base
+///      verifyCredential() does not reject expired credentials.
+///
+///      Q3 2026 roadmap: integrate into verify path with ZK circuit support.
 contract CredentialExpiry {
     address public owner;
     address public hskPassport;

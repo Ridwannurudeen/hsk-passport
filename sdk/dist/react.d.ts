@@ -45,7 +45,7 @@ export declare function HSKPassportGate({ network, groupId, scope, signer, onVer
  */
 export declare function useHSKPassport(network?: NetworkName): {
     passport: HSKPassport;
-    generateProof: (identitySecret: string, groupId: number, scope: string | number) => Promise<HSKPassportProof | null>;
+    generateProof: (identitySecret: string, groupId: number, scope: string | number, callerAddress: string) => Promise<HSKPassportProof | null>;
     loading: boolean;
     error: Error | null;
 };

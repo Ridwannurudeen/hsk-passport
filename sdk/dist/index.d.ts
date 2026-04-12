@@ -63,15 +63,15 @@ export declare class HSKPassport {
         readonly contracts: {
             readonly semaphore: "0xd09e8Aec6B6A36588E7A105f606A9fe9a134CFE9";
             readonly credentialRegistry: "0x20265dAe4711B3CeF88D7078bf1290f815279De1";
-            readonly hskPassport: "0x79A0E1160FA829595f45f0479782095ed497d5E6";
-            readonly demoIssuer: "0xD6CB3393B9e1E162ed3EF8187082511d20Be28d1";
-            readonly gatedRWA: "0xFc6bDE32f79ad43696abc6A2a6291bfA8AF1D249";
+            readonly hskPassport: "0xb430F30376344303560c0554DC94766D780a5c64";
+            readonly demoIssuer: "0x77bE0CD574a3602923E2a0C3B42F01C11112A170";
+            readonly gatedRWA: "0x5f7274C64C63Ea73144cf539aBF2504eB3208f25";
         };
-        readonly deployBlock: 26371173;
+        readonly deployBlock: 26410000;
         readonly groups: {
-            readonly KYC_VERIFIED: 15;
-            readonly ACCREDITED_INVESTOR: 16;
-            readonly HK_RESIDENT: 17;
+            readonly KYC_VERIFIED: 20;
+            readonly ACCREDITED_INVESTOR: 21;
+            readonly HK_RESIDENT: 22;
         };
     };
     /** Get group info from chain */
@@ -88,9 +88,14 @@ export declare class HSKPassport {
      * @param identity - The user's Semaphore identity
      * @param groupId - The credential group to prove membership in
      * @param scope - Action scope (unique per action for sybil resistance)
-     * @param message - Optional message to bind to the proof (default: 1)
+     * @param message - REQUIRED. Bind the proof to prevent front-running.
+     *                  Pass `BigInt(callerAddress)` where callerAddress is the msg.sender
+     *                  that will submit the proof on-chain. The dApp's verifier contract
+     *                  MUST check that `proof.message == uint256(uint160(msg.sender))`.
+     *                  Passing arbitrary values (like 1) leaves the proof vulnerable
+     *                  to front-running.
      */
-    generateProof(identity: Identity, groupId: number, scope: number | bigint | string, message?: number | bigint): Promise<HSKPassportProof>;
+    generateProof(identity: Identity, groupId: number, scope: number | bigint | string, message: number | bigint): Promise<HSKPassportProof>;
     /** Verify a proof on-chain (read-only, does not consume nullifier) */
     verifyProof(groupId: number, proof: HSKPassportProof): Promise<boolean>;
     /** Submit and validate a proof on-chain (consumes nullifier, requires signer) */

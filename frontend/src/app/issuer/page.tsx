@@ -9,7 +9,7 @@ import {
   GROUPS,
   EXPLORER_URL,
 } from "@/lib/contracts";
-import { apiGetKYCQueue, apiReviewKYC, type KYCRequest } from "@/lib/api";
+import { apiGetKYCQueue, apiReviewKYC, buildReviewMessage, type KYCRequest } from "@/lib/api";
 import { useToast } from "@/components/Toast";
 
 const CREDENTIAL_TYPE_TO_GROUP: Record<string, number> = {
@@ -91,10 +91,17 @@ export default function IssuerPage() {
       const tx = await passport.issueCredential(groupId, BigInt(req.identity_commitment));
       await tx.wait();
 
+      // Sign review authorization for the backend
+      const nonce = Date.now();
+      const message = buildReviewMessage(req.id, "approve", nonce);
+      const signature = await signer.signMessage(message);
+
       await apiReviewKYC({
         id: req.id,
         reviewer: address,
         action: "approve",
+        signature,
+        nonce,
         txHash: tx.hash,
       });
 
@@ -103,10 +110,18 @@ export default function IssuerPage() {
     } catch (e) {
       const msg = (e as Error).message;
       if (msg.includes("CredentialAlreadyIssued")) {
-        // mark as approved anyway — they already have it
-        await apiReviewKYC({ id: req.id, reviewer: address, action: "approve" });
-        toast("Credential already on-chain, marked approved", "info");
-        await refreshQueue();
+        try {
+          const { signer: s2 } = await connectWallet();
+          const nonce2 = Date.now();
+          const sig2 = await s2.signMessage(buildReviewMessage(req.id, "approve", nonce2));
+          await apiReviewKYC({ id: req.id, reviewer: address, action: "approve", signature: sig2, nonce: nonce2 });
+          toast("Credential already on-chain, marked approved", "info");
+          await refreshQueue();
+        } catch (ee) {
+          toast(`Already issued but backend update failed: ${(ee as Error).message.slice(0, 80)}`, "error");
+        }
+      } else if (msg.includes("user rejected")) {
+        toast("Signature or transaction cancelled.", "info");
       } else {
         toast(`Approval failed: ${msg.slice(0, 100)}`, "error");
       }
@@ -118,16 +133,27 @@ export default function IssuerPage() {
     const reason = prompt("Rejection reason (optional):") || "Did not meet verification requirements";
     setReviewingId(req.id);
     try {
+      const { signer } = await connectWallet();
+      const nonce = Date.now();
+      const signature = await signer.signMessage(buildReviewMessage(req.id, "reject", nonce));
+
       await apiReviewKYC({
         id: req.id,
-        reviewer: address || "0x0000000000000000000000000000000000000000",
+        reviewer: address,
         action: "reject",
+        signature,
+        nonce,
         rejectionReason: reason,
       });
       toast("Request rejected", "info");
       await refreshQueue();
     } catch (e) {
-      toast(`Reject failed: ${(e as Error).message}`, "error");
+      const msg = (e as Error).message;
+      if (msg.includes("user rejected")) {
+        toast("Signature cancelled.", "info");
+      } else {
+        toast(`Reject failed: ${msg.slice(0, 100)}`, "error");
+      }
     }
     setReviewingId(null);
   }

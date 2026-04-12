@@ -80,6 +80,8 @@ export async function apiReviewKYC(body: {
   id: string;
   reviewer: string;
   action: "approve" | "reject";
+  signature: string;
+  nonce: number;
   txHash?: string;
   rejectionReason?: string;
 }): Promise<{ id: string; status: string }> {
@@ -88,6 +90,14 @@ export async function apiReviewKYC(body: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`KYC review failed: ${res.status}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    throw new Error((err as { error?: string }).error || `KYC review failed: ${res.status}`);
+  }
   return res.json();
+}
+
+/** Build the message a reviewer must sign */
+export function buildReviewMessage(id: string, action: "approve" | "reject", nonce: number): string {
+  return `HSK Passport review: ${action} request ${id} at ${nonce}`;
 }

@@ -58,7 +58,12 @@ export function HSKPassportGate({
       const passport = HSKPassport.connect(network, signer);
       const identity = passport.createIdentity(identitySecret);
 
-      const proof = await passport.generateProof(identity, groupId, scope);
+      // Bind proof to caller to prevent front-running
+      if (!signer) {
+        throw new Error("HSKPassportGate requires a signer to bind proofs to the caller address");
+      }
+      const callerAddress = await signer.getAddress();
+      const proof = await passport.generateProof(identity, groupId, scope, BigInt(callerAddress));
       setStatus("Proof generated! Verifying...");
 
       const valid = await passport.verifyProof(groupId, proof);
@@ -102,12 +107,22 @@ export function useHSKPassport(network: NetworkName = "hashkey-testnet") {
   const passport = HSKPassport.connect(network);
 
   const generateProofForGroup = useCallback(
-    async (identitySecret: string, groupId: number, scope: string | number) => {
+    async (
+      identitySecret: string,
+      groupId: number,
+      scope: string | number,
+      callerAddress: string
+    ) => {
       setLoading(true);
       setError(null);
       try {
         const identity = passport.createIdentity(identitySecret);
-        const proof = await passport.generateProof(identity, groupId, scope);
+        const proof = await passport.generateProof(
+          identity,
+          groupId,
+          scope,
+          BigInt(callerAddress)
+        );
         return proof;
       } catch (err) {
         setError(err as Error);
