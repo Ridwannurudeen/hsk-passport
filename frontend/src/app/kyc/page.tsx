@@ -21,10 +21,17 @@ import {
   imageToDataUrl,
   dataUrlToImage,
   videoFrameToCanvas,
+  saveSession,
+  loadSession,
+  clearSession,
+  deserializeDescriptor,
+  serializeDescriptor,
+  compressDataUrl,
   type ExtractedDocumentData,
   type FaceMatchResult,
   type LivenessFrame,
 } from "@/lib/kyc-local";
+import { COUNTRIES } from "@/lib/countries";
 import { useToast } from "@/components/Toast";
 
 const CREDENTIAL_TYPES = [
@@ -65,7 +72,7 @@ export default function KYCPage() {
   const [submitting, setSubmitting] = useState(false);
   const [kycStatus, setKYCStatus] = useState<KYCRequest | null>(null);
 
-  // Load face models on mount
+  // Load face models + any saved session on mount
   useEffect(() => {
     loadFaceApiModels().catch((e) => {
       toast(`Face model load failed: ${(e as Error).message}`, "error");
@@ -74,11 +81,45 @@ export default function KYCPage() {
     const stored = loadIdentity();
     if (stored) {
       setIdentity(stored);
-      setStage("document");
       checkStatus(stored);
+
+      // Attempt to restore in-progress session
+      const session = loadSession();
+      if (session) {
+        if (session.extractedData) setExtractedData(session.extractedData);
+        if (session.documentPreviewCompressed) setDocumentPreview(session.documentPreviewCompressed);
+        if (session.documentFaceDescriptor) {
+          setDocumentFaceDescriptor(deserializeDescriptor(session.documentFaceDescriptor));
+        }
+        if (session.selfieDescriptor) {
+          setSelfieDescriptor(deserializeDescriptor(session.selfieDescriptor));
+        }
+        if (session.faceMatch) setFaceMatch(session.faceMatch);
+        if (session.livenessPass) setLivenessPass(session.livenessPass);
+        if (session.credentialType) setCredentialType(session.credentialType);
+        if (session.stage) setStage(session.stage as Stage);
+        toast("Restored your verification progress", "info");
+      } else {
+        setStage("document");
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-save session whenever key state changes (except when we're already submitted)
+  useEffect(() => {
+    if (!identity || stage === "identity" || stage === "submitted") return;
+    saveSession({
+      stage,
+      credentialType,
+      extractedData,
+      documentPreviewCompressed: documentPreview.length > 200_000 ? null : documentPreview,
+      documentFaceDescriptor: serializeDescriptor(documentFaceDescriptor),
+      selfieDescriptor: serializeDescriptor(selfieDescriptor),
+      faceMatch,
+      livenessPass,
+    });
+  }, [identity, stage, credentialType, extractedData, documentPreview, documentFaceDescriptor, selfieDescriptor, faceMatch, livenessPass]);
 
   async function checkStatus(id: Identity) {
     try {
@@ -115,7 +156,9 @@ export default function KYCPage() {
   async function handleDocumentUpload(file: File) {
     setDocumentFile(file);
     const dataUrl = await imageToDataUrl(file);
-    setDocumentPreview(dataUrl);
+    // Store compressed version in React state (used for both display and session persistence)
+    const compressed = await compressDataUrl(dataUrl, 500);
+    setDocumentPreview(compressed);
     setExtractedData(null);
     setDocumentFaceDescriptor(null);
     setOcrProgress(0);
@@ -287,6 +330,7 @@ export default function KYCPage() {
       });
 
       toast("Submitted! Waiting for issuer review.", "success");
+      clearSession();
       setKYCStatus({
         ...(result as unknown as KYCRequest),
         identity_commitment: getCommitment(identity).toString(),
@@ -317,14 +361,40 @@ export default function KYCPage() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-12">
-      <div className="mb-6">
-        <div className="inline-block px-3 py-1 mb-3 text-xs font-mono text-purple-400 border border-purple-800 rounded-full bg-purple-950/30">
-          Privacy-preserving KYC — all processing in-browser
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <div className="inline-block px-3 py-1 mb-3 text-xs font-mono text-purple-400 border border-purple-800 rounded-full bg-purple-950/30">
+            Privacy-preserving KYC — all processing in-browser
+          </div>
+          <h1 className="text-3xl font-bold mb-2">Verify Your Identity</h1>
+          <p className="text-gray-400">
+            Real document OCR, face matching, and liveness detection — all running locally in your browser. No data ever leaves your device.
+          </p>
+          <p className="text-xs text-gray-500 mt-2">
+            Progress auto-saved. You can safely close this tab and return within 30 minutes.
+          </p>
         </div>
-        <h1 className="text-3xl font-bold mb-2">Verify Your Identity</h1>
-        <p className="text-gray-400">
-          Real document OCR, face matching, and liveness detection — all running locally in your browser. No data ever leaves your device.
-        </p>
+        {stage !== "identity" && stage !== "submitted" && (
+          <button
+            onClick={() => {
+              if (confirm("Clear all verification progress and start over?")) {
+                clearSession();
+                setExtractedData(null);
+                setDocumentPreview("");
+                setDocumentFile(null);
+                setDocumentFaceDescriptor(null);
+                setSelfieDescriptor(null);
+                setFaceMatch(null);
+                setLivenessPass(false);
+                setStage("document");
+                toast("Cleared. Start over from document upload.", "info");
+              }
+            }}
+            className="shrink-0 px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 text-gray-400 rounded-lg border border-gray-700"
+          >
+            Start Over
+          </button>
+        )}
       </div>
 
       {/* Privacy guarantee */}
@@ -453,16 +523,10 @@ export default function KYCPage() {
                           onChange={(e) => setExtractedData({ ...extractedData, possibleCountry: e.target.value || null })}
                           className="w-full px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-purple-300 text-sm"
                         >
-                          <option value="">(select)</option>
-                          <option value="HK">Hong Kong SAR</option>
-                          <option value="SG">Singapore</option>
-                          <option value="AE">United Arab Emirates</option>
-                          <option value="US">United States</option>
-                          <option value="GB">United Kingdom</option>
-                          <option value="JP">Japan</option>
-                          <option value="KR">South Korea</option>
-                          <option value="CN">China</option>
-                          <option value="OTHER">Other</option>
+                          <option value="">(select country)</option>
+                          {COUNTRIES.map((c) => (
+                            <option key={c.code} value={c.code}>{c.name}</option>
+                          ))}
                         </select>
                       </div>
                       <div className="flex justify-between pt-2 border-t border-gray-800">
@@ -480,6 +544,18 @@ export default function KYCPage() {
                   )}
                 </div>
               </div>
+
+              {/* Raw OCR text — collapsible — helps user correct fields */}
+              {extractedData?.rawText && (
+                <details className="mt-4">
+                  <summary className="text-xs text-purple-400 hover:text-purple-300 cursor-pointer">
+                    Show raw OCR output (for reference — copy from here if fields are wrong)
+                  </summary>
+                  <pre className="mt-2 p-3 bg-gray-950 border border-gray-800 rounded text-[11px] font-mono text-gray-400 whitespace-pre-wrap max-h-40 overflow-y-auto">
+                    {extractedData.rawText}
+                  </pre>
+                </details>
+              )}
 
               {documentFaceDescriptor && !ocrRunning && (
                 <button

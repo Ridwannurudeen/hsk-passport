@@ -90,25 +90,32 @@ async function preprocessImage(file: File): Promise<HTMLCanvasElement> {
 }
 
 export async function extractDocumentText(file: File): Promise<string> {
-  // Preprocess for better OCR
   const canvas = await preprocessImage(file);
+  const worker = await createWorker("eng", 1, { logger: () => {} });
 
-  const worker = await createWorker("eng", 1, {
-    // Use the better quality LSTM engine
-    logger: () => {},
-  });
+  // Try multiple page segmentation modes, pick result with most content.
+  // PSM 6: single uniform block. PSM 11: sparse text. PSM 4: single column of variable-size text.
+  const psmModes = ["6", "11", "4"] as const;
+  let best = { text: "", score: 0 };
 
-  // Tune Tesseract for document text (mixed printed text blocks)
-  await worker.setParameters({
-    tessedit_pageseg_mode: "6" as unknown as Parameters<typeof worker.setParameters>[0]["tessedit_pageseg_mode"], // Assume a single uniform block of text
-    preserve_interword_spaces: "1",
-    tessedit_char_whitelist:
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .,'-/<>():",
-  });
+  for (const psm of psmModes) {
+    await worker.setParameters({
+      tessedit_pageseg_mode: psm as unknown as Parameters<typeof worker.setParameters>[0]["tessedit_pageseg_mode"],
+      preserve_interword_spaces: "1",
+    });
+    try {
+      const result = await worker.recognize(canvas);
+      const text = result.data.text;
+      const lines = text.split("\n").filter(l => l.trim().length >= 3).length;
+      const score = lines * 10 + text.length;
+      if (score > best.score) best = { text, score };
+    } catch {
+      // ignore failed PSM
+    }
+  }
 
-  const result = await worker.recognize(canvas);
   await worker.terminate();
-  return result.data.text;
+  return best.text;
 }
 
 export async function extractDocumentTextWithPreview(file: File): Promise<{ text: string; preprocessedDataUrl: string }> {
@@ -169,14 +176,30 @@ export function parseDocumentFields(rawText: string): ExtractedDocumentData {
   let possibleIDNumber: string | null = null;
   let possibleCountry: string | null = null;
 
+  // Heuristic: name lines usually have ≥2 words, mostly letters, no year-like digits
+  const nameCandidates: { line: string; score: number }[] = [];
+
   for (const line of lines) {
-    // Name detection
-    if (!possibleName) {
-      const nameMatch = line.match(/^[A-Z][a-zA-Z\s'-]{2,40}\s[A-Z][a-zA-Z\s'-]{2,40}$/);
-      if (nameMatch && !/\d/.test(line) && line.length < 50) {
-        possibleName = line;
-      } else if (/^[A-Z\s'-]{6,50}$/.test(line) && line.split(/\s+/).length >= 2 && line.split(/\s+/).length <= 5) {
-        possibleName = line;
+    // Name detection — collect candidates with a score, pick the best later
+    const words = line.trim().split(/\s+/);
+    const letterCount = (line.match(/[a-zA-Z]/g) || []).length;
+    const digitCount = (line.match(/\d/g) || []).length;
+    const totalChars = line.replace(/\s/g, "").length;
+    // Heuristic scoring:
+    //  - 2-5 words
+    //  - mostly letters (letters > 60% of non-space chars)
+    //  - not many digits
+    //  - reasonable total length (6-60 chars)
+    //  - bonus for lines with all caps (common on IDs)
+    if (words.length >= 2 && words.length <= 5 && totalChars >= 6 && totalChars <= 60) {
+      const letterRatio = letterCount / Math.max(1, totalChars);
+      if (letterRatio > 0.6 && digitCount <= 2) {
+        let score = letterRatio * 100 + (words.length * 5);
+        if (/^[A-Z][a-zA-Z\s.'-]+$/.test(line)) score += 20;
+        if (/^[A-Z\s.'-]+$/.test(line)) score += 30; // all caps = bonus
+        // Penalize lines that look like headers/labels
+        if (/^(NAME|SURNAME|GIVEN|NAMES?|PASSPORT|ID|DOB|BIRTH|NATIONAL|CARD|IDENTIFICATION|REPUBLIC|KINGDOM)/i.test(line)) score -= 50;
+        nameCandidates.push({ line, score });
       }
     }
 
@@ -209,6 +232,12 @@ export function parseDocumentFields(rawText: string): ExtractedDocumentData {
         }
       }
     }
+  }
+
+  // Pick the best name candidate
+  if (nameCandidates.length > 0) {
+    nameCandidates.sort((a, b) => b.score - a.score);
+    possibleName = nameCandidates[0].line;
   }
 
   return {
@@ -384,4 +413,87 @@ export function videoFrameToCanvas(video: HTMLVideoElement): HTMLCanvasElement {
   const ctx = canvas.getContext("2d");
   ctx?.drawImage(video, 0, 0);
   return canvas;
+}
+
+// ============================================================
+// Session persistence — save in-progress verification to localStorage
+// so users don't lose work on refresh.
+// ============================================================
+
+const SESSION_KEY = "hsk-passport-kyc-session";
+const MAX_SESSION_AGE_MS = 30 * 60 * 1000; // 30 minutes
+
+export interface KYCSession {
+  timestamp: number;
+  stage: string;
+  credentialType: string;
+  extractedData: ExtractedDocumentData | null;
+  documentPreviewCompressed: string | null; // downsized data URL for UI only
+  documentFaceDescriptor: number[] | null; // serialized Float32Array
+  selfieDescriptor: number[] | null;
+  faceMatch: FaceMatchResult | null;
+  livenessPass: boolean;
+}
+
+export function saveSession(session: Omit<KYCSession, "timestamp">): void {
+  try {
+    const s: KYCSession = { ...session, timestamp: Date.now() };
+    localStorage.setItem(SESSION_KEY, JSON.stringify(s));
+  } catch {
+    // localStorage quota or disabled — ignore silently
+  }
+}
+
+export function loadSession(): KYCSession | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const session = JSON.parse(raw) as KYCSession;
+    // Expire old sessions
+    if (Date.now() - session.timestamp > MAX_SESSION_AGE_MS) {
+      localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
+    return session;
+  } catch {
+    return null;
+  }
+}
+
+export function clearSession(): void {
+  try {
+    localStorage.removeItem(SESSION_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+/** Restore a Float32Array face descriptor from a serialized number array */
+export function deserializeDescriptor(arr: number[] | null): Float32Array | null {
+  if (!arr) return null;
+  return new Float32Array(arr);
+}
+
+export function serializeDescriptor(desc: Float32Array | null): number[] | null {
+  if (!desc) return null;
+  return Array.from(desc);
+}
+
+/** Downsize an image data URL to a small thumbnail for session storage */
+export async function compressDataUrl(dataUrl: string, maxDim = 400): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext("2d")?.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", 0.7));
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
 }
