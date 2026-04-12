@@ -31,14 +31,102 @@ export async function loadFaceApiModels(): Promise<void> {
 }
 
 // ============================================================
-// Document OCR
+// Document OCR (with preprocessing)
 // ============================================================
 
-export async function extractDocumentText(imageData: string | File | HTMLImageElement): Promise<string> {
-  const worker = await createWorker("eng");
-  const result = await worker.recognize(imageData as Parameters<typeof worker.recognize>[0]);
+/**
+ * Preprocess image to improve OCR accuracy:
+ *  - Upscale small images (Tesseract works best at 300+ DPI equivalent)
+ *  - Convert to grayscale
+ *  - Boost contrast
+ *  - Binarize (threshold at midpoint)
+ */
+async function preprocessImage(file: File): Promise<HTMLCanvasElement> {
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const i = new Image();
+    i.onload = () => { URL.revokeObjectURL(url); resolve(i); };
+    i.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
+    i.src = url;
+  });
+
+  // Upscale if image is small (targeting ~1600px on the long edge)
+  const maxDim = Math.max(img.width, img.height);
+  const scale = maxDim < 1600 ? 1600 / maxDim : 1;
+  const w = Math.round(img.width * scale);
+  const h = Math.round(img.height * scale);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, 0, 0, w, h);
+
+  // Grayscale + contrast boost + soft binarization
+  const imageData = ctx.getImageData(0, 0, w, h);
+  const data = imageData.data;
+
+  // Compute mean luminance for adaptive thresholding
+  let sum = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    sum += gray;
+  }
+  const mean = sum / (data.length / 4);
+
+  // Contrast stretching around the mean
+  const CONTRAST = 1.6;
+  for (let i = 0; i < data.length; i += 4) {
+    const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    // Center on mean, apply contrast, then clamp
+    let v = (gray - mean) * CONTRAST + mean;
+    v = Math.max(0, Math.min(255, v));
+    data[i] = data[i + 1] = data[i + 2] = v;
+  }
+  ctx.putImageData(imageData, 0, 0);
+
+  return canvas;
+}
+
+export async function extractDocumentText(file: File): Promise<string> {
+  // Preprocess for better OCR
+  const canvas = await preprocessImage(file);
+
+  const worker = await createWorker("eng", 1, {
+    // Use the better quality LSTM engine
+    logger: () => {},
+  });
+
+  // Tune Tesseract for document text (mixed printed text blocks)
+  await worker.setParameters({
+    tessedit_pageseg_mode: "6" as unknown as Parameters<typeof worker.setParameters>[0]["tessedit_pageseg_mode"], // Assume a single uniform block of text
+    preserve_interword_spaces: "1",
+    tessedit_char_whitelist:
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .,'-/<>():",
+  });
+
+  const result = await worker.recognize(canvas);
   await worker.terminate();
   return result.data.text;
+}
+
+export async function extractDocumentTextWithPreview(file: File): Promise<{ text: string; preprocessedDataUrl: string }> {
+  const canvas = await preprocessImage(file);
+
+  const worker = await createWorker("eng", 1, { logger: () => {} });
+  await worker.setParameters({
+    tessedit_pageseg_mode: "6" as unknown as Parameters<typeof worker.setParameters>[0]["tessedit_pageseg_mode"],
+    preserve_interword_spaces: "1",
+  });
+
+  const result = await worker.recognize(canvas);
+  await worker.terminate();
+
+  return {
+    text: result.data.text,
+    preprocessedDataUrl: canvas.toDataURL("image/png"),
+  };
 }
 
 export function parseDocumentFields(rawText: string): ExtractedDocumentData {
@@ -189,39 +277,67 @@ export async function detectEyeAspectRatio(
   return (eyeAspectRatio(leftEye) + eyeAspectRatio(rightEye)) / 2;
 }
 
+export interface BlinkDetectionResult {
+  detected: boolean;
+  baseline: number;
+  threshold: number;
+  minSeen: number;
+  currentEAR: number;
+  framesAnalyzed: number;
+  debug: string;
+}
+
 /**
- * Adaptive blink detection — doesn't use a fixed threshold.
+ * Adaptive blink detection with full debug info so UI can show what's happening.
  *
  * Algorithm:
- *  1. Compute user's personal baseline from the first N frames (top 70% of EAR values → their eyes-open average)
- *  2. A blink is any frame where EAR < baseline * 0.70 (30% drop)
- *  3. To avoid false positives from jitter, require at least 2 frames below the drop threshold
- *
- * This works regardless of individual eye shape — whether your baseline is 0.20 or 0.35,
- * a genuine blink drops it by 40-60% which clearly crosses 30%.
+ *  1. Need ≥5 frames to establish baseline
+ *  2. Baseline = median of top 60% of EAR values (more robust to outliers than mean)
+ *  3. Blink = ANY frame where EAR < baseline * 0.80 (20% drop — more forgiving)
+ *     OR any frame where EAR < 0.22 (absolute threshold for definite closure)
  */
-export function detectBlink(frames: LivenessFrame[]): boolean {
-  if (frames.length < 6) return false; // need enough data to establish baseline
+export function detectBlink(frames: LivenessFrame[]): BlinkDetectionResult {
+  const currentEAR = frames.length > 0 ? frames[frames.length - 1].eyeAspectRatio : 0;
 
-  // Establish baseline from top 70% of EAR values (likely eyes-open frames)
-  const sorted = frames.map(f => f.eyeAspectRatio).sort((a, b) => b - a);
-  const openCount = Math.max(3, Math.floor(sorted.length * 0.7));
-  const baseline = sorted.slice(0, openCount).reduce((a, b) => a + b, 0) / openCount;
-
-  const blinkThreshold = baseline * 0.70; // 30% drop from baseline
-  const hardMinThreshold = 0.20; // sanity floor — EAR below this is definitely closed
-
-  // Count consecutive "closed" frames
-  let closedStreak = 0;
-  for (const f of frames) {
-    if (f.eyeAspectRatio < blinkThreshold || f.eyeAspectRatio < hardMinThreshold) {
-      closedStreak++;
-      if (closedStreak >= 1) return true; // one genuine drop = blink detected
-    } else {
-      closedStreak = 0;
-    }
+  if (frames.length < 5) {
+    return {
+      detected: false,
+      baseline: 0,
+      threshold: 0,
+      minSeen: currentEAR,
+      currentEAR,
+      framesAnalyzed: frames.length,
+      debug: `Calibrating... ${frames.length}/5 frames`,
+    };
   }
-  return false;
+
+  // Median of top 60% is a robust baseline (ignores outliers from blinks)
+  const sorted = [...frames].map(f => f.eyeAspectRatio).sort((a, b) => b - a);
+  const openCount = Math.max(3, Math.floor(sorted.length * 0.6));
+  const top = sorted.slice(0, openCount);
+  const baseline = top[Math.floor(top.length / 2)]; // median
+
+  const blinkThreshold = Math.max(baseline * 0.80, 0.15); // 20% drop OR hard floor at 0.15
+  const absoluteClosedThreshold = 0.22; // classic EAR threshold
+
+  const minSeen = Math.min(...frames.map(f => f.eyeAspectRatio));
+
+  // Detect: any frame below adaptive threshold, or below absolute threshold
+  const detected = frames.some(
+    f => f.eyeAspectRatio < blinkThreshold || f.eyeAspectRatio < absoluteClosedThreshold
+  );
+
+  return {
+    detected,
+    baseline,
+    threshold: blinkThreshold,
+    minSeen,
+    currentEAR,
+    framesAnalyzed: frames.length,
+    debug: detected
+      ? "Blink detected!"
+      : `EAR: ${currentEAR.toFixed(3)} | baseline: ${baseline.toFixed(3)} | need < ${blinkThreshold.toFixed(3)} | min seen: ${minSeen.toFixed(3)}`,
+  };
 }
 
 // ============================================================

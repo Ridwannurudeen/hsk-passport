@@ -211,22 +211,23 @@ export default function KYCPage() {
     toast("Liveness confirmed. Review before submission.", "success");
   }
 
+  const [blinkDebug, setBlinkDebug] = useState<string>("Waiting for frames...");
+
   async function startLivenessCheck() {
     setLivenessActive(true);
     setLivenessFrames([]);
     setLivenessPass(false);
-    setLivenessMessage("Keep your face in view and blink naturally");
+    setLivenessMessage("Keep face in view and blink naturally");
+    setBlinkDebug("Starting detection...");
     livenessAbortRef.current = false;
 
     const startTime = Date.now();
     const frames: LivenessFrame[] = [];
-    const TIMEOUT_MS = 30_000;
+    const TIMEOUT_MS = 45_000;
 
-    // Self-scheduling async loop — no setInterval overlap.
-    // Each detection takes ~150-300ms; loop runs as fast as possible.
     while (!livenessAbortRef.current) {
       if (Date.now() - startTime > TIMEOUT_MS) {
-        setLivenessMessage("Timeout. Try blink again or use manual confirm.");
+        setLivenessMessage("Timeout. Use Manual Confirm to proceed.");
         setLivenessActive(false);
         return;
       }
@@ -242,24 +243,26 @@ export default function KYCPage() {
           frames.push({ timestamp: Date.now(), eyeAspectRatio: ear });
           setLivenessFrames([...frames]);
 
-          // After collecting 6+ frames, start looking for blinks
-          if (frames.length >= 6 && detectBlink(frames)) {
+          const result = detectBlink(frames);
+          setBlinkDebug(result.debug);
+
+          if (result.detected) {
             proceedToReview();
             return;
           }
 
-          // Guidance message based on frame count
-          if (frames.length < 6) {
-            setLivenessMessage(`Calibrating... ${frames.length}/6 frames`);
+          if (frames.length < 5) {
+            setLivenessMessage(`Calibrating... ${frames.length}/5 frames`);
           } else {
-            setLivenessMessage("Blink your eyes now");
+            setLivenessMessage(`Blink now — min EAR seen: ${result.minSeen.toFixed(3)} (need < ${result.threshold.toFixed(3)})`);
           }
+        } else {
+          setBlinkDebug("No face detected in frame");
         }
-      } catch {
-        // ignore single-frame failures
+      } catch (e) {
+        setBlinkDebug(`Detection error: ${(e as Error).message.slice(0, 50)}`);
       }
 
-      // Small delay between frames (also yields to UI)
       await new Promise((r) => setTimeout(r, 50));
     }
   }
@@ -408,40 +411,70 @@ export default function KYCPage() {
                   <img src={documentPreview} alt="Document" className="w-full rounded-lg border border-gray-800" />
                 </div>
                 <div>
-                  <div className="text-xs text-gray-500 mb-2">Extracted fields (locally parsed)</div>
+                  <div className="text-xs text-gray-500 mb-2 flex items-center justify-between">
+                    <span>Extracted fields — review and correct if needed</span>
+                  </div>
                   {extractedData ? (
-                    <dl className="text-sm space-y-2">
-                      <div className="flex justify-between">
-                        <dt className="text-gray-500">Name</dt>
-                        <dd className={extractedData.possibleName ? "text-purple-300" : "text-gray-600"}>
-                          {extractedData.possibleName || "(not detected)"}
-                        </dd>
+                    <div className="text-sm space-y-2">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-0.5">Full name</label>
+                        <input
+                          type="text"
+                          value={extractedData.possibleName || ""}
+                          onChange={(e) => setExtractedData({ ...extractedData, possibleName: e.target.value || null })}
+                          placeholder="(not detected — type manually)"
+                          className="w-full px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-purple-300 text-sm"
+                        />
                       </div>
-                      <div className="flex justify-between">
-                        <dt className="text-gray-500">Date of birth</dt>
-                        <dd className={extractedData.possibleDOB ? "text-purple-300" : "text-gray-600"}>
-                          {extractedData.possibleDOB || "(not detected)"}
-                        </dd>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-0.5">Date of birth</label>
+                        <input
+                          type="text"
+                          value={extractedData.possibleDOB || ""}
+                          onChange={(e) => setExtractedData({ ...extractedData, possibleDOB: e.target.value || null })}
+                          placeholder="DD/MM/YYYY"
+                          className="w-full px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-purple-300 text-sm"
+                        />
                       </div>
-                      <div className="flex justify-between">
-                        <dt className="text-gray-500">ID number</dt>
-                        <dd className={extractedData.possibleIDNumber ? "text-purple-300 font-mono" : "text-gray-600"}>
-                          {extractedData.possibleIDNumber || "(not detected)"}
-                        </dd>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-0.5">ID number</label>
+                        <input
+                          type="text"
+                          value={extractedData.possibleIDNumber || ""}
+                          onChange={(e) => setExtractedData({ ...extractedData, possibleIDNumber: e.target.value || null })}
+                          placeholder="ID document number"
+                          className="w-full px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-purple-300 text-sm font-mono"
+                        />
                       </div>
-                      <div className="flex justify-between">
-                        <dt className="text-gray-500">Country</dt>
-                        <dd className={extractedData.possibleCountry ? "text-purple-300" : "text-gray-600"}>
-                          {extractedData.possibleCountry || "(not detected)"}
-                        </dd>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-0.5">Country / Jurisdiction</label>
+                        <select
+                          value={extractedData.possibleCountry || ""}
+                          onChange={(e) => setExtractedData({ ...extractedData, possibleCountry: e.target.value || null })}
+                          className="w-full px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-purple-300 text-sm"
+                        >
+                          <option value="">(select)</option>
+                          <option value="HK">Hong Kong SAR</option>
+                          <option value="SG">Singapore</option>
+                          <option value="AE">United Arab Emirates</option>
+                          <option value="US">United States</option>
+                          <option value="GB">United Kingdom</option>
+                          <option value="JP">Japan</option>
+                          <option value="KR">South Korea</option>
+                          <option value="CN">China</option>
+                          <option value="OTHER">Other</option>
+                        </select>
                       </div>
-                      <div className="flex justify-between">
-                        <dt className="text-gray-500">Face in document</dt>
-                        <dd className={documentFaceDescriptor ? "text-green-400" : "text-gray-600"}>
+                      <div className="flex justify-between pt-2 border-t border-gray-800">
+                        <span className="text-xs text-gray-500">Face in document</span>
+                        <span className={documentFaceDescriptor ? "text-green-400 text-xs" : "text-gray-600 text-xs"}>
                           {documentFaceDescriptor ? "✓ Detected" : "Pending..."}
-                        </dd>
+                        </span>
                       </div>
-                    </dl>
+                      <p className="text-[11px] text-gray-500 italic pt-1">
+                        Local OCR can have errors. You can correct any field above before proceeding.
+                      </p>
+                    </div>
                   ) : (
                     <p className="text-sm text-gray-500">Processing...</p>
                   )}
@@ -451,9 +484,10 @@ export default function KYCPage() {
               {documentFaceDescriptor && !ocrRunning && (
                 <button
                   onClick={proceedToSelfie}
-                  className="mt-4 w-full px-4 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-lg"
+                  disabled={!extractedData?.possibleName}
+                  className="mt-4 w-full px-4 py-2.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg"
                 >
-                  Continue to Selfie →
+                  {!extractedData?.possibleName ? "Enter at least your name to continue" : "Continue to Selfie →"}
                 </button>
               )}
             </div>
@@ -498,30 +532,45 @@ export default function KYCPage() {
           )}
 
           {stage === "liveness" && (
-            <div className="mt-4 space-y-2">
-              {/* Retry + skip buttons */}
-              {!livenessActive && !livenessPass && (
-                <div className="flex gap-2">
+            <div className="mt-4 space-y-3">
+              {/* Debug info (always visible during liveness) */}
+              <div className="bg-gray-800 border border-gray-700 rounded-lg p-3 text-xs font-mono text-gray-400">
+                <div>Status: {livenessActive ? "scanning" : "paused"}</div>
+                <div className="mt-1 break-all">{blinkDebug}</div>
+              </div>
+
+              {/* Action buttons — always available during liveness stage */}
+              <div className="flex gap-2">
+                {!livenessActive && !livenessPass && (
                   <button
                     onClick={startLivenessCheck}
                     className="flex-1 px-4 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-lg"
                   >
-                    Retry Blink Detection
+                    {livenessFrames.length > 0 ? "Retry Blink Detection" : "Start Blink Detection"}
                   </button>
+                )}
+                {livenessActive && (
                   <button
-                    onClick={proceedToReview}
-                    className="px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-200 text-sm rounded-lg border border-gray-700"
-                    title="If automatic blink detection keeps failing, confirm manually. Face match was already verified."
+                    onClick={() => {
+                      livenessAbortRef.current = true;
+                      setLivenessActive(false);
+                    }}
+                    className="flex-1 px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-200 text-sm rounded-lg border border-gray-700"
                   >
-                    Manual Confirm
+                    Stop Scanning
                   </button>
-                </div>
-              )}
-              {livenessActive && (
-                <p className="text-xs text-center text-gray-500">
-                  Tip: hold still for calibration, then blink normally. Takes 3-5 seconds.
-                </p>
-              )}
+                )}
+                <button
+                  onClick={proceedToReview}
+                  className="px-4 py-2.5 bg-green-700 hover:bg-green-600 text-white text-sm rounded-lg"
+                  title="Face match already verified. Click to skip blink detection and proceed."
+                >
+                  Skip & Continue
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 text-center">
+                Blink naturally. If detection fails, click &quot;Skip &amp; Continue&quot; — your face match was already verified.
+              </p>
             </div>
           )}
 
