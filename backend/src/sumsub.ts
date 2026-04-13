@@ -168,30 +168,30 @@ export async function getApplicantInfo(applicantId: string): Promise<{ idDocs: S
  * Sumsub sends signature in header `x-payload-digest` (some accounts use `X-Payload-Digest-Alg` for algo).
  * Default algorithm is HMAC-SHA256 of the raw request body using the webhook secret.
  */
-export function verifyWebhookSignature(rawBody: string, providedSignature: string, algo: string = "HMAC_SHA256_HEX"): boolean {
+export function verifyWebhookSignature(rawBody: Buffer | string, providedSignature: string, algo: string = "HMAC_SHA256_HEX"): boolean {
   if (!SUMSUB_WEBHOOK_SECRET) return false;
   if (!providedSignature) return false;
 
-  let hash: string;
+  const bodyBuf = Buffer.isBuffer(rawBody) ? rawBody : Buffer.from(rawBody, "utf8");
+
+  let hashAlgo: "sha1" | "sha256" | "sha512";
   switch (algo.toUpperCase()) {
     case "HMAC_SHA1_HEX":
-      hash = crypto.createHmac("sha1", SUMSUB_WEBHOOK_SECRET).update(rawBody).digest("hex");
-      break;
+      hashAlgo = "sha1"; break;
     case "HMAC_SHA512_HEX":
-      hash = crypto.createHmac("sha512", SUMSUB_WEBHOOK_SECRET).update(rawBody).digest("hex");
-      break;
+      hashAlgo = "sha512"; break;
     case "HMAC_SHA256_HEX":
     default:
-      hash = crypto.createHmac("sha256", SUMSUB_WEBHOOK_SECRET).update(rawBody).digest("hex");
-      break;
+      hashAlgo = "sha256"; break;
   }
-  // Constant-time compare
+  const hash = crypto.createHmac(hashAlgo, SUMSUB_WEBHOOK_SECRET).update(bodyBuf).digest();
+
+  let providedBuf: Buffer;
   try {
-    return crypto.timingSafeEqual(
-      Buffer.from(hash, "hex"),
-      Buffer.from(providedSignature.toLowerCase(), "hex")
-    );
+    providedBuf = Buffer.from(providedSignature.toLowerCase(), "hex");
   } catch {
     return false;
   }
+  if (providedBuf.length !== hash.length) return false; // length-check is constant-time
+  return crypto.timingSafeEqual(hash, providedBuf);
 }

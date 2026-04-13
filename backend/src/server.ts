@@ -28,7 +28,34 @@ import {
 
 const app = Fastify({ logger: { level: "info" } });
 
-await app.register(cors, { origin: true });
+// Capture the raw request body for HMAC signature verification on webhook routes.
+// Fastify normally parses JSON before handlers run — that parsed-then-restringified body
+// does not byte-match the original, which breaks HMAC signatures (audit finding).
+app.addContentTypeParser(
+  "application/json",
+  { parseAs: "buffer" },
+  (req, body, done) => {
+    (req as unknown as { rawBody?: Buffer }).rawBody = body as Buffer;
+    try {
+      done(null, body.length === 0 ? {} : JSON.parse((body as Buffer).toString("utf8")));
+    } catch (e) {
+      done(e as Error, undefined);
+    }
+  }
+);
+
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ||
+  "https://hskpassport.gudman.xyz,http://localhost:3000,http://localhost:3001"
+).split(",").map((s) => s.trim()).filter(Boolean);
+
+await app.register(cors, {
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true); // curl, server-to-server
+    if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    cb(new Error("Not allowed by CORS"), false);
+  },
+  credentials: false,
+});
 
 app.get("/health", async () => ({
   status: "ok",
@@ -80,6 +107,18 @@ app.post("/api/kyc/submit", async (request, reply) => {
     reply.code(400);
     return { error: "missing required fields: commitment, wallet, jurisdiction, credentialType" };
   }
+  if (!/^\d+$/.test(body.commitment) || body.commitment.length > 80) {
+    reply.code(400);
+    return { error: "commitment must be a numeric string (Semaphore identity commitment)" };
+  }
+  if (!/^0x[a-fA-F0-9]{40}$/.test(body.wallet)) {
+    reply.code(400);
+    return { error: "wallet must be a 0x-prefixed 20-byte hex address" };
+  }
+  if (body.jurisdiction.length > 32 || body.credentialType.length > 40) {
+    reply.code(400);
+    return { error: "jurisdiction/credentialType too long" };
+  }
 
   // Check for existing pending request
   const existing = getKYCByCommitment(body.commitment) as any;
@@ -130,10 +169,23 @@ function redactKYC(row: KYCRow) {
   };
 }
 
+// Per-signature replay cache. Key = `${addr}:${nonce}`. Within the 5-min window, a signed
+// read header can only be used once. Entries are GC'd by the age check on read.
+const usedIssuerNonces = new Map<string, number>();
+const NONCE_WINDOW_MS = 5 * 60_000;
+
+function gcNonces(now: number) {
+  if (usedIssuerNonces.size < 4096) return;
+  for (const [k, ts] of usedIssuerNonces) {
+    if (now - ts > NONCE_WINDOW_MS) usedIssuerNonces.delete(k);
+  }
+}
+
 /**
  * Verify issuer authentication from request headers.
  * Required headers: x-issuer-addr, x-issuer-sig, x-issuer-nonce
  * Signed payload: "HSK Passport issuer read at <nonce>"
+ * Each (address, nonce) pair can be used at most once within a 5-minute window.
  */
 async function authenticateIssuer(request: { headers: Record<string, string | string[] | undefined> }): Promise<boolean> {
   const addr = request.headers["x-issuer-addr"] as string | undefined;
@@ -141,9 +193,15 @@ async function authenticateIssuer(request: { headers: Record<string, string | st
   const nonceRaw = request.headers["x-issuer-nonce"] as string | undefined;
   if (!addr || !sig || !nonceRaw) return false;
   const nonce = parseInt(nonceRaw, 10);
-  if (!Number.isFinite(nonce)) return false;
-  const age = Date.now() - nonce;
-  if (age < 0 || age > 5 * 60_000) return false;
+  if (!Number.isFinite(nonce) || nonce <= 0) return false;
+  const now = Date.now();
+  const age = now - nonce;
+  if (age < 0 || age > NONCE_WINDOW_MS) return false;
+
+  const normalizedAddr = addr.toLowerCase();
+  const key = `${normalizedAddr}:${nonce}`;
+  if (usedIssuerNonces.has(key)) return false; // replay
+  gcNonces(now);
 
   const message = `HSK Passport issuer read at ${nonce}`;
   let recovered: string;
@@ -152,15 +210,21 @@ async function authenticateIssuer(request: { headers: Record<string, string | st
   } catch {
     return false;
   }
-  if (recovered.toLowerCase() !== addr.toLowerCase()) return false;
+  if (recovered.toLowerCase() !== normalizedAddr) return false;
 
   const provider = new JsonRpcProvider(CONFIG.rpcUrl);
   const passport = new Contract(CONFIG.hskPassport, PASSPORT_READ_ABI, provider);
+  let isApproved: boolean;
   try {
-    return await passport.approvedIssuers(recovered);
+    isApproved = await passport.approvedIssuers(recovered);
   } catch {
     return false;
   }
+  if (!isApproved) return false;
+
+  // Success — burn the nonce so it cannot be replayed.
+  usedIssuerNonces.set(key, now);
+  return true;
 }
 
 app.get("/api/kyc/queue", async (request) => {
@@ -409,11 +473,15 @@ app.get("/api/kyc/sumsub/data/:commitment", async (request, reply) => {
  * request and issue credentials on-chain.
  */
 app.post("/api/kyc/sumsub/webhook", async (request, reply) => {
-  const rawBody = JSON.stringify(request.body);
+  const raw = (request as unknown as { rawBody?: Buffer }).rawBody;
+  if (!raw) {
+    reply.code(400);
+    return { error: "raw body unavailable" };
+  }
   const providedSig = (request.headers["x-payload-digest"] as string) || "";
   const algo = (request.headers["x-payload-digest-alg"] as string) || "HMAC_SHA256_HEX";
 
-  if (!verifyWebhookSignature(rawBody, providedSig, algo)) {
+  if (!verifyWebhookSignature(raw, providedSig, algo)) {
     reply.code(401);
     return { error: "invalid webhook signature" };
   }

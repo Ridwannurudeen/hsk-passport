@@ -50,7 +50,7 @@ interface IHSKPassport {
 
 contract MyDApp {
     IHSKPassport public passport;
-    uint256 public constant KYC_GROUP = 15;
+    uint256 public constant KYC_GROUP = 25;
 
     constructor(address _passport) {
         passport = IHSKPassport(_passport);
@@ -198,7 +198,7 @@ const valid = await passport.verifyProof(15, proof);`}</pre>
           <pre className="text-sm font-mono text-gray-300">{`import { HSKPassportGate } from "hsk-passport-sdk/react";
 
 <HSKPassportGate
-  groupId={15}
+  groupId={25}
   scope="mint-silver-token"
   identitySecret={walletSignature}
   signer={signer}

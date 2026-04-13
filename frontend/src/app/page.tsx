@@ -14,68 +14,86 @@ export default function Home() {
   return (
     <div>
       {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-950/30 via-gray-950 to-gray-950 pointer-events-none" />
-        <div className="absolute inset-0 opacity-30 pointer-events-none" style={{
-          backgroundImage: "radial-gradient(circle at 30% 20%, rgba(147,51,234,0.15), transparent 50%)",
-        }} />
+      <section className="relative overflow-hidden border-b border-gray-900">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(59,130,246,0.08),transparent_55%)] pointer-events-none" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-500/30 to-transparent" />
 
-        <div className="relative max-w-6xl mx-auto px-4 py-20 text-center">
-          <div className="inline-block px-3 py-1 mb-6 text-xs font-mono text-purple-400 border border-purple-800 rounded-full bg-purple-950/30">
-            Compliance layer for HashKey regulated RWA + institutional DeFi
-          </div>
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight mb-6">
-            Verify once.
-            <br />
-            <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-              Prove anywhere. Reveal nothing.
-            </span>
-          </h1>
-          <p className="text-lg sm:text-xl text-gray-400 max-w-2xl mx-auto mb-10">
-            Every regulated product on HashKey needs compliance, but today that means leaking identity or rebuilding KYC for every app. HSK Passport is a reusable privacy layer: extend HashKey&apos;s KYC + DID stack, verify once, prove anywhere on-chain, reveal nothing.
-          </p>
-          <div className="flex flex-wrap gap-3 justify-center mb-12">
-            <Link
-              href="/kyc"
-              className="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-lg transition-colors"
-            >
-              Get Verified
-            </Link>
-            <Link
-              href="/developers"
-              className="px-6 py-3 bg-gray-900 border border-gray-700 hover:border-gray-500 text-gray-100 font-medium rounded-lg transition-colors"
-            >
-              Build with HSK Passport
-            </Link>
-            <Link
-              href="/demo"
-              className="px-6 py-3 border border-gray-800 hover:border-gray-600 text-gray-400 hover:text-gray-200 font-medium rounded-lg transition-colors"
-            >
-              Try Demo
-            </Link>
-          </div>
-
-          {/* Live stats from indexer */}
-          {stats && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto">
-              <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl p-4">
-                <div className="text-3xl font-bold text-purple-300">{stats.activeCredentials}</div>
-                <div className="text-xs text-gray-500 mt-1">Active credentials</div>
-              </div>
-              <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl p-4">
-                <div className="text-3xl font-bold text-purple-300">3</div>
-                <div className="text-xs text-gray-500 mt-1">Credential types</div>
-              </div>
-              <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl p-4">
-                <div className="text-3xl font-bold text-purple-300">3</div>
-                <div className="text-xs text-gray-500 mt-1">Integrated dApps</div>
-              </div>
-              <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl p-4">
-                <div className="text-3xl font-bold text-purple-300">0</div>
-                <div className="text-xs text-gray-500 mt-1">Bytes PII on-chain</div>
-              </div>
+        <div className="relative max-w-6xl mx-auto px-4 pt-24 pb-16">
+          <div className="max-w-3xl">
+            <div className="inline-flex items-center gap-2 mb-6 text-[11px] font-mono tracking-[0.14em] uppercase text-blue-400">
+              <span className="block w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+              v5 live on HashKey Chain testnet · 45 passing tests
             </div>
-          )}
+            <h1 className="text-[44px] sm:text-[56px] lg:text-[64px] font-semibold tracking-[-0.025em] leading-[1.02] mb-6 text-white">
+              Verifiable compliance for regulated RWA and institutional DeFi.
+            </h1>
+            <p className="text-lg sm:text-xl text-gray-400 max-w-2xl mb-9 leading-relaxed">
+              Zero-knowledge KYC credentials on HashKey Chain. Issuer-staked, timelock-governed, Sumsub-verified. Extend HashKey&apos;s KYC stack — verify once, prove eligibility to any dApp without revealing identity.
+            </p>
+            <div className="flex flex-wrap gap-3 mb-14">
+              <Link
+                href="/kyc"
+                className="group inline-flex items-center gap-2 px-5 py-3 bg-white text-gray-950 hover:bg-gray-100 font-medium rounded-md transition-all text-sm"
+              >
+                Get verified
+                <span className="transition-transform group-hover:translate-x-0.5">→</span>
+              </Link>
+              <Link
+                href="/developers"
+                className="group inline-flex items-center gap-2 px-5 py-3 bg-gray-900 hover:bg-gray-800 border border-gray-800 hover:border-gray-700 text-gray-100 font-medium rounded-md transition-all text-sm"
+              >
+                Start building
+                <span className="opacity-60 group-hover:opacity-100 transition-opacity">→</span>
+              </Link>
+              <Link
+                href="/composer"
+                className="group inline-flex items-center gap-2 px-5 py-3 text-gray-400 hover:text-gray-100 font-medium rounded-md transition-colors text-sm"
+              >
+                Try the Policy Composer
+                <span className="opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+              </Link>
+            </div>
+          </div>
+
+          {/* Live stats row */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-gray-900 border border-gray-900 rounded-xl overflow-hidden">
+            {[
+              { value: stats?.activeCredentials ?? "—", label: "Credentials issued", sub: "testnet, live" },
+              { value: "45", label: "Passing tests", sub: "contracts + invariants" },
+              { value: "8", label: "Protocol contracts", sub: "deployed v5" },
+              { value: "0", label: "Bytes PII", sub: "ever on-chain" },
+            ].map((s) => (
+              <div key={s.label} className="bg-gray-950 p-5">
+                <div className="text-3xl font-semibold text-white tabular-nums">{s.value}</div>
+                <div className="text-sm text-gray-300 mt-1">{s.label}</div>
+                <div className="text-xs text-gray-500 mt-0.5">{s.sub}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Standards + integrations strip */}
+      <section className="border-b border-gray-900 bg-gray-950/50">
+        <div className="max-w-6xl mx-auto px-4 py-8">
+          <div className="text-[11px] font-mono tracking-[0.18em] uppercase text-gray-500 mb-4 text-center">
+            Built on open standards · Compatible with
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm text-gray-400">
+            <span className="hover:text-gray-200 transition-colors">W3C Verifiable Credentials</span>
+            <span className="text-gray-700">·</span>
+            <span className="hover:text-gray-200 transition-colors">Semaphore v4</span>
+            <span className="text-gray-700">·</span>
+            <span className="hover:text-gray-200 transition-colors">Groth16 ZK</span>
+            <span className="text-gray-700">·</span>
+            <span className="hover:text-gray-200 transition-colors">Sumsub KYC</span>
+            <span className="text-gray-700">·</span>
+            <span className="hover:text-gray-200 transition-colors">HashKey Chain</span>
+            <span className="text-gray-700">·</span>
+            <span className="hover:text-gray-200 transition-colors">HashKey DID</span>
+            <span className="text-gray-700">·</span>
+            <span className="hover:text-gray-200 transition-colors">OpenZeppelin Timelock</span>
+          </div>
         </div>
       </section>
 

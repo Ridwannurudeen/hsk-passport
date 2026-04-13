@@ -30,7 +30,7 @@ interface IHSKPassport {
 
 contract MyDApp {
     IHSKPassport public passport;
-    uint256 public constant KYC_GROUP = 15; // KYC_VERIFIED
+    uint256 public constant KYC_GROUP = 25; // KYC_VERIFIED
 
     constructor(address _passport) {
         passport = IHSKPassport(_passport);
@@ -113,8 +113,8 @@ const tx = await myDApp.kycGatedFunction(proof);`}
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">HSKPassport</span>
-              <a href="https://hashkey-testnet.blockscout.com/address/0xb430F30376344303560c0554DC94766D780a5c64" target="_blank" rel="noopener noreferrer" className="font-mono text-purple-300 text-xs hover:text-purple-200">
-                0xb430...5c64
+              <a href="https://hashkey-testnet.blockscout.com/address/0x7d2E692A08f2fb0724238396e0436106b4FbD792" target="_blank" rel="noopener noreferrer" className="font-mono text-purple-300 text-xs hover:text-purple-200">
+                0x7d2E...D792
               </a>
             </div>
             <div className="flex justify-between">
@@ -125,14 +125,14 @@ const tx = await myDApp.kycGatedFunction(proof);`}
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">DemoIssuer</span>
-              <a href="https://hashkey-testnet.blockscout.com/address/0x77bE0CD574a3602923E2a0C3B42F01C11112A170" target="_blank" rel="noopener noreferrer" className="font-mono text-purple-300 text-xs hover:text-purple-200">
-                0x77bE...A170
+              <a href="https://hashkey-testnet.blockscout.com/address/0xBf7d566B8077A098F6844fb6b827D2A4118C88C3" target="_blank" rel="noopener noreferrer" className="font-mono text-purple-300 text-xs hover:text-purple-200">
+                0xBf7d...88C3
               </a>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">GatedRWA (hSILVER)</span>
-              <a href="https://hashkey-testnet.blockscout.com/address/0x5f7274C64C63Ea73144cf539aBF2504eB3208f25" target="_blank" rel="noopener noreferrer" className="font-mono text-purple-300 text-xs hover:text-purple-200">
-                0x5f72...8f25
+              <a href="https://hashkey-testnet.blockscout.com/address/0xb6955cb3e442c4222fFc3b92c322851109d0b9c9" target="_blank" rel="noopener noreferrer" className="font-mono text-purple-300 text-xs hover:text-purple-200">
+                0xb695...b9c9
               </a>
             </div>
           </div>
