@@ -21,7 +21,7 @@
 - [ ] **Jurisdiction-aware credential types** — separate groups for EU/GDPR-compliant KYC, Singapore MAS-approved, UAE VARA, US SEC accredited investor
 - [ ] **Revocation registry v2** — on-chain status lists per W3C VC standards, enabling off-chain revocation checks
 - [ ] **Mobile SDK** (React Native) — ZK proof generation on mobile via WASM bridge
-- [ ] **Grant-funded integrations** — partner with 5 ecosystem dApps for priority integration support
+- [ ] **Ecosystem integrations** — partner with 5 HashKey Chain dApps for priority integration support
 
 ## Q4 2026 — Cross-Chain + Standards
 
@@ -51,5 +51,5 @@
 
 - **Developers**: pick up a task from the roadmap, open a PR
 - **Issuers**: contact us if you run a KYC or compliance service and want to become a protocol issuer
-- **Researchers**: we fund ZK privacy research via grants — open an issue describing your proposal
+- **Researchers**: open an issue describing your ZK privacy research proposal
 - **Auditors**: audit engagements planned for Q2 2026 mainnet launch

@@ -243,7 +243,7 @@ contract HSKPassport {
     ///      currently on-chain could have expired, the group enters a "stale window" and this call
     ///      reverts. Issuers must re-issue credentials before their validity period lapses.
     /// @dev For per-credential expiry (preserving anonymity), use on-chain ZK range proofs in the
-    ///      validity period — shipped as a grant milestone (see /roadmap).
+    ///      validity period — see /roadmap for the per-credential ZK range proof milestone.
     function verifyCredentialWithExpiry(
         uint256 groupId,
         ISemaphore.SemaphoreProof calldata proof,

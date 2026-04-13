@@ -14,3 +14,9 @@ backend/dist/
 backend/*.db
 backend/*.db-wal
 backend/*.db-shm
+
+# Grant + outreach materials — local only, not part of the hackathon repo
+GRANT_APPLICATION.md
+OUTREACH.md
+PITCH_DECK.*
+PARTNERS.md

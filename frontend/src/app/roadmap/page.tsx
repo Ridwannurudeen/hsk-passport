@@ -19,7 +19,7 @@ export default function RoadmapPage() {
         <Item label="SDK on npm" detail="hsk-passport-sdk v1.0.0 published; contracts library in-repo." />
       </Section>
 
-      <Section title="Q3 2026 — production hardening (grant milestone)" tone="yellow">
+      <Section title="Q3 2026 — production hardening" tone="yellow">
         <Item label="On-chain credential expiry enforcement" detail="verifyCredential() rejects expired credentials via the CredentialExpiry registry. Re-verification every 90-365 days per regulatory tier." />
         <Item label="Issuer slashing activation" detail="IssuerRegistry stake forfeit on provable misissuance, routed through Safe → Timelock → execute." />
         <Item label="Blind-signature issuance" detail="Backend never learns commitment ↔ Sumsub applicant mapping. Eliminates the backend-correlation risk." />
@@ -44,7 +44,7 @@ export default function RoadmapPage() {
 
       <div className="mt-12 bg-gray-900 border border-gray-800 rounded-xl p-5 text-sm text-gray-400">
         <strong className="text-white block mb-2">On honest positioning:</strong>
-        Every KYC-gated protocol has these gaps. Most don&apos;t list them. We list them because closing them is the work, not pretending they don&apos;t exist. If you&apos;re a HashKey grant reviewer, this page is our implicit milestone contract.
+        Every KYC-gated protocol has these gaps. Most don&apos;t list them. We list them because closing them is the work, not pretending they don&apos;t exist.
       </div>
     </div>
   );

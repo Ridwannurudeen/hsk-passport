@@ -127,7 +127,7 @@ export default function GovernancePage() {
           <p><strong className="text-white">Q2 2026:</strong> 3-of-5 Safe with core contributors as signers</p>
           <p><strong className="text-white">Q3 2026:</strong> Expand to 5-of-9 with ecosystem representatives</p>
           <p><strong className="text-white">Q4 2026:</strong> Migrate to on-chain Governor with token-weighted voting</p>
-          <p><strong className="text-white">2027:</strong> Full DAO with treasury, grants, upgradeable by governance</p>
+          <p><strong className="text-white">2027:</strong> Full DAO with treasury and protocol upgradeability under governance</p>
         </div>
       </section>
     </div>
