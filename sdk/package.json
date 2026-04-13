@@ -1,5 +1,5 @@
 {
-  "name": "@hsk-passport/sdk",
+  "name": "hsk-passport-sdk",
   "version": "1.0.0",
   "description": "TypeScript SDK for HSK Passport — privacy-preserving ZK credentials on HashKey Chain. Add KYC verification to your dApp without exposing personal data on-chain.",
   "main": "dist/index.js",

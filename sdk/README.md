@@ -1,6 +1,6 @@
-# @hsk-passport/sdk
+# hsk-passport-sdk
 
-[![npm version](https://img.shields.io/npm/v/@hsk-passport/sdk.svg)](https://www.npmjs.com/package/@hsk-passport/sdk)
+[![npm version](https://img.shields.io/npm/v/hsk-passport-sdk.svg)](https://www.npmjs.com/package/hsk-passport-sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **TypeScript SDK for HSK Passport — privacy-preserving ZK credentials on HashKey Chain.**
@@ -12,7 +12,7 @@ Add ZK KYC verification to your dApp in under 10 minutes. Users prove credential
 ## Install
 
 ```bash
-npm install @hsk-passport/sdk
+npm install hsk-passport-sdk
 # Peer dependencies (if not already in your project)
 npm install ethers @semaphore-protocol/identity @semaphore-protocol/group @semaphore-protocol/proof
 ```
@@ -20,7 +20,7 @@ npm install ethers @semaphore-protocol/identity @semaphore-protocol/group @semap
 ## Quick Start
 
 ```typescript
-import { HSKPassport } from "@hsk-passport/sdk";
+import { HSKPassport } from "hsk-passport-sdk";
 import { BrowserProvider } from "ethers";
 
 // 1. Connect
@@ -52,7 +52,7 @@ const valid = await passport.verifyProof(15, proof);
 ## React Component
 
 ```tsx
-import { HSKPassportGate } from "@hsk-passport/sdk/react";
+import { HSKPassportGate } from "hsk-passport-sdk/react";
 
 <HSKPassportGate
   groupId={15}                   // KYC_VERIFIED

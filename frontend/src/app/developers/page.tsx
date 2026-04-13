@@ -84,10 +84,10 @@ contract MyDApp {
           Install the SDK (or copy from <a href="https://github.com/Ridwannurudeen/hsk-passport/tree/master/sdk" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300">/sdk</a>):
         </p>
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-4">
-          <pre className="text-sm font-mono text-gray-300">npm install @hsk-passport/sdk ethers @semaphore-protocol/identity @semaphore-protocol/group @semaphore-protocol/proof</pre>
+          <pre className="text-sm font-mono text-gray-300">npm install hsk-passport-sdk ethers @semaphore-protocol/identity @semaphore-protocol/group @semaphore-protocol/proof</pre>
         </div>
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 overflow-x-auto">
-          <pre className="text-sm font-mono text-gray-300">{`import { HSKPassport } from "@hsk-passport/sdk";
+          <pre className="text-sm font-mono text-gray-300">{`import { HSKPassport } from "hsk-passport-sdk";
 import { BrowserProvider } from "ethers";
 
 // Connect
@@ -195,7 +195,7 @@ const valid = await passport.verifyProof(15, proof);`}</pre>
       <section className="mb-10">
         <h2 className="text-2xl font-semibold mb-4">React Component</h2>
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 overflow-x-auto">
-          <pre className="text-sm font-mono text-gray-300">{`import { HSKPassportGate } from "@hsk-passport/sdk/react";
+          <pre className="text-sm font-mono text-gray-300">{`import { HSKPassportGate } from "hsk-passport-sdk/react";
 
 <HSKPassportGate
   groupId={15}

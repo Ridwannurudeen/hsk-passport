@@ -147,7 +147,7 @@ contract MyRWA {
 Frontend:
 
 ```ts
-import { HSKPassport } from "@hsk-passport/sdk";
+import { HSKPassport } from "hsk-passport-sdk";
 
 const passport = HSKPassport.connect("hashkey-testnet", signer);
 const identity = passport.createIdentity(walletSignature);
@@ -163,7 +163,7 @@ See [/developers](https://hskpassport.gudman.xyz/developers) for the full guide.
 contracts/       Hardhat: Solidity contracts + tests + deploy scripts
 frontend/        Next.js 16: KYC, issuer dashboard, demo, ecosystem, developer portal
 backend/         Fastify + SQLite: indexer, KYC workflow API, auto-issuer (demo)
-sdk/             @hsk-passport/sdk — TypeScript SDK + React component
+sdk/             hsk-passport-sdk — TypeScript SDK + React component
 schemas/         W3C VC-aligned JSON-LD credential schemas
 ```
 

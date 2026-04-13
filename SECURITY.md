@@ -28,7 +28,7 @@ We aim to respond within 48 hours and coordinate responsible disclosure.
 ## In Scope
 
 - Smart contracts deployed at the addresses listed in `README.md` / `PROTOCOL.md`
-- TypeScript SDK (`@hsk-passport/sdk`)
+- TypeScript SDK (`hsk-passport-sdk`)
 - Indexer backend and REST API
 - ZK circuit trust assumptions (Groth16, Semaphore v4 trusted setup)
 

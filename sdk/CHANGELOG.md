@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to `@hsk-passport/sdk` are documented here.
+All notable changes to `hsk-passport-sdk` are documented here.
 
 ## [1.0.0] — 2026-04-12
 

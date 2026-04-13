@@ -10,7 +10,7 @@
 
 - [ ] **Mainnet deployment** on HashKey Chain (chain ID 177)
 - [ ] **Third-party security audit** of contracts and circuits
-- [ ] **SDK v1.0** published to npm (`@hsk-passport/sdk`)
+- [ ] **SDK v1.0** published to npm (`hsk-passport-sdk`)
 - [ ] **Integration with HashKey Exchange KYC** — the first production issuer
 - [ ] **Third-party issuer onboarding program** — application form, approval process, technical docs for KYC providers to become issuers
 - [ ] **Monitoring & uptime SLA** for indexer API

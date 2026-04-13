@@ -68,7 +68,7 @@ One credential. Verified by any dApp. Revocable. Privacy-preserving. Compliance-
 - **Multi-Jurisdiction Pool** — accept users from any of [HK, SG, AE] without revealing which
 
 ### Developer Surface
-- **TypeScript SDK** (`@hsk-passport/sdk`) with React `<HSKPassportGate />` component
+- **TypeScript SDK** (`hsk-passport-sdk`) with React `<HSKPassportGate />` component
 - **REST API indexer** — 10-second polling, revocation-aware member queries
 - **KYC workflow API** — user submission → issuer review → on-chain issuance
 - **Developer portal** with quick-start, code snippets, live addresses, API reference

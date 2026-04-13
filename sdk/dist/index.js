@@ -16,7 +16,7 @@ Object.defineProperty(exports, "Identity", { enumerable: true, get: function () 
  *
  * @example
  * ```ts
- * import { HSKPassport } from "@hsk-passport/sdk";
+ * import { HSKPassport } from "hsk-passport-sdk";
  *
  * const passport = HSKPassport.connect("hashkey-testnet");
  * const identity = passport.createIdentity("user-secret");

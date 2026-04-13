@@ -36,7 +36,7 @@ export interface GroupInfo {
  *
  * @example
  * ```ts
- * import { HSKPassport } from "@hsk-passport/sdk";
+ * import { HSKPassport } from "hsk-passport-sdk";
  *
  * const passport = HSKPassport.connect("hashkey-testnet");
  * const identity = passport.createIdentity("user-secret");
