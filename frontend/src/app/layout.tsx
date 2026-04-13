@@ -87,14 +87,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               <div className="flex items-center gap-8">
                 <Wordmark />
                 <div className="hidden lg:flex items-center gap-0.5">
-                  <NavLink href="/kyc">Get verified</NavLink>
-                  <NavLink href="/user" highlight>Dashboard</NavLink>
                   <NavLink href="/composer" highlight>Composer</NavLink>
+                  <NavLink href="/kyc">Get verified</NavLink>
                   <NavLink href="/demo">Demo</NavLink>
                   <NavLink href="/ecosystem">Ecosystem</NavLink>
                   <NavLink href="/developers">Developers</NavLink>
-                  <NavLink href="/docs">Docs</NavLink>
-                  <NavLink href="/roadmap">Roadmap</NavLink>
+                  <NavLink href="/user" highlight>Dashboard</NavLink>
                 </div>
               </div>
               <div className="flex items-center gap-2">

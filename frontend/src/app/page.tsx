@@ -44,12 +44,10 @@ export default function Home() {
           <div className="max-w-3xl anim-fade-up">
             <div className="badge mb-7">
               <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "var(--success)" }} />
-              <span>v5 live on HashKey Chain testnet</span>
-              <span style={{ color: "var(--text-subtle)" }}>•</span>
-              <span style={{ color: "var(--text-muted)" }}>45 tests</span>
+              <span>v5 live · 45 tests · real Sumsub wired</span>
             </div>
             <h1 className="display-1 mb-6">
-              Verifiable compliance for
+              The default compliance layer for
               <br />
               <span
                 className="bg-clip-text text-transparent gradient-shift"
@@ -57,27 +55,31 @@ export default function Home() {
                   backgroundImage: "linear-gradient(110deg, var(--accent-primary), #8fb2ff 40%, var(--accent-primary))",
                 }}
               >
-                regulated RWA & DeFi.
+                regulated apps on HashKey Chain.
               </span>
             </h1>
             <p
-              className="text-[17px] sm:text-[19px] leading-[1.55] mb-10 max-w-[58ch]"
+              className="text-[17px] sm:text-[19px] leading-[1.55] mb-4 max-w-[60ch]"
               style={{ color: "var(--text-secondary)" }}
             >
-              Zero-knowledge KYC credentials on HashKey Chain. Issuer-staked, timelock-governed,
-              Sumsub-verified. Extend HashKey&apos;s compliance stack — verify once, prove eligibility
-              to any dApp, reveal nothing.
+              Verify once with a trusted issuer. Privately prove KYC, accreditation, or jurisdiction to any HashKey Chain dApp. Reveal nothing on-chain.
+            </p>
+            <p
+              className="text-[15px] sm:text-[16px] leading-[1.55] mb-10 max-w-[58ch] italic"
+              style={{ color: "var(--text-muted)" }}
+            >
+              We&apos;re not replacing HashKey&apos;s compliance stack — we&apos;re making it reusable and private across the ecosystem.
             </p>
             <div className="flex flex-wrap items-center gap-3 anim-fade-up anim-delay-2">
-              <Link href="/kyc" className="btn btn-accent">
-                Get verified
+              <Link href="/composer" className="btn btn-accent">
+                Open the Policy Composer
                 <ArrowIcon />
               </Link>
-              <Link href="/developers" className="btn btn-secondary">
-                Start building
+              <Link href="/kyc" className="btn btn-secondary">
+                Get verified
               </Link>
-              <Link href="/composer" className="btn btn-ghost link-hover">
-                Try the Policy Composer →
+              <Link href="/demo" className="btn btn-ghost link-hover">
+                Watch the live ZK proof flow →
               </Link>
             </div>
           </div>

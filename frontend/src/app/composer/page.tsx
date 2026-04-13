@@ -18,6 +18,71 @@ export default function ComposerPage() {
   const [dappName, setDappName] = useState("MyApp");
   const [actionScope, setActionScope] = useState("my-dapp:mint");
   const [copied, setCopied] = useState<string>("");
+  const [activePreset, setActivePreset] = useState<string>("");
+
+  type Preset = {
+    id: string;
+    name: string;
+    desc: string;
+    apply: () => void;
+  };
+
+  const presets: Preset[] = [
+    {
+      id: "rwa-allowlist",
+      name: "Private RWA Allowlist",
+      desc: "KYC-gated regulated RWA mint (e.g. tokenized silver, tokenized treasuries). Caller-bound, anonymous.",
+      apply: () => {
+        setRequireKyc(true);
+        setRequireAccredited(false);
+        setJurisdictions(new Set());
+        setDappName("PrivateRWAToken");
+        setActionScope("private-rwa:mint");
+      },
+    },
+    {
+      id: "accredited-pool",
+      name: "Accredited DeFi Pool",
+      desc: "KYC + accredited-investor proof. For tokenized funds, undercollateralized lending, and institutional DeFi.",
+      apply: () => {
+        setRequireKyc(true);
+        setRequireAccredited(true);
+        setJurisdictions(new Set());
+        setDappName("AccreditedPool");
+        setActionScope("accredited-pool:enter");
+      },
+    },
+    {
+      id: "regional-rwa",
+      name: "APAC Regional RWA",
+      desc: "KYC + jurisdiction proof from {HK, SG, AE} — selective disclosure (verifier learns set membership only).",
+      apply: () => {
+        setRequireKyc(true);
+        setRequireAccredited(false);
+        setJurisdictions(new Set(["HK", "SG", "AE"]));
+        setDappName("APACSilverPool");
+        setActionScope("apac-silver:mint");
+      },
+    },
+    {
+      id: "institutional",
+      name: "Institutional Tier",
+      desc: "Full stack: KYC + accreditation + APAC residency. Models a regulated institutional product.",
+      apply: () => {
+        setRequireKyc(true);
+        setRequireAccredited(true);
+        setJurisdictions(new Set(["HK", "SG", "AE"]));
+        setDappName("InstitutionalVault");
+        setActionScope("institutional:deposit");
+      },
+    },
+  ];
+
+  function applyPreset(p: Preset) {
+    p.apply();
+    setActivePreset(p.id);
+    setTimeout(() => setActivePreset(""), 1500);
+  }
 
   function toggleJurisdiction(j: Jurisdiction) {
     const next = new Set(jurisdictions);
@@ -169,6 +234,31 @@ describe("${dappName}Gated", () => {
         <p className="text-lg text-gray-400 max-w-2xl">
           Pick the compliance rules your dApp needs. We&apos;ll generate the Solidity contract, React component, and test file. Paste into your project and you&apos;re done.
         </p>
+      </div>
+
+      {/* Presets — judge-facing one-click templates */}
+      <div className="mb-8">
+        <div className="flex items-baseline justify-between mb-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">Start from a preset</h2>
+          <span className="text-xs text-gray-500">or build a custom policy below ↓</span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          {presets.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => applyPreset(p)}
+              className={`text-left bg-gray-900 hover:bg-gray-800/80 border rounded-xl p-4 transition-all ${
+                activePreset === p.id ? "border-purple-500 ring-2 ring-purple-500/30" : "border-gray-800 hover:border-purple-700"
+              }`}
+            >
+              <div className="text-sm font-semibold text-white mb-1.5">{p.name}</div>
+              <div className="text-xs text-gray-400 leading-snug">{p.desc}</div>
+              {activePreset === p.id && (
+                <div className="text-xs text-purple-400 mt-2">✓ Loaded</div>
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-[380px_1fr] gap-6">
