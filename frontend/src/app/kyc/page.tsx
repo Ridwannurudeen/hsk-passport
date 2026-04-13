@@ -8,7 +8,8 @@ import {
   getCommitment,
   Identity,
 } from "@/lib/semaphore";
-import { apiSubmitKYC, apiGetKYCStatus, type KYCRequest } from "@/lib/api";
+import { apiSubmitKYC, apiGetKYCStatus, apiGetSumsubConfig, apiSumsubInit, apiSumsubStatus, type KYCRequest } from "@/lib/api";
+import { SumsubVerification } from "@/components/SumsubVerification";
 import {
   loadFaceApiModels,
   extractDocumentText,
@@ -40,11 +41,16 @@ const CREDENTIAL_TYPES = [
   { id: "HKResident", name: "HK Resident", desc: "Hong Kong residency proof" },
 ];
 
-type Stage = "identity" | "document" | "selfie" | "liveness" | "review" | "submitted";
+type Stage = "identity" | "method" | "document" | "selfie" | "liveness" | "review" | "submitted" | "sumsub";
+type Method = "sumsub" | "local";
 
 export default function KYCPage() {
   const { toast } = useToast();
   const [stage, setStage] = useState<Stage>("identity");
+  const [method, setMethod] = useState<Method>("sumsub");
+  const [sumsubAvailable, setSumsubAvailable] = useState<boolean>(false);
+  const [sumsubAccessToken, setSumsubAccessToken] = useState<string>("");
+  const [sumsubLevelName, setSumsubLevelName] = useState<string>("");
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [credentialType, setCredentialType] = useState("KYCVerified");
 
@@ -72,10 +78,17 @@ export default function KYCPage() {
   const [submitting, setSubmitting] = useState(false);
   const [kycStatus, setKYCStatus] = useState<KYCRequest | null>(null);
 
-  // Load face models + any saved session on mount
+  // Load face models + Sumsub config + any saved session on mount
   useEffect(() => {
     loadFaceApiModels().catch((e) => {
       toast(`Face model load failed: ${(e as Error).message}`, "error");
+    });
+
+    apiGetSumsubConfig().then((cfg) => {
+      setSumsubAvailable(cfg.enabled);
+      setSumsubLevelName(cfg.levelName);
+    }).catch(() => {
+      setSumsubAvailable(false);
     });
 
     const stored = loadIdentity();
@@ -141,11 +154,57 @@ export default function KYCPage() {
       const sig = await signMessage("HSK Passport: Generate my Semaphore identity");
       const id = createIdentityFromSignature(sig);
       setIdentity(id);
-      setStage("document");
       await checkStatus(id);
-      toast("Identity created. Now verify your document.", "success");
+      // If Sumsub is configured, show method selection. Otherwise go straight to local.
+      setStage(sumsubAvailable ? "method" : "document");
+      toast("Identity created. Choose your verification method.", "success");
     } catch (e) {
       toast(`Failed: ${(e as Error).message.slice(0, 100)}`, "error");
+    }
+  }
+
+  async function startSumsubFlow() {
+    if (!identity) return;
+    try {
+      const init = await apiSumsubInit(getCommitment(identity).toString());
+      setSumsubAccessToken(init.accessToken);
+      setSumsubLevelName(init.levelName);
+      setMethod("sumsub");
+      setStage("sumsub");
+      toast("Sumsub verification loading...", "info");
+    } catch (e) {
+      toast(`Sumsub init failed: ${(e as Error).message.slice(0, 150)}`, "error");
+    }
+  }
+
+  function startLocalFlow() {
+    setMethod("local");
+    setStage("document");
+  }
+
+  async function onSumsubComplete(reviewAnswer: "GREEN" | "RED" | "YELLOW") {
+    if (!identity) return;
+    if (reviewAnswer === "GREEN") {
+      // Submit to our backend KYC queue for credential issuance
+      try {
+        const { address } = await connectWallet();
+        await apiSubmitKYC({
+          commitment: getCommitment(identity).toString(),
+          wallet: address,
+          jurisdiction: "SUMSUB_VERIFIED",
+          credentialType,
+          documentType: "sumsub",
+        });
+        toast("Sumsub approved! Credential will be issued on-chain shortly.", "success");
+        setStage("submitted");
+        await checkStatus(identity);
+      } catch (e) {
+        toast(`Submit failed: ${(e as Error).message.slice(0, 100)}`, "error");
+      }
+    } else if (reviewAnswer === "RED") {
+      toast("Sumsub rejected the verification. Please try again.", "error");
+    } else {
+      toast("Sumsub review pending further checks. Try refreshing status.", "info");
     }
   }
 
@@ -430,6 +489,116 @@ export default function KYCPage() {
             className="px-6 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-lg transition-colors"
           >
             Connect & Create Identity
+          </button>
+        </div>
+      )}
+
+      {/* Stage 1.5: Method selection */}
+      {stage === "method" && identity && (
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">Credential type</label>
+            <select
+              value={credentialType}
+              onChange={(e) => setCredentialType(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white"
+            >
+              {CREDENTIAL_TYPES.map((t) => (
+                <option key={t.id} value={t.id}>{t.name} — {t.desc}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            {/* Sumsub option */}
+            <button
+              onClick={startSumsubFlow}
+              className="bg-gradient-to-br from-purple-950/40 to-gray-900 border border-purple-700/50 hover:border-purple-500 rounded-xl p-6 text-left transition-colors"
+            >
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <div className="text-xs text-purple-400 font-mono mb-1">REGULATED KYC</div>
+                  <h3 className="text-lg font-semibold">Sumsub Verification</h3>
+                </div>
+                <span className="text-xs px-2 py-0.5 bg-green-900/50 text-green-400 rounded">Production-grade</span>
+              </div>
+              <p className="text-sm text-gray-400 mb-3">
+                Real KYC via Sumsub — the same provider HashKey Exchange uses. Document OCR, face matching, liveness detection on Sumsub&apos;s regulated infrastructure. Your documents stay with a regulated KYC provider.
+              </p>
+              <ul className="text-xs text-gray-500 space-y-0.5">
+                <li>• SFC-compliant verification pipeline</li>
+                <li>• Supports 14,000+ document types across 220+ countries</li>
+                <li>• Automated approval in ~30 seconds</li>
+              </ul>
+            </button>
+
+            {/* Local option */}
+            <button
+              onClick={startLocalFlow}
+              className="bg-gray-900 border border-gray-800 hover:border-gray-600 rounded-xl p-6 text-left transition-colors"
+            >
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <div className="text-xs text-gray-400 font-mono mb-1">PRIVACY DEMO</div>
+                  <h3 className="text-lg font-semibold">In-Browser Verification</h3>
+                </div>
+                <span className="text-xs px-2 py-0.5 bg-blue-900/50 text-blue-400 rounded">Zero data leaves device</span>
+              </div>
+              <p className="text-sm text-gray-400 mb-3">
+                Experimental: document OCR, face matching, and liveness detection all run locally in your browser. No third party sees your documents.
+              </p>
+              <ul className="text-xs text-gray-500 space-y-0.5">
+                <li>• Tesseract.js OCR in-browser</li>
+                <li>• face-api.js face matching</li>
+                <li>• OCR accuracy varies by document</li>
+              </ul>
+            </button>
+          </div>
+
+          {!sumsubAvailable && (
+            <p className="text-xs text-yellow-400">
+              Sumsub is not configured on this server — only in-browser verification is available.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Stage 1.7: Sumsub verification */}
+      {stage === "sumsub" && identity && sumsubAccessToken && (
+        <div className="space-y-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 text-sm text-gray-300 flex items-center justify-between">
+            <div>
+              <strong className="text-purple-300">Sumsub Verification Active</strong>
+              <div className="text-xs text-gray-500 mt-0.5">
+                Complete the steps below. On approval, your credential is issued on-chain automatically.
+              </div>
+            </div>
+            <button
+              onClick={() => setStage("method")}
+              className="text-xs text-gray-400 hover:text-white px-3 py-1 bg-gray-800 rounded"
+            >
+              Change method
+            </button>
+          </div>
+          <SumsubVerification
+            accessToken={sumsubAccessToken}
+            levelName={sumsubLevelName}
+            onComplete={onSumsubComplete}
+            onError={(e) => toast(`Sumsub error: ${e.message.slice(0, 120)}`, "error")}
+          />
+          <button
+            onClick={async () => {
+              if (!identity) return;
+              const status = await apiSumsubStatus(getCommitment(identity).toString());
+              if (status.reviewAnswer === "GREEN") {
+                onSumsubComplete("GREEN");
+              } else {
+                toast(`Current status: ${status.reviewStatus || "pending"} (${status.reviewAnswer || "no decision"})`, "info");
+              }
+            }}
+            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm text-gray-200 rounded-lg"
+          >
+            Refresh Status
           </button>
         </div>
       )}

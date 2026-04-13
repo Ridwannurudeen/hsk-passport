@@ -16,6 +16,14 @@ import {
 } from "./db.js";
 import { startIndexer } from "./indexer.js";
 import { startAutoIssuer } from "./auto-issuer.js";
+import {
+  sumsubConfig,
+  createApplicant,
+  getApplicantByExternalId,
+  generateAccessToken,
+  verifyWebhookSignature,
+  type SumsubApplicant,
+} from "./sumsub.js";
 
 const app = Fastify({ logger: { level: "info" } });
 
@@ -197,6 +205,132 @@ app.post("/api/kyc/review", async (request, reply) => {
   }
 
   return { id: body.id, status: body.action === "approve" ? "approved" : "rejected" };
+});
+
+// ================================================================
+// Sumsub integration — real KYC verification flow
+// ================================================================
+
+// Config check endpoint — frontend uses this to decide whether to show Sumsub
+app.get("/api/kyc/sumsub/config", async () => {
+  return {
+    enabled: sumsubConfig.configured,
+    levelName: sumsubConfig.levelName,
+  };
+});
+
+/**
+ * Initialize a Sumsub applicant and return a short-lived access token
+ * that the frontend WebSDK uses to render the verification flow.
+ *
+ * Uses the user's Semaphore identity commitment as externalUserId so
+ * one credential = one applicant = one on-chain commitment.
+ */
+app.post("/api/kyc/sumsub/init", async (request, reply) => {
+  if (!sumsubConfig.configured) {
+    reply.code(501);
+    return { error: "Sumsub not configured on this server" };
+  }
+
+  const body = request.body as { commitment?: string };
+  if (!body.commitment || !/^\d+$/.test(body.commitment)) {
+    reply.code(400);
+    return { error: "missing or invalid commitment (must be numeric string)" };
+  }
+
+  try {
+    // Create or fetch applicant for this commitment
+    let applicant = await getApplicantByExternalId(body.commitment);
+    if (!applicant) {
+      applicant = await createApplicant(body.commitment);
+    }
+
+    // Generate fresh access token for the Web SDK
+    const access = await generateAccessToken(body.commitment);
+
+    return {
+      applicantId: applicant.id,
+      externalUserId: applicant.externalUserId,
+      accessToken: access.token,
+      levelName: sumsubConfig.levelName,
+      reviewStatus: applicant.review?.reviewStatus || "init",
+      reviewAnswer: applicant.review?.reviewResult?.reviewAnswer || null,
+    };
+  } catch (e) {
+    const msg = (e as Error).message;
+    console.error("[sumsub] init error:", msg);
+    reply.code(500);
+    return { error: msg.slice(0, 300) };
+  }
+});
+
+/**
+ * Poll Sumsub for an applicant's current status.
+ * Frontend calls this after Web SDK completes to check if the review passed.
+ */
+app.get("/api/kyc/sumsub/status/:commitment", async (request, reply) => {
+  if (!sumsubConfig.configured) {
+    reply.code(501);
+    return { error: "Sumsub not configured on this server" };
+  }
+
+  const { commitment } = request.params as { commitment: string };
+  const applicant = await getApplicantByExternalId(commitment);
+  if (!applicant) return { status: "none" };
+
+  return {
+    applicantId: applicant.id,
+    reviewStatus: applicant.review?.reviewStatus || "init",
+    reviewAnswer: applicant.review?.reviewResult?.reviewAnswer || null,
+    rejectLabels: applicant.review?.reviewResult?.rejectLabels || [],
+  };
+});
+
+/**
+ * Sumsub webhook receiver. Verifies HMAC signature, then handles the event.
+ * On GREEN (approved) result, the auto-issuer will pick up the pending KYC
+ * request and issue credentials on-chain.
+ */
+app.post("/api/kyc/sumsub/webhook", async (request, reply) => {
+  const rawBody = JSON.stringify(request.body);
+  const providedSig = (request.headers["x-payload-digest"] as string) || "";
+  const algo = (request.headers["x-payload-digest-alg"] as string) || "HMAC_SHA256_HEX";
+
+  if (!verifyWebhookSignature(rawBody, providedSig, algo)) {
+    reply.code(401);
+    return { error: "invalid webhook signature" };
+  }
+
+  const event = request.body as {
+    type?: string;
+    applicantId?: string;
+    externalUserId?: string;
+    reviewStatus?: string;
+    reviewResult?: { reviewAnswer?: string };
+  };
+
+  console.log("[sumsub] webhook:", event.type, event.externalUserId, event.reviewStatus, event.reviewResult?.reviewAnswer);
+
+  // Handle applicantReviewed: if GREEN, auto-create a KYC request for the auto-issuer to process
+  if (event.type === "applicantReviewed" && event.externalUserId) {
+    const applicant = await getApplicantByExternalId(event.externalUserId);
+    if (applicant?.review?.reviewResult?.reviewAnswer === "GREEN") {
+      // If no existing DB record, create one so the auto-issuer picks it up
+      const existing = getKYCByCommitment(event.externalUserId) as { id?: string; status?: string } | undefined;
+      if (!existing) {
+        insertKYCRequest({
+          id: randomUUID(),
+          commitment: event.externalUserId,
+          wallet: "sumsub-verified",
+          jurisdiction: "UNKNOWN",
+          credentialType: "KYCVerified",
+          documentType: "sumsub:" + (applicant.id || "").slice(0, 10),
+        });
+      }
+    }
+  }
+
+  return { ok: true };
 });
 
 // ================================================================

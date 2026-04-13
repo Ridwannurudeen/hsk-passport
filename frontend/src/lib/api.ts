@@ -101,3 +101,44 @@ export async function apiReviewKYC(body: {
 export function buildReviewMessage(id: string, action: "approve" | "reject", nonce: number): string {
   return `HSK Passport review: ${action} request ${id} at ${nonce}`;
 }
+
+// ============================================================
+// Sumsub integration
+// ============================================================
+
+export async function apiGetSumsubConfig(): Promise<{ enabled: boolean; levelName: string }> {
+  const res = await fetch(`${apiBase()}/api/kyc/sumsub/config`, { cache: "no-store" });
+  if (!res.ok) return { enabled: false, levelName: "" };
+  return res.json();
+}
+
+export async function apiSumsubInit(commitment: string): Promise<{
+  applicantId: string;
+  accessToken: string;
+  levelName: string;
+  reviewStatus: string;
+  reviewAnswer: string | null;
+}> {
+  const res = await fetch(`${apiBase()}/api/kyc/sumsub/init`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ commitment }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    throw new Error((err as { error?: string }).error || `Sumsub init failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function apiSumsubStatus(commitment: string): Promise<{
+  applicantId?: string;
+  reviewStatus?: string;
+  reviewAnswer?: string | null;
+  rejectLabels?: string[];
+  status?: string;
+}> {
+  const res = await fetch(`${apiBase()}/api/kyc/sumsub/status/${commitment}`, { cache: "no-store" });
+  if (!res.ok) return {};
+  return res.json();
+}
