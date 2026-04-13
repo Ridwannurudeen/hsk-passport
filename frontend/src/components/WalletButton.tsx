@@ -45,14 +45,24 @@ export function WalletButton() {
   return (
     <button
       onClick={handleClick}
-      className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+      className={`text-[12px] font-medium rounded-lg transition-all h-[34px] px-3 ${address ? "font-mono" : ""}`}
+      style={
         address
-          ? "bg-gray-800 border-gray-700 text-purple-300 hover:text-white hover:border-purple-600"
-          : "bg-purple-600 border-purple-500 text-white hover:bg-purple-500"
-      }`}
+          ? {
+              background: "var(--bg-elevated)",
+              border: "1px solid var(--border-muted)",
+              color: "var(--accent-primary)",
+            }
+          : {
+              background: "var(--accent-primary)",
+              border: "1px solid transparent",
+              color: "white",
+              boxShadow: "0 0 0 1px rgba(255,255,255,0.08) inset, 0 6px 20px -6px var(--accent-glow)",
+            }
+      }
       title={address ? `Click to copy: ${address}` : "Connect wallet"}
     >
-      {connecting ? "Connecting..." : address ? short : "Connect Wallet"}
+      {connecting ? "Connecting..." : address ? short : "Connect"}
     </button>
   );
 }

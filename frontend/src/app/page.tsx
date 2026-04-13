@@ -13,257 +13,412 @@ export default function Home() {
 
   return (
     <div>
-      {/* Hero */}
-      <section className="relative overflow-hidden border-b border-gray-900">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(59,130,246,0.08),transparent_55%)] pointer-events-none" />
-        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-500/30 to-transparent" />
+      {/* ============================================================
+          HERO
+         ============================================================ */}
+      <section className="relative overflow-hidden bg-grid-fade">
+        {/* Animated gradient orbs */}
+        <div
+          className="orb"
+          style={{
+            top: "-10%",
+            left: "10%",
+            width: "520px",
+            height: "520px",
+            background: "radial-gradient(circle, var(--accent-glow) 0%, transparent 70%)",
+          }}
+        />
+        <div
+          className="orb"
+          style={{
+            top: "20%",
+            right: "-5%",
+            width: "420px",
+            height: "420px",
+            background: "radial-gradient(circle, rgba(122, 155, 255, 0.15) 0%, transparent 70%)",
+            animationDelay: "-6s",
+          }}
+        />
 
-        <div className="relative max-w-6xl mx-auto px-4 pt-24 pb-16">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 mb-6 text-[11px] font-mono tracking-[0.14em] uppercase text-blue-400">
-              <span className="block w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-              v5 live on HashKey Chain testnet · 45 passing tests
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-20 sm:pt-28 pb-16 sm:pb-24">
+          <div className="max-w-3xl anim-fade-up">
+            <div className="badge mb-7">
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "var(--success)" }} />
+              <span>v5 live on HashKey Chain testnet</span>
+              <span style={{ color: "var(--text-subtle)" }}>•</span>
+              <span style={{ color: "var(--text-muted)" }}>45 tests</span>
             </div>
-            <h1 className="text-[44px] sm:text-[56px] lg:text-[64px] font-semibold tracking-[-0.025em] leading-[1.02] mb-6 text-white">
-              Verifiable compliance for regulated RWA and institutional DeFi.
+            <h1 className="display-1 mb-6">
+              Verifiable compliance for
+              <br />
+              <span
+                className="bg-clip-text text-transparent gradient-shift"
+                style={{
+                  backgroundImage: "linear-gradient(110deg, var(--accent-primary), #8fb2ff 40%, var(--accent-primary))",
+                }}
+              >
+                regulated RWA & DeFi.
+              </span>
             </h1>
-            <p className="text-lg sm:text-xl text-gray-400 max-w-2xl mb-9 leading-relaxed">
-              Zero-knowledge KYC credentials on HashKey Chain. Issuer-staked, timelock-governed, Sumsub-verified. Extend HashKey&apos;s KYC stack — verify once, prove eligibility to any dApp without revealing identity.
+            <p
+              className="text-[17px] sm:text-[19px] leading-[1.55] mb-10 max-w-[58ch]"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              Zero-knowledge KYC credentials on HashKey Chain. Issuer-staked, timelock-governed,
+              Sumsub-verified. Extend HashKey&apos;s compliance stack — verify once, prove eligibility
+              to any dApp, reveal nothing.
             </p>
-            <div className="flex flex-wrap gap-3 mb-14">
-              <Link
-                href="/kyc"
-                className="group inline-flex items-center gap-2 px-5 py-3 bg-white text-gray-950 hover:bg-gray-100 font-medium rounded-md transition-all text-sm"
-              >
+            <div className="flex flex-wrap items-center gap-3 anim-fade-up anim-delay-2">
+              <Link href="/kyc" className="btn btn-accent">
                 Get verified
-                <span className="transition-transform group-hover:translate-x-0.5">→</span>
+                <ArrowIcon />
               </Link>
-              <Link
-                href="/developers"
-                className="group inline-flex items-center gap-2 px-5 py-3 bg-gray-900 hover:bg-gray-800 border border-gray-800 hover:border-gray-700 text-gray-100 font-medium rounded-md transition-all text-sm"
-              >
+              <Link href="/developers" className="btn btn-secondary">
                 Start building
-                <span className="opacity-60 group-hover:opacity-100 transition-opacity">→</span>
               </Link>
-              <Link
-                href="/composer"
-                className="group inline-flex items-center gap-2 px-5 py-3 text-gray-400 hover:text-gray-100 font-medium rounded-md transition-colors text-sm"
-              >
-                Try the Policy Composer
-                <span className="opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+              <Link href="/composer" className="btn btn-ghost link-hover">
+                Try the Policy Composer →
               </Link>
             </div>
           </div>
 
-          {/* Live stats row */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-gray-900 border border-gray-900 rounded-xl overflow-hidden">
+          {/* Live metric row */}
+          <div
+            className="mt-16 sm:mt-20 grid grid-cols-2 md:grid-cols-4 gap-px rounded-2xl overflow-hidden anim-fade-up anim-delay-3"
+            style={{ background: "var(--border-muted)", border: "1px solid var(--border-muted)" }}
+          >
             {[
               { value: stats?.activeCredentials ?? "—", label: "Credentials issued", sub: "testnet, live" },
               { value: "45", label: "Passing tests", sub: "contracts + invariants" },
               { value: "8", label: "Protocol contracts", sub: "deployed v5" },
               { value: "0", label: "Bytes PII", sub: "ever on-chain" },
             ].map((s) => (
-              <div key={s.label} className="bg-gray-950 p-5">
-                <div className="text-3xl font-semibold text-white tabular-nums">{s.value}</div>
-                <div className="text-sm text-gray-300 mt-1">{s.label}</div>
-                <div className="text-xs text-gray-500 mt-0.5">{s.sub}</div>
+              <div key={s.label} className="p-6 sm:p-7" style={{ background: "var(--bg-canvas)" }}>
+                <div className="display-2 tabular mb-1.5" style={{ color: "var(--text-primary)" }}>{s.value}</div>
+                <div className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>{s.label}</div>
+                <div className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{s.sub}</div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Standards + integrations strip */}
-      <section className="border-b border-gray-900 bg-gray-950/50">
-        <div className="max-w-6xl mx-auto px-4 py-8">
-          <div className="text-[11px] font-mono tracking-[0.18em] uppercase text-gray-500 mb-4 text-center">
-            Built on open standards · Compatible with
+      {/* ============================================================
+          STANDARDS STRIP
+         ============================================================ */}
+      <section className="border-y" style={{ borderColor: "var(--border-muted)", background: "var(--bg-subtle)" }}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+          <div className="eyebrow text-center mb-5" style={{ color: "var(--text-muted)" }}>
+            Built on open standards — compatible with
           </div>
-          <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm text-gray-400">
-            <span className="hover:text-gray-200 transition-colors">W3C Verifiable Credentials</span>
-            <span className="text-gray-700">·</span>
-            <span className="hover:text-gray-200 transition-colors">Semaphore v4</span>
-            <span className="text-gray-700">·</span>
-            <span className="hover:text-gray-200 transition-colors">Groth16 ZK</span>
-            <span className="text-gray-700">·</span>
-            <span className="hover:text-gray-200 transition-colors">Sumsub KYC</span>
-            <span className="text-gray-700">·</span>
-            <span className="hover:text-gray-200 transition-colors">HashKey Chain</span>
-            <span className="text-gray-700">·</span>
-            <span className="hover:text-gray-200 transition-colors">HashKey DID</span>
-            <span className="text-gray-700">·</span>
-            <span className="hover:text-gray-200 transition-colors">OpenZeppelin Timelock</span>
-          </div>
-        </div>
-      </section>
-
-      {/* For 3 audiences */}
-      <section className="max-w-6xl mx-auto px-4 py-20">
-        <h2 className="text-3xl font-bold text-center mb-12">Built for three sides of the market</h2>
-        <div className="grid md:grid-cols-3 gap-6">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-            <div className="w-10 h-10 rounded-lg bg-blue-600/20 text-blue-400 flex items-center justify-center text-lg font-bold mb-4">U</div>
-            <h3 className="text-xl font-bold mb-2">Users</h3>
-            <p className="text-sm text-gray-400 mb-4">Verify once. Use everywhere. Never expose personal data on-chain.</p>
-            <ul className="text-xs text-gray-500 space-y-1 mb-4">
-              <li>• One KYC, reusable across dApps</li>
-              <li>• Zero personal data on blockchain</li>
-              <li>• Revocable, expirable credentials</li>
-            </ul>
-            <Link href="/kyc" className="text-sm text-blue-400 hover:text-blue-300">Get verified →</Link>
-          </div>
-
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-            <div className="w-10 h-10 rounded-lg bg-purple-600/20 text-purple-400 flex items-center justify-center text-lg font-bold mb-4">D</div>
-            <h3 className="text-xl font-bold mb-2">dApp Developers</h3>
-            <p className="text-sm text-gray-400 mb-4">One modifier. Any function gated behind ZK compliance checks.</p>
-            <ul className="text-xs text-gray-500 space-y-1 mb-4">
-              <li>• One-line Solidity integration</li>
-              <li>• TypeScript SDK + React component</li>
-              <li>• Indexer API for fast member queries</li>
-            </ul>
-            <Link href="/developers" className="text-sm text-purple-400 hover:text-purple-300">Developer docs →</Link>
-          </div>
-
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-            <div className="w-10 h-10 rounded-lg bg-green-600/20 text-green-400 flex items-center justify-center text-lg font-bold mb-4">I</div>
-            <h3 className="text-xl font-bold mb-2">Issuers</h3>
-            <p className="text-sm text-gray-400 mb-4">Review KYC submissions, issue revocable credentials on-chain.</p>
-            <ul className="text-xs text-gray-500 space-y-1 mb-4">
-              <li>• Queue of pending submissions</li>
-              <li>• Approve/reject with audit log</li>
-              <li>• Schema registry for credential types</li>
-            </ul>
-            <Link href="/issuer" className="text-sm text-green-400 hover:text-green-300">Issuer dashboard →</Link>
+          <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm" style={{ color: "var(--text-secondary)" }}>
+            {[
+              "W3C Verifiable Credentials",
+              "Semaphore v4",
+              "Groth16 ZK",
+              "Sumsub KYC",
+              "HashKey Chain",
+              "HashKey DID",
+              "OpenZeppelin Timelock",
+            ].map((item, i, arr) => (
+              <span key={item} className="flex items-center gap-8">
+                <span className="link-hover hover:text-[color:var(--text-primary)] transition-colors">{item}</span>
+                {i < arr.length - 1 && <span style={{ color: "var(--text-subtle)" }}>·</span>}
+              </span>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* One-line integration */}
-      <section className="max-w-5xl mx-auto px-4 py-20">
-        <div className="text-center mb-10">
-          <h2 className="text-3xl font-bold mb-3">One line. Full compliance.</h2>
-          <p className="text-gray-400">Gate any function behind a ZK credential check.</p>
-        </div>
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 overflow-x-auto">
-          <pre className="text-sm font-mono text-gray-300">{`contract MyRWAToken {
-    IHSKPassport passport;
+      {/* ============================================================
+          ONE-LINE INTEGRATION — code-first
+         ============================================================ */}
+      <section className="relative max-w-6xl mx-auto px-4 sm:px-6 py-24 sm:py-32">
+        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+          <div>
+            <div className="eyebrow mb-4" style={{ color: "var(--accent-primary)" }}>For developers</div>
+            <h2 className="display-2 mb-5" style={{ color: "var(--text-primary)" }}>
+              One require line.
+              <br />
+              Full compliance.
+            </h2>
+            <p className="text-[17px] leading-[1.6] mb-6" style={{ color: "var(--text-secondary)" }}>
+              Paste one call into your contract. Users prove KYC, accreditation, or jurisdiction
+              via zero-knowledge proofs that cost ~241k gas and reveal nothing.
+            </p>
+            <ul className="space-y-3 mb-8">
+              {[
+                "Caller-bound proofs prevent front-running",
+                "Per-action nullifiers prevent sybil attacks",
+                "Revocable, expirable, governance-controlled",
+              ].map((item) => (
+                <li key={item} className="flex items-start gap-3 text-sm" style={{ color: "var(--text-secondary)" }}>
+                  <CheckIcon />
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <div className="flex flex-wrap gap-3">
+              <Link href="/developers" className="btn btn-secondary">Read the quickstart</Link>
+              <Link href="/composer" className="btn btn-ghost link-hover">Generate your policy →</Link>
+            </div>
+          </div>
 
-    function mint(ISemaphore.SemaphoreProof calldata proof) external {
-        require(proof.message == uint256(uint160(msg.sender)), "bind proof to caller");
-        require(passport.verifyCredential(20, proof), "KYC required"); // ← One line. Done.
-        _mint(msg.sender, 100e18);
-    }
-}`}</pre>
-        </div>
-        <div className="text-center mt-6">
-          <Link href="/developers" className="text-sm text-purple-400 hover:text-purple-300">
-            Read the full integration guide →
-          </Link>
+          <div className="code-window">
+            <div className="code-window-header">
+              <span className="code-dot code-dot-red" />
+              <span className="code-dot code-dot-yellow" />
+              <span className="code-dot code-dot-green" />
+              <span className="ml-2 text-xs font-mono" style={{ color: "var(--text-muted)" }}>MyRWAToken.sol</span>
+            </div>
+            <pre className="p-6 text-[13px] leading-[1.7] font-mono overflow-x-auto"><code>
+<span style={{ color: "#7a8194" }}>// Gate any function behind a ZK credential check</span>{"\n"}
+<span style={{ color: "#c689ff" }}>contract</span> <span style={{ color: "#7fc8ff" }}>MyRWAToken</span> {"{"}{"\n"}
+{"    "}<span style={{ color: "#c689ff" }}>function</span> <span style={{ color: "#b9e28b" }}>mint</span>(<span style={{ color: "#7fc8ff" }}>SemaphoreProof</span> <span style={{ color: "#c689ff" }}>calldata</span> proof) <span style={{ color: "#c689ff" }}>external</span> {"{"}{"\n"}
+{"        "}<span style={{ color: "#c689ff" }}>require</span>({"\n"}
+{"            "}proof.message == <span style={{ color: "#ffb170" }}>uint256</span>(<span style={{ color: "#ffb170" }}>uint160</span>(msg.sender)),{"\n"}
+{"            "}<span style={{ color: "#b9e28b" }}>&quot;proof must be bound to caller&quot;</span>{"\n"}
+{"        "});{"\n"}
+{"        "}<span style={{ color: "#c689ff" }}>require</span>({"\n"}
+{"            "}passport.<span style={{ color: "#ffb170" }}>verifyCredential</span>(<span style={{ color: "#ffa06b" }}>25</span>, proof),{"\n"}
+{"            "}<span style={{ color: "#b9e28b" }}>&quot;KYC required&quot;</span>{"\n"}
+{"        "});{"\n"}
+{"        "}_mint(msg.sender, <span style={{ color: "#ffa06b" }}>100e18</span>);{"\n"}
+{"    "}{"}"}{"\n"}
+{"}"}
+            </code></pre>
+          </div>
         </div>
       </section>
 
-      {/* Architecture */}
-      <section className="max-w-6xl mx-auto px-4 py-20">
-        <h2 className="text-3xl font-bold text-center mb-10">How it works</h2>
-        <div className="grid md:grid-cols-3 gap-6">
+      {/* ============================================================
+          THREE AUDIENCES
+         ============================================================ */}
+      <section className="relative border-y" style={{ borderColor: "var(--border-muted)", background: "var(--bg-subtle)" }}>
+        <div className="absolute inset-0 bg-dots opacity-50 pointer-events-none" />
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-24 sm:py-32">
+          <div className="max-w-2xl mb-14">
+            <div className="eyebrow mb-3" style={{ color: "var(--accent-primary)" }}>Who uses HSK Passport</div>
+            <h2 className="display-2" style={{ color: "var(--text-primary)" }}>
+              One protocol. Three sides of the market.
+            </h2>
+          </div>
+          <div className="grid md:grid-cols-3 gap-4">
+            {[
+              {
+                tag: "Users",
+                title: "Verify once, prove anywhere",
+                desc: "Complete KYC with Sumsub. Get a zero-knowledge credential bound to your wallet. Use it across every compliant dApp.",
+                href: "/kyc",
+                cta: "Get verified",
+                icon: <UserIcon />,
+              },
+              {
+                tag: "Developers",
+                title: "Ship compliant dApps in minutes",
+                desc: "SDK on npm, React gate component, Hardhat helpers. Policy Composer generates Solidity + React + tests.",
+                href: "/developers",
+                cta: "Developer docs",
+                icon: <CodeIcon />,
+              },
+              {
+                tag: "Issuers",
+                title: "Regulated issuance, staked reputation",
+                desc: "Stake HSK, issue revocable credentials, earn reputation. Slashable via 48h timelock governance on misissuance.",
+                href: "/issuer",
+                cta: "Issuer dashboard",
+                icon: <ShieldIcon />,
+              },
+            ].map((card, i) => (
+              <Link
+                key={card.tag}
+                href={card.href}
+                className={`group relative p-6 rounded-2xl surface-interactive anim-fade-up anim-delay-${i + 1}`}
+              >
+                <div className="mb-5">
+                  <div
+                    className="w-10 h-10 rounded-lg flex items-center justify-center"
+                    style={{ background: "var(--accent-subtle)", color: "var(--accent-primary)" }}
+                  >
+                    {card.icon}
+                  </div>
+                </div>
+                <div className="eyebrow mb-2" style={{ color: "var(--text-muted)" }}>{card.tag}</div>
+                <h3 className="text-[18px] font-semibold mb-2 leading-snug" style={{ color: "var(--text-primary)" }}>
+                  {card.title}
+                </h3>
+                <p className="text-sm leading-relaxed mb-5" style={{ color: "var(--text-secondary)" }}>
+                  {card.desc}
+                </p>
+                <div
+                  className="text-sm font-medium flex items-center gap-1.5 link-hover group-hover:gap-2 transition-all"
+                  style={{ color: "var(--accent-primary)" }}
+                >
+                  {card.cta}
+                  <span>→</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ============================================================
+          HOW IT WORKS — numbered steps
+         ============================================================ */}
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-24 sm:py-32">
+        <div className="max-w-2xl mb-14">
+          <div className="eyebrow mb-3" style={{ color: "var(--accent-primary)" }}>Architecture</div>
+          <h2 className="display-2" style={{ color: "var(--text-primary)" }}>How it works</h2>
+        </div>
+        <div className="grid md:grid-cols-3 gap-px rounded-2xl overflow-hidden" style={{ background: "var(--border-muted)", border: "1px solid var(--border-muted)" }}>
           {[
             {
-              step: "1",
+              step: "01",
               title: "Issuer verifies off-chain",
-              desc: "A trusted issuer (e.g., HashKey Exchange, approved KYC provider) verifies the user's identity documents off-chain. They add the user's cryptographic commitment (hash of a keypair) to an on-chain Semaphore group.",
+              desc: "Sumsub (same KYC provider HashKey Exchange uses) runs iBeta-L2 liveness, document authenticity, and face dedup. On GREEN, the issuer wallet adds the user's Semaphore commitment to an on-chain group.",
             },
             {
-              step: "2",
+              step: "02",
               title: "User proves in-browser",
-              desc: "The user generates a Groth16 zero-knowledge proof in their browser via WASM. This proof demonstrates group membership — without revealing WHICH member. Proof is bound to the caller address to prevent front-running.",
+              desc: "The user's browser generates a Groth16 ZK proof in WASM. The proof demonstrates group membership without revealing which member. Bound to msg.sender to prevent front-running.",
             },
             {
-              step: "3",
+              step: "03",
               title: "dApp verifies on-chain",
-              desc: "Any dApp on HashKey Chain calls verifyCredential() with the proof. The contract returns true/false in ~241k gas. The dApp learns nothing about who the user is — only that they hold a valid credential.",
+              desc: "Any contract calls verifyCredential(). Returns true/false in ~241k gas. The dApp learns nothing beyond eligibility. Nullifiers are scoped per action for sybil resistance.",
             },
           ].map((s) => (
-            <div key={s.step} className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-              <div className="text-4xl font-bold text-purple-400 mb-3">{s.step}</div>
-              <h3 className="text-lg font-semibold mb-2">{s.title}</h3>
-              <p className="text-sm text-gray-400">{s.desc}</p>
+            <div key={s.step} className="p-8" style={{ background: "var(--bg-canvas)" }}>
+              <div
+                className="display-2 mb-5 font-mono"
+                style={{
+                  color: "transparent",
+                  backgroundImage: "linear-gradient(180deg, var(--text-primary), var(--text-muted) 140%)",
+                  WebkitBackgroundClip: "text",
+                  backgroundClip: "text",
+                }}
+              >
+                {s.step}
+              </div>
+              <h3 className="text-[17px] font-semibold mb-3" style={{ color: "var(--text-primary)" }}>{s.title}</h3>
+              <p className="text-sm leading-[1.65]" style={{ color: "var(--text-secondary)" }}>{s.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Ecosystem preview */}
-      <section className="max-w-6xl mx-auto px-4 py-20">
-        <div className="flex items-end justify-between mb-8">
-          <div>
-            <h2 className="text-3xl font-bold mb-2">Ecosystem</h2>
-            <p className="text-gray-400 text-sm">Live dApps using HSK Passport on testnet today</p>
+      {/* ============================================================
+          ECOSYSTEM PREVIEW
+         ============================================================ */}
+      <section className="border-y" style={{ borderColor: "var(--border-muted)", background: "var(--bg-subtle)" }}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-24 sm:py-32">
+          <div className="flex items-end justify-between mb-12">
+            <div>
+              <div className="eyebrow mb-3" style={{ color: "var(--accent-primary)" }}>Ecosystem</div>
+              <h2 className="display-2" style={{ color: "var(--text-primary)" }}>Live on testnet</h2>
+            </div>
+            <Link href="/ecosystem" className="btn btn-ghost link-hover">View all →</Link>
           </div>
-          <Link href="/ecosystem" className="text-sm text-purple-400 hover:text-purple-300">View all →</Link>
-        </div>
-        <div className="grid md:grid-cols-3 gap-4">
-          {[
-            { name: "HashKey Silver", symbol: "hSILVER", tag: "RWA", color: "from-gray-700 to-gray-600" },
-            { name: "HK Pilot Airdrop", symbol: "hPILOT", tag: "Airdrop", color: "from-purple-900 to-purple-700" },
-            { name: "Accredited Pool", symbol: "—", tag: "Lending", color: "from-green-900 to-emerald-700" },
-          ].map((app) => (
-            <Link href="/ecosystem" key={app.name} className="block bg-gray-900 border border-gray-800 hover:border-purple-800 rounded-xl overflow-hidden transition-colors">
-              <div className={`h-1 bg-gradient-to-r ${app.color}`} />
-              <div className="p-4">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="font-semibold">{app.name}</div>
-                  <span className="text-xs text-gray-500">{app.tag}</span>
+          <div className="grid md:grid-cols-3 gap-4">
+            {[
+              { name: "HashKey Silver", symbol: "hSILVER", tag: "RWA", desc: "KYC-gated regulated RWA mint, caller-bound proof enforced." },
+              { name: "HK Pilot Airdrop", symbol: "hPILOT", tag: "Airdrop", desc: "Sybil-resistant airdrop via action-scoped nullifiers." },
+              { name: "Accredited Pool", symbol: "ACC", tag: "Lending", desc: "Tiered lending — retail vs accredited investor gates." },
+            ].map((app, i) => (
+              <Link
+                key={app.name}
+                href="/ecosystem"
+                className={`group block p-6 rounded-2xl surface-interactive anim-fade-up anim-delay-${i + 1}`}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <span className="eyebrow" style={{ color: "var(--text-muted)" }}>{app.tag}</span>
+                  <span className="text-xs font-mono" style={{ color: "var(--accent-primary)" }}>{app.symbol}</span>
                 </div>
-                <div className="text-xs font-mono text-purple-400">{app.symbol}</div>
-              </div>
-            </Link>
-          ))}
+                <h3 className="text-[17px] font-semibold mb-2" style={{ color: "var(--text-primary)" }}>{app.name}</h3>
+                <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>{app.desc}</p>
+                <div className="mt-5 text-sm font-medium flex items-center gap-1.5 group-hover:gap-2 transition-all" style={{ color: "var(--accent-primary)" }}>
+                  View integration →
+                </div>
+              </Link>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* Roadmap */}
-      <section className="max-w-4xl mx-auto px-4 py-20">
-        <h2 className="text-3xl font-bold text-center mb-10">Roadmap</h2>
-        <div className="space-y-3">
-          {[
-            { period: "Q2 2026", items: ["Mainnet deployment on HashKey Chain", "Integration with HashKey Exchange KYC provider", "SDK v1.0 on npm", "Third-party issuer onboarding program"], status: "current" },
-            { period: "Q3 2026", items: ["HashKey DID bridge — compose with existing .key identities", "Jurisdiction-aware credential types (EU, SG, AE, US)", "Revocation registry v2 with on-chain status lists", "Mobile SDK (React Native)"], status: "planned" },
-            { period: "Q4 2026", items: ["Cross-chain credential bridge (LayerZero / HashKey Bridge)", "Zupass / PCD interop for event-based credentials", "Regulatory audit report", "HSK token staking for issuers"], status: "planned" },
-          ].map((q) => (
-            <div key={q.period} className={`bg-gray-900 border rounded-xl p-5 ${q.status === "current" ? "border-purple-700" : "border-gray-800"}`}>
-              <div className="flex items-center gap-3 mb-3">
-                <div className={`text-sm font-semibold ${q.status === "current" ? "text-purple-400" : "text-gray-400"}`}>{q.period}</div>
-                {q.status === "current" && (
-                  <span className="text-xs px-2 py-0.5 bg-purple-900/50 text-purple-300 rounded">Now</span>
-                )}
-              </div>
-              <ul className="text-sm text-gray-300 space-y-1">
-                {q.items.map((item) => <li key={item}>• {item}</li>)}
-              </ul>
+      {/* ============================================================
+          CTA BAND
+         ============================================================ */}
+      <section className="relative max-w-6xl mx-auto px-4 sm:px-6 py-24 sm:py-32">
+        <div
+          className="relative overflow-hidden rounded-2xl p-10 sm:p-16 text-center"
+          style={{
+            background: "linear-gradient(135deg, var(--bg-subtle), var(--bg-inset))",
+            border: "1px solid var(--border-default)",
+          }}
+        >
+          <div
+            className="absolute inset-0 opacity-60 pointer-events-none"
+            style={{
+              background: "radial-gradient(circle at 50% 0%, var(--accent-glow), transparent 60%)",
+            }}
+          />
+          <div className="relative">
+            <h2 className="display-2 mb-4" style={{ color: "var(--text-primary)" }}>
+              Ready to build compliant?
+            </h2>
+            <p className="text-[17px] mb-8 max-w-xl mx-auto" style={{ color: "var(--text-secondary)" }}>
+              Mint a credential in under 2 minutes, or ship a compliance-gated dApp in under 10.
+            </p>
+            <div className="flex flex-wrap gap-3 justify-center">
+              <Link href="/kyc" className="btn btn-accent">Get verified</Link>
+              <Link href="/composer" className="btn btn-secondary">Generate a policy</Link>
             </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Final CTA */}
-      <section className="max-w-4xl mx-auto px-4 py-20">
-        <div className="bg-gradient-to-br from-purple-950/40 to-gray-900 border border-purple-800/50 rounded-2xl p-10 text-center">
-          <h2 className="text-3xl font-bold mb-3">Build the compliant future of HashKey Chain</h2>
-          <p className="text-gray-400 max-w-2xl mx-auto mb-8">
-            HSK Passport is open source, MIT-licensed, and deployed on HashKey Chain testnet. Integrate in minutes. Scale to production.
-          </p>
-          <div className="flex flex-wrap gap-3 justify-center">
-            <Link href="/developers" className="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-lg transition-colors">
-              Developer Docs
-            </Link>
-            <a href="https://github.com/Ridwannurudeen/hsk-passport" target="_blank" rel="noopener noreferrer"
-              className="px-6 py-3 bg-gray-900 border border-gray-700 hover:border-gray-500 text-gray-100 font-medium rounded-lg transition-colors">
-              View on GitHub
-            </a>
           </div>
         </div>
       </section>
     </div>
+  );
+}
+
+function ArrowIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 12h14M12 5l7 7-7 7" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" className="shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--accent-primary)" }}>
+      <path d="M20 6L9 17l-5-5" />
+    </svg>
+  );
+}
+
+function UserIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
+function CodeIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="16 18 22 12 16 6" />
+      <polyline points="8 6 2 12 8 18" />
+    </svg>
+  );
+}
+
+function ShieldIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </svg>
   );
 }
