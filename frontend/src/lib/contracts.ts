@@ -2,54 +2,56 @@ export const CHAIN_ID = 133;
 export const RPC_URL = "https://testnet.hsk.xyz";
 export const EXPLORER_URL = "https://hashkey-testnet.blockscout.com";
 
-// V4 addresses — post-audit deployment with issuer offboarding + anti-sybil bridges + delegate split
+// V5 addresses — expiry enforcement + issuer slashing via timelock
 export const ADDRESSES = {
   semaphoreVerifier: "0xe874E5DE61fa40dAf82e8916489d1B7071aC3b9A",
   semaphore: "0xd09e8Aec6B6A36588E7A105f606A9fe9a134CFE9",
   credentialRegistry: "0x20265dAe4711B3CeF88D7078bf1290f815279De1",
-  hskPassport: "0xb430F30376344303560c0554DC94766D780a5c64",
-  demoIssuer: "0x77bE0CD574a3602923E2a0C3B42F01C11112A170",
-  gatedRWA: "0x5f7274C64C63Ea73144cf539aBF2504eB3208f25",
-  kycGatedAirdrop: "0xdf399c83cc316b518836df37F7aB54e2b2ada9f9",
-  kycGatedLending: "0x5B3107e67B6439A22dDC21e547f75855A3e70deD",
+  hskPassport: "0x7d2E692A08f2fb0724238396e0436106b4FbD792",
+  demoIssuer: "0xBf7d566B8077A098F6844fb6b827D2A4118C88C3",
+  gatedRWA: "0xb6955cb3e442c4222fFc3b92c322851109d0b9c9",
+  kycGatedAirdrop: "0x71c96016CBCAeE7B2Edc8b40Fec45de1d16Fb4b8",
+  kycGatedLending: "0x37179886986bd35a4d580f157f55f249c43A0BFD",
   jurisdictionSetVerifier: "0x450Dbd60aC27B7bf0131c2b25451380552dd4fBb",
-  jurisdictionGatedPool: "0xA7C937D3D269267590bF9d411B066C57AC8462ec",
+  jurisdictionGatedPool: "0x305f5F0b44d541785305DaDb372f118A9284Ce4D",
   mockHashKeyDID: "0x39931820e457949b724d28C585F821005fcaB409",
-  hashKeyDIDBridge: "0x0cB4c519F984A2f43c1ca217CDB5095dB3b3A2a5",
+  hashKeyDIDBridge: "0xF072D06adcA2B6d5941bde6cc87f41feC5F5Ea7a",
   mockKYCSoulbound: "0x195572EaE140f53CcBA065751C92659935D075E9",
-  hashKeyKYCImporter: "0x7A40694Eda3046706Fe89db771e88Cf3A979A117",
-  // Roadmap scaffolding — deployed but NOT production-enforced (see SECURITY.md)
+  hashKeyKYCImporter: "0x5431ae6D2f5c3Ad3373B7B4DD4066000D681f5B8",
   credentialExpiry: "0xBB47Eb4104E8f77243B445AAE4925c74A839A924",
   credentialReputation: "0x15b29aFeABb1d4C31A0BF6C87f0ae1d357D55D71",
   issuerRegistry: "0x5BbAe6e90b82c7c51EbA9cA6D844D698dE2eb504",
   timelock: "0xb07Bc78559CbDe44c047b1dC3028d13c4f863D8A",
 };
 
-// Block where HSKPassport was deployed — use as fromBlock for event queries
-// to avoid expensive full-range scans that cause RPC timeouts.
-export const HSK_PASSPORT_DEPLOY_BLOCK = 26410000;
+// Block where v5 HSKPassport was deployed — use as fromBlock for event queries.
+export const HSK_PASSPORT_DEPLOY_BLOCK = 26800000;
 
 export const GROUPS = {
-  KYC_VERIFIED: 20,
-  ACCREDITED_INVESTOR: 21,
-  HK_RESIDENT: 22,
-  SG_RESIDENT: 23,
-  AE_RESIDENT: 24,
+  KYC_VERIFIED: 25,
+  ACCREDITED_INVESTOR: 26,
+  HK_RESIDENT: 27,
+  SG_RESIDENT: 28,
+  AE_RESIDENT: 29,
 };
 
 export const GROUP_NAMES: Record<number, string> = {
-  20: "KYC Verified",
-  21: "Accredited Investor",
-  22: "HK Resident",
-  23: "SG Resident",
-  24: "AE Resident",
+  25: "KYC Verified",
+  26: "Accredited Investor",
+  27: "HK Resident",
+  28: "SG Resident",
+  29: "AE Resident",
 };
 
 export const HSK_PASSPORT_ABI = [
   "function semaphore() view returns (address)",
   "function owner() view returns (address)",
   "function approvedIssuers(address) view returns (bool)",
-  "function credentialGroups(uint256) view returns (string name, uint256 groupId, address issuer, uint256 memberCount, bool active, bytes32 schemaHash)",
+  "function credentialGroups(uint256) view returns (string name, uint256 groupId, address issuer, uint256 memberCount, bool active, bytes32 schemaHash, uint256 validityPeriod)",
+  "function credentialIssuedAt(uint256, uint256) view returns (uint256)",
+  "function isCredentialExpired(uint256 groupId, uint256 identityCommitment) view returns (bool)",
+  "function setValidityPeriod(uint256 groupId, uint256 validityPeriodSec)",
+  "function verifyCredentialWithExpiry(uint256 groupId, tuple(uint256 merkleTreeDepth, uint256 merkleTreeRoot, uint256 nullifier, uint256 message, uint256 scope, uint256[8] points) proof, uint256 earliestAcceptableIssuance) view returns (bool)",
   "function groupDelegates(uint256 groupId, address delegate) view returns (bool)",
   "function addDelegate(uint256 groupId, address delegate)",
   "function removeDelegate(uint256 groupId, address delegate)",

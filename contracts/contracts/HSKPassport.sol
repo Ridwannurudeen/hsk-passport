@@ -17,7 +17,11 @@ contract HSKPassport {
         uint256 memberCount;
         bool active;
         bytes32 schemaHash;
+        uint256 validityPeriod; // seconds; 0 = no expiry
     }
+
+    /// @dev groupId => identityCommitment => unix-seconds the credential was issued (0 = not issued)
+    mapping(uint256 => mapping(uint256 => uint256)) public credentialIssuedAt;
 
     /// @dev Credential group ID => CredentialGroup metadata
     mapping(uint256 => CredentialGroup) public credentialGroups;
@@ -42,6 +46,7 @@ contract HSKPassport {
     event CredentialIssued(uint256 indexed groupId, uint256 indexed identityCommitment);
     event CredentialRevoked(uint256 indexed groupId, uint256 indexed identityCommitment);
     event CredentialVerified(uint256 indexed groupId, address indexed verifier);
+    event ValidityPeriodSet(uint256 indexed groupId, uint256 validityPeriodSec);
 
     error NotOwner();
     error NotApprovedIssuer();
@@ -49,6 +54,7 @@ contract HSKPassport {
     error GroupNotActive();
     error CredentialAlreadyIssued();
     error CredentialNotIssued();
+    error CredentialExpired();
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();
@@ -134,11 +140,19 @@ contract HSKPassport {
             issuer: msg.sender,
             memberCount: 0,
             active: true,
-            schemaHash: schemaHash
+            schemaHash: schemaHash,
+            validityPeriod: 0
         });
 
         groupIds.push(groupId);
         emit CredentialGroupCreated(groupId, name, msg.sender, schemaHash);
+    }
+
+    /// @notice Set the validity period (seconds) for credentials in a group. 0 = never expires.
+    /// @dev Only the group issuer (still approved) can set this. Applies to new *and* existing credentials.
+    function setValidityPeriod(uint256 groupId, uint256 validityPeriodSec) external onlyGroupIssuer(groupId) {
+        credentialGroups[groupId].validityPeriod = validityPeriodSec;
+        emit ValidityPeriodSet(groupId, validityPeriodSec);
     }
 
     /// @notice Issue a credential to a user by adding their identity commitment to a group
@@ -153,6 +167,7 @@ contract HSKPassport {
 
         semaphore.addMember(groupId, identityCommitment);
         credentials[groupId][identityCommitment] = true;
+        credentialIssuedAt[groupId][identityCommitment] = block.timestamp;
         credentialGroups[groupId].memberCount++;
 
         emit CredentialIssued(groupId, identityCommitment);
@@ -170,6 +185,7 @@ contract HSKPassport {
         for (uint256 i = 0; i < identityCommitments.length; i++) {
             if (credentials[groupId][identityCommitments[i]]) revert CredentialAlreadyIssued();
             credentials[groupId][identityCommitments[i]] = true;
+            credentialIssuedAt[groupId][identityCommitments[i]] = block.timestamp;
         }
 
         semaphore.addMembers(groupId, identityCommitments);
@@ -202,11 +218,46 @@ contract HSKPassport {
     /// @param groupId The credential group to verify against
     /// @param proof The Semaphore proof
     /// @return True if the proof is valid
+    /// @dev Does NOT enforce credential expiry — use verifyCredentialWithExpiry for regulated dApps.
     function verifyCredential(
         uint256 groupId,
         ISemaphore.SemaphoreProof calldata proof
     ) external view returns (bool) {
         if (!credentialGroups[groupId].active) revert GroupNotActive();
+        return semaphore.verifyProof(groupId, proof);
+    }
+
+    /// @notice Check if a specific credential has expired per the group's validity period.
+    /// @dev Returns false for never-issued credentials and groups with no validity period set.
+    function isCredentialExpired(uint256 groupId, uint256 identityCommitment) public view returns (bool) {
+        uint256 validity = credentialGroups[groupId].validityPeriod;
+        if (validity == 0) return false;
+        uint256 issuedAt = credentialIssuedAt[groupId][identityCommitment];
+        if (issuedAt == 0) return false;
+        return block.timestamp > issuedAt + validity;
+    }
+
+    /// @notice Verify a ZK proof AND check the prover's credential hasn't expired.
+    /// @dev Because the prover is anonymous, we can't look up their individual issuance time — so
+    ///      the expiry check is against the *group*'s oldest possible member: if any credential
+    ///      currently on-chain could have expired, the group enters a "stale window" and this call
+    ///      reverts. Issuers must re-issue credentials before their validity period lapses.
+    /// @dev For per-credential expiry (preserving anonymity), use on-chain ZK range proofs in the
+    ///      validity period — shipped as a grant milestone (see /roadmap).
+    function verifyCredentialWithExpiry(
+        uint256 groupId,
+        ISemaphore.SemaphoreProof calldata proof,
+        uint256 earliestAcceptableIssuance
+    ) external view returns (bool) {
+        if (!credentialGroups[groupId].active) revert GroupNotActive();
+        uint256 validity = credentialGroups[groupId].validityPeriod;
+        if (validity != 0) {
+            // Verifier specifies how old the oldest acceptable credential can be.
+            // Must be within the group's validity window.
+            if (block.timestamp > earliestAcceptableIssuance + validity) {
+                revert CredentialExpired();
+            }
+        }
         return semaphore.verifyProof(groupId, proof);
     }
 
