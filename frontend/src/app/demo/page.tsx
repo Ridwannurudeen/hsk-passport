@@ -85,10 +85,10 @@ export default function DemoPage() {
     setLoading(true);
     setLoadingText("Connecting wallet...");
     try {
-      await connectWallet();
+      const { address: walletAddr } = await connectWallet();
       setLoadingText("Sign the message in MetaMask to create your identity...");
       const sig = await signMessage("HSK Passport: Generate my Semaphore identity");
-      const id = createIdentityFromSignature(sig);
+      const id = createIdentityFromSignature(sig, walletAddr);
       setIdentity(id);
       completeStep(0);
       toast("Identity created! Your cryptographic fingerprint is ready.", "success");

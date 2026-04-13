@@ -66,12 +66,34 @@ export async function apiGetKYCStatus(commitment: string): Promise<KYCRequest | 
   return res.json();
 }
 
-export async function apiGetKYCQueue(status: "pending" | "approved" | "rejected" | "" = "pending"): Promise<{
+export interface IssuerAuth {
+  address: string;
+  signature: string;
+  nonce: number;
+}
+
+/** Build the message a reviewer must sign to read the queue / individual KYC requests. */
+export function buildIssuerReadMessage(nonce: number): string {
+  return `HSK Passport issuer read at ${nonce}`;
+}
+
+export async function apiGetKYCQueue(
+  status: "pending" | "approved" | "rejected" | "" = "pending",
+  auth?: IssuerAuth,
+): Promise<{
   queue: KYCRequest[];
   count: number;
+  authenticated?: boolean;
+  note?: string;
 }> {
   const q = status ? `?status=${status}` : "";
-  const res = await fetch(`${apiBase()}/api/kyc/queue${q}`, { cache: "no-store" });
+  const headers: Record<string, string> = {};
+  if (auth) {
+    headers["x-issuer-addr"] = auth.address;
+    headers["x-issuer-sig"] = auth.signature;
+    headers["x-issuer-nonce"] = String(auth.nonce);
+  }
+  const res = await fetch(`${apiBase()}/api/kyc/queue${q}`, { cache: "no-store", headers });
   if (!res.ok) throw new Error(`API ${res.status}`);
   return res.json();
 }
@@ -128,6 +150,30 @@ export async function apiSumsubInit(commitment: string): Promise<{
     const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
     throw new Error((err as { error?: string }).error || `Sumsub init failed: ${res.status}`);
   }
+  return res.json();
+}
+
+export interface SumsubIdDoc {
+  idDocType?: string;
+  country?: string;
+  firstName?: string;
+  lastName?: string;
+  middleName?: string;
+  dob?: string;
+  issuedDate?: string;
+  validUntil?: string;
+  number?: string;
+}
+
+export async function apiSumsubData(commitment: string): Promise<{
+  applicantId?: string;
+  reviewStatus?: string;
+  reviewAnswer?: string | null;
+  idDocs?: SumsubIdDoc[];
+  status?: string;
+}> {
+  const res = await fetch(`${apiBase()}/api/kyc/sumsub/data/${commitment}`, { cache: "no-store" });
+  if (!res.ok) return {};
   return res.json();
 }
 

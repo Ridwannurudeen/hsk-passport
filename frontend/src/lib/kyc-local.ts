@@ -346,8 +346,8 @@ export function detectBlink(frames: LivenessFrame[]): BlinkDetectionResult {
   const top = sorted.slice(0, openCount);
   const baseline = top[Math.floor(top.length / 2)]; // median
 
-  const blinkThreshold = Math.max(baseline * 0.80, 0.15); // 20% drop OR hard floor at 0.15
-  const absoluteClosedThreshold = 0.22; // classic EAR threshold
+  const blinkThreshold = Math.max(baseline * 0.88, 0.18); // 12% drop OR hard floor at 0.18 — forgiving for low-res webcams
+  const absoluteClosedThreshold = 0.24; // slightly relaxed absolute threshold
 
   const minSeen = Math.min(...frames.map(f => f.eyeAspectRatio));
 

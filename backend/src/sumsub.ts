@@ -126,6 +126,39 @@ export async function generateAccessToken(externalUserId: string, ttlSec = 600):
   });
 }
 
+export interface SumsubIdDoc {
+  idDocType?: string;
+  country?: string;
+  firstName?: string;
+  lastName?: string;
+  middleName?: string;
+  dob?: string;
+  issuedDate?: string;
+  validUntil?: string;
+  number?: string;
+  address?: { formattedAddress?: string };
+}
+
+/**
+ * Fetch extracted ID document info for an applicant.
+ * Returns the verified fields that Sumsub pulled from the submitted documents.
+ */
+export async function getApplicantInfo(applicantId: string): Promise<{ idDocs: SumsubIdDoc[] } | null> {
+  try {
+    return await callSumsub<{ idDocs: SumsubIdDoc[] }>({
+      method: "GET",
+      uri: `/resources/applicants/${applicantId}/one`,
+    }).then((full: unknown) => {
+      const f = full as { info?: { idDocs?: SumsubIdDoc[] }; fixedInfo?: { idDocs?: SumsubIdDoc[] } };
+      const idDocs = f.info?.idDocs || f.fixedInfo?.idDocs || [];
+      return { idDocs };
+    });
+  } catch (e) {
+    if ((e as Error).message.includes("404")) return null;
+    throw e;
+  }
+}
+
 // ============================================================
 // Webhook signature verification
 // ============================================================

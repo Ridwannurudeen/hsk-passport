@@ -64,11 +64,11 @@ Off-chain KYC stays off-chain. Only a 32-byte commitment goes on-chain. Users pr
 ### Core production-path contracts
 | Contract | Address | Purpose |
 |---|---|---|
-| HSKPassport | [`0x79A0E116...d5E6`](https://hashkey-testnet.blockscout.com/address/0x79A0E1160FA829595f45f0479782095ed497d5E6) | Credential groups, issuance, verification |
+| HSKPassport | [`0xb430F303...5c64`](https://hashkey-testnet.blockscout.com/address/0xb430F30376344303560c0554DC94766D780a5c64) | Credential groups, issuance, verification |
 | CredentialRegistry | [`0x20265dAe...9De1`](https://hashkey-testnet.blockscout.com/address/0x20265dAe4711B3CeF88D7078bf1290f815279De1) | Schema registry (W3C VC aligned) |
 | Semaphore v4 | [`0xd09e8Aec...CFE9`](https://hashkey-testnet.blockscout.com/address/0xd09e8Aec6B6A36588E7A105f606A9fe9a134CFE9) | ZK proof verification |
-| HashKeyDIDBridge | [`0x37e85562...4472`](https://hashkey-testnet.blockscout.com/address/0x37e855626a5cF51e808F96efe4455Dc225724472) | Bridge `.key` DIDs → credentials |
-| HashKeyKYCImporter | [`0x01fF7BFb...a54f`](https://hashkey-testnet.blockscout.com/address/0x01fF7BFba82820a2595467a554678DB672eEa54f) | Bridge HashKey Exchange KYC → credentials |
+| HashKeyDIDBridge | [`0x0cB4c519...A2a5`](https://hashkey-testnet.blockscout.com/address/0x0cB4c519F984A2f43c1ca217CDB5095dB3b3A2a5) | Bridge `.key` DIDs → credentials |
+| HashKeyKYCImporter | [`0x7A40694E...A117`](https://hashkey-testnet.blockscout.com/address/0x7A40694Eda3046706Fe89db771e88Cf3A979A117) | Bridge HashKey Exchange KYC → credentials |
 
 ### Reference dApps
 | dApp | Use case |
@@ -79,7 +79,7 @@ Off-chain KYC stays off-chain. Only a 32-byte commitment goes on-chain. Users pr
 | JurisdictionGatedPool | Accept users from {HK, SG, AE} without revealing which |
 
 ### Credential groups
-KYC_VERIFIED (15), ACCREDITED_INVESTOR (16), HK_RESIDENT (17), SG_RESIDENT (18), AE_RESIDENT (19)
+KYC_VERIFIED (20), ACCREDITED_INVESTOR (21), HK_RESIDENT (22), SG_RESIDENT (23), AE_RESIDENT (24)
 
 ## Security Properties (what we enforce today)
 
@@ -130,7 +130,7 @@ interface IHSKPassport {
 
 contract MyRWA {
     IHSKPassport constant passport =
-        IHSKPassport(0x79A0E1160FA829595f45f0479782095ed497d5E6);
+        IHSKPassport(0xb430F30376344303560c0554DC94766D780a5c64);
 
     function mint(ISemaphore.SemaphoreProof calldata proof) external {
         // REQUIRED: bind proof to caller to prevent front-running
@@ -138,7 +138,7 @@ contract MyRWA {
             proof.message == uint256(uint160(msg.sender)),
             "proof must be bound to caller"
         );
-        require(passport.verifyCredential(15, proof), "KYC required");
+        require(passport.verifyCredential(20, proof), "KYC required");
         // ... your logic
     }
 }

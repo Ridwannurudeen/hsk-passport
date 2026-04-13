@@ -2,7 +2,7 @@ export const HSK_PASSPORT_ABI = [
   "function semaphore() view returns (address)",
   "function owner() view returns (address)",
   "function approvedIssuers(address) view returns (bool)",
-  "function approvedDelegates(address) view returns (bool)",
+  "function groupDelegates(uint256 groupId, address delegate) view returns (bool)",
   "function credentialGroups(uint256) view returns (string name, uint256 groupId, address issuer, uint256 memberCount, bool active, bytes32 schemaHash)",
   "function credentials(uint256, uint256) view returns (bool)",
   "function getGroupIds() view returns (uint256[])",

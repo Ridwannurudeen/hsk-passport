@@ -91,8 +91,8 @@ The user generates a Groth16 zero-knowledge proof in their browser:
 The proof demonstrates: "I know a private key whose commitment is a leaf in this Merkle tree" — without revealing which leaf.
 
 **Proof parameters:**
-- `message`: Arbitrary signal bound to the proof (e.g., action identifier)
-- `scope`: Nullifier scope for sybil resistance (unique per action)
+- `message`: **Caller-bound signal** — must equal `uint256(uint160(msg.sender))` for any dApp that consumes the proof. This binds the proof to the calling wallet and prevents front-running / proof-replay by a third party.
+- `scope`: Nullifier scope for sybil resistance (unique per action — typically `keccak256("dapp:action")`)
 - `nullifier`: Deterministic from identity + scope (prevents double-proving per scope)
 
 ### 3.5 On-Chain Verification
@@ -202,6 +202,11 @@ Proofs are bound to a `message` parameter. dApps should include the caller's add
 | PoseidonT3 | `0x3B574ED5c34F8CE27E1D6960b69dec3003071301` |
 | Semaphore | `0xd09e8Aec6B6A36588E7A105f606A9fe9a134CFE9` |
 | CredentialRegistry | `0x20265dAe4711B3CeF88D7078bf1290f815279De1` |
-| HSKPassport | `0x728bB8D8269a826b54a45385cF87ebDD785Ed1D6` |
-| DemoIssuer | `0x0a1dcaC5735312f469E77E4a13D6B3E9AC666632` |
-| GatedRWA (hSILVER) | `0xF7E07555Ebf79c1B344c8E36c7393316714762dB` |
+| HSKPassport | `0xb430F30376344303560c0554DC94766D780a5c64` |
+| DemoIssuer | `0x77bE0CD574a3602923E2a0C3B42F01C11112A170` |
+| GatedRWA (hSILVER) | `0x5f7274C64C63Ea73144cf539aBF2504eB3208f25` |
+| KYCGatedAirdrop | `0xdf399c83cc316b518836df37F7aB54e2b2ada9f9` |
+| KYCGatedLending | `0x5B3107e67B6439A22dDC21e547f75855A3e70deD` |
+| HashKeyDIDBridge | `0x0cB4c519F984A2f43c1ca217CDB5095dB3b3A2a5` |
+| HashKeyKYCImporter | `0x7A40694Eda3046706Fe89db771e88Cf3A979A117` |
+| JurisdictionGatedPool | `0xA7C937D3D269267590bF9d411B066C57AC8462ec` |

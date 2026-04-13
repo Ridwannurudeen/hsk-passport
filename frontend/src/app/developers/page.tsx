@@ -155,7 +155,7 @@ const valid = await passport.verifyProof(15, proof);`}</pre>
           <div className="text-xs text-gray-500 mb-3 font-mono">HashKey Chain Testnet (chain ID 133)</div>
           <dl className="space-y-2 text-sm">
             {[
-              { label: "HSKPassport", address: "0x79A0E1160FA829595f45f0479782095ed497d5E6" },
+              { label: "HSKPassport", address: "0xb430F30376344303560c0554DC94766D780a5c64" },
               { label: "CredentialRegistry", address: "0x20265dAe4711B3CeF88D7078bf1290f815279De1" },
               { label: "Semaphore", address: "0xd09e8Aec6B6A36588E7A105f606A9fe9a134CFE9" },
               { label: "DemoIssuer", address: "0xD6CB3393B9e1E162ed3EF8187082511d20Be28d1" },

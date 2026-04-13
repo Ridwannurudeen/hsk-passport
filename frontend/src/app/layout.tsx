@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import { ToastProviderWrapper } from "@/components/ToastWrapper";
+import { WalletButton } from "@/components/WalletButton";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -40,6 +41,8 @@ export default function RootLayout({
                 </Link>
                 <div className="hidden lg:flex items-center gap-5">
                   <Link href="/kyc" className="text-sm text-gray-400 hover:text-white transition-colors">Get Verified</Link>
+                  <Link href="/user" className="text-sm text-purple-300 hover:text-purple-200 transition-colors font-medium">My Data</Link>
+                  <Link href="/composer" className="text-sm text-green-400 hover:text-green-300 transition-colors font-medium">Composer</Link>
                   <Link href="/bridge" className="text-sm text-gray-400 hover:text-white transition-colors">Bridge</Link>
                   <Link href="/ecosystem" className="text-sm text-gray-400 hover:text-white transition-colors">Ecosystem</Link>
                   <Link href="/demo" className="text-sm text-gray-400 hover:text-white transition-colors">Demo</Link>
@@ -48,8 +51,11 @@ export default function RootLayout({
                   <Link href="/stats" className="text-sm text-gray-400 hover:text-white transition-colors">Stats</Link>
                 </div>
               </div>
-              <div className="text-xs text-gray-500 font-mono">
-                HashKey Chain Testnet
+              <div className="flex items-center gap-3">
+                <span className="hidden sm:inline text-xs text-gray-500 font-mono">
+                  HashKey Chain Testnet
+                </span>
+                <WalletButton />
               </div>
             </div>
           </div>

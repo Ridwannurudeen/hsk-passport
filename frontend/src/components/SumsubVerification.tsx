@@ -7,6 +7,7 @@ interface SumsubVerificationProps {
   levelName: string;
   onComplete: (reviewAnswer: "GREEN" | "RED" | "YELLOW") => void;
   onError?: (error: Error) => void;
+  onTokenExpired?: () => Promise<string>;
 }
 
 export function SumsubVerification({
@@ -14,6 +15,7 @@ export function SumsubVerification({
   levelName,
   onComplete,
   onError,
+  onTokenExpired,
 }: SumsubVerificationProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
@@ -33,8 +35,13 @@ export function SumsubVerification({
 
         snsWebSdkInstance = snsWebSdk
           .init(accessToken, async () => {
-            // Called when token expires — frontend should fetch a fresh one
-            // For now, return the same token (10-min TTL is enough for one session)
+            if (onTokenExpired) {
+              try {
+                return await onTokenExpired();
+              } catch (e) {
+                console.error("[Sumsub] token refresh failed:", e);
+              }
+            }
             return accessToken;
           })
           .withConf({

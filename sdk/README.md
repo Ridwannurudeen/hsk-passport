@@ -87,7 +87,7 @@ interface IHSKPassport {
 
 contract MyRWAToken {
     IHSKPassport public constant passport =
-        IHSKPassport(0x79A0E1160FA829595f45f0479782095ed497d5E6);
+        IHSKPassport(0xb430F30376344303560c0554DC94766D780a5c64);
 
     uint256 public constant KYC_GROUP = 15;
     mapping(uint256 => bool) public usedNullifiers;
@@ -201,7 +201,7 @@ const passport = HSKPassport.connect("hashkey-testnet");
 
 | Contract | Address |
 |----------|---------|
-| HSKPassport | `0x79A0E1160FA829595f45f0479782095ed497d5E6` |
+| HSKPassport | `0xb430F30376344303560c0554DC94766D780a5c64` |
 | CredentialRegistry | `0x20265dAe4711B3CeF88D7078bf1290f815279De1` |
 | CredentialExpiry | `0x11fF27Bf3F0Bbf45a5dC43210359c56E45E97770` |
 | CredentialReputation | `0x39cc2a483Cc22Cf7B461759404642Fa528df96D7` |

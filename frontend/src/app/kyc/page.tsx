@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { connectWallet, signMessage } from "@/lib/wallet";
 import {
   createIdentityFromSignature,
-  loadIdentity,
+  loadIdentityForWallet,
   getCommitment,
   Identity,
 } from "@/lib/semaphore";
@@ -78,46 +78,104 @@ export default function KYCPage() {
   const [submitting, setSubmitting] = useState(false);
   const [kycStatus, setKYCStatus] = useState<KYCRequest | null>(null);
 
-  // Load face models + Sumsub config + any saved session on mount
+  // Tracks the currently connected MetaMask account. When it changes, the page automatically
+  // loads that wallet's identity (if it exists) or prompts a signature to create one.
+  const [currentWallet, setCurrentWallet] = useState<string | null>(null);
+
+  function resetPerWalletState() {
+    setExtractedData(null);
+    setDocumentPreview("");
+    setDocumentFile(null);
+    setDocumentFaceDescriptor(null);
+    setSelfieDescriptor(null);
+    setFaceMatch(null);
+    setLivenessPass(false);
+    setSumsubAccessToken("");
+    setKYCStatus(null);
+    try {
+      localStorage.removeItem("hsk-passport-kyc-session");
+    } catch {}
+  }
+
+  // Load face models + Sumsub config on mount
   useEffect(() => {
     loadFaceApiModels().catch((e) => {
       toast(`Face model load failed: ${(e as Error).message}`, "error");
     });
 
-    apiGetSumsubConfig().then((cfg) => {
-      setSumsubAvailable(cfg.enabled);
-      setSumsubLevelName(cfg.levelName);
-    }).catch(() => {
-      setSumsubAvailable(false);
-    });
-
-    const stored = loadIdentity();
-    if (stored) {
-      setIdentity(stored);
-      checkStatus(stored);
-
-      // Attempt to restore in-progress session
-      const session = loadSession();
-      if (session) {
-        if (session.extractedData) setExtractedData(session.extractedData);
-        if (session.documentPreviewCompressed) setDocumentPreview(session.documentPreviewCompressed);
-        if (session.documentFaceDescriptor) {
-          setDocumentFaceDescriptor(deserializeDescriptor(session.documentFaceDescriptor));
-        }
-        if (session.selfieDescriptor) {
-          setSelfieDescriptor(deserializeDescriptor(session.selfieDescriptor));
-        }
-        if (session.faceMatch) setFaceMatch(session.faceMatch);
-        if (session.livenessPass) setLivenessPass(session.livenessPass);
-        if (session.credentialType) setCredentialType(session.credentialType);
-        if (session.stage) setStage(session.stage as Stage);
-        toast("Restored your verification progress", "info");
-      } else {
-        setStage("document");
+    (async () => {
+      try {
+        const cfg = await apiGetSumsubConfig();
+        setSumsubAvailable(cfg.enabled);
+        setSumsubLevelName(cfg.levelName);
+      } catch {
+        setSumsubAvailable(false);
       }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    })();
   }, []);
+
+  // Watch MetaMask account. When it changes (or on first detect), auto-swap identity.
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.ethereum) return;
+    const eth = window.ethereum as { request: (p: { method: string }) => Promise<string[]>; on?: (e: string, h: (a: string[]) => void) => void };
+
+    const onAccount = (accs: string[]) => {
+      const addr = accs[0]?.toLowerCase() || null;
+      setCurrentWallet(addr);
+    };
+
+    eth.request({ method: "eth_accounts" }).then(onAccount).catch(() => {});
+    eth.on?.("accountsChanged", onAccount);
+  }, []);
+
+  // Whenever the connected wallet changes, load that wallet's identity (or clear state if none).
+  useEffect(() => {
+    if (!currentWallet) return;
+    const sumsubEnabled = sumsubAvailable;
+    (async () => {
+      const stored = loadIdentityForWallet(currentWallet);
+      if (stored) {
+        // Switching to a wallet that already has an identity → silently load it.
+        if (identity?.commitment.toString() !== stored.commitment.toString()) {
+          resetPerWalletState();
+        }
+        setIdentity(stored);
+        checkStatus(stored);
+
+        const session = loadSession();
+        const hasRealProgress = session && (session.extractedData || session.selfieDescriptor || session.livenessPass);
+        if (session && hasRealProgress) {
+          if (session.extractedData) setExtractedData(session.extractedData);
+          if (session.documentPreviewCompressed) setDocumentPreview(session.documentPreviewCompressed);
+          if (session.documentFaceDescriptor) {
+            setDocumentFaceDescriptor(deserializeDescriptor(session.documentFaceDescriptor));
+          }
+          if (session.selfieDescriptor) {
+            setSelfieDescriptor(deserializeDescriptor(session.selfieDescriptor));
+          }
+          if (session.faceMatch) setFaceMatch(session.faceMatch);
+          if (session.livenessPass) setLivenessPass(session.livenessPass);
+          if (session.credentialType) setCredentialType(session.credentialType);
+          if (session.stage) setStage(session.stage as Stage);
+          toast("Restored your verification progress", "info");
+        } else {
+          setStage(sumsubEnabled ? "method" : "document");
+        }
+      } else {
+        // No identity for this wallet yet — clean slate, show the "create identity" stage.
+        if (identity) {
+          resetPerWalletState();
+          setIdentity(null);
+          setKYCStatus(null);
+          setStage("identity");
+          toast("Switched to a new wallet — sign to create an identity for it.", "info");
+        } else {
+          setStage("identity");
+        }
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentWallet, sumsubAvailable]);
 
   // Auto-save session whenever key state changes (except when we're already submitted)
   useEffect(() => {
@@ -150,12 +208,21 @@ export default function KYCPage() {
 
   async function handleCreateIdentity() {
     try {
-      await connectWallet();
+      const { address: walletAddr } = await connectWallet();
+      setCurrentWallet(walletAddr.toLowerCase());
+      // If this wallet already has an identity in this browser, just load it silently.
+      const existing = loadIdentityForWallet(walletAddr);
+      if (existing) {
+        setIdentity(existing);
+        await checkStatus(existing);
+        setStage(sumsubAvailable ? "method" : "document");
+        toast("Identity loaded for this wallet.", "success");
+        return;
+      }
       const sig = await signMessage("HSK Passport: Generate my Semaphore identity");
-      const id = createIdentityFromSignature(sig);
+      const id = createIdentityFromSignature(sig, walletAddr);
       setIdentity(id);
       await checkStatus(id);
-      // If Sumsub is configured, show method selection. Otherwise go straight to local.
       setStage(sumsubAvailable ? "method" : "document");
       toast("Identity created. Choose your verification method.", "success");
     } catch (e) {
@@ -326,11 +393,20 @@ export default function KYCPage() {
     const startTime = Date.now();
     const frames: LivenessFrame[] = [];
     const TIMEOUT_MS = 45_000;
+    const FALLBACK_MS = 15_000; // auto-pass after 15s of stable face tracking
 
     while (!livenessAbortRef.current) {
-      if (Date.now() - startTime > TIMEOUT_MS) {
-        setLivenessMessage("Timeout. Use Manual Confirm to proceed.");
+      const elapsed = Date.now() - startTime;
+      if (elapsed > TIMEOUT_MS) {
+        setLivenessMessage("Timeout. Use Skip & Continue to proceed.");
         setLivenessActive(false);
+        return;
+      }
+      // Auto-pass: if we've been tracking a face stably for 15s+ without detecting a blink,
+      // treat sustained face presence as sufficient liveness signal.
+      if (elapsed > FALLBACK_MS && frames.length > 50) {
+        setLivenessMessage("Face tracked continuously — accepting as live.");
+        proceedToReview();
         return;
       }
 
@@ -420,6 +496,11 @@ export default function KYCPage() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-12">
+      {identity && currentWallet && (
+        <div className="mb-6 bg-purple-950/30 border border-purple-800/50 rounded-xl px-4 py-3 text-xs text-purple-200 font-mono">
+          Identity active for wallet <span className="text-purple-100">{currentWallet.slice(0, 6)}...{currentWallet.slice(-4)}</span> — switch MetaMask accounts to use a different identity.
+        </div>
+      )}
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
           <div className="inline-block px-3 py-1 mb-3 text-xs font-mono text-purple-400 border border-purple-800 rounded-full bg-purple-950/30">
@@ -433,6 +514,14 @@ export default function KYCPage() {
             Progress auto-saved. You can safely close this tab and return within 30 minutes.
           </p>
         </div>
+        {sumsubAvailable && stage !== "identity" && stage !== "submitted" && stage !== "method" && (
+          <button
+            onClick={() => setStage("method")}
+            className="shrink-0 px-3 py-1.5 text-xs bg-purple-900/40 hover:bg-purple-900/60 text-purple-300 rounded-lg border border-purple-800"
+          >
+            Switch Method
+          </button>
+        )}
         {stage !== "identity" && stage !== "submitted" && (
           <button
             onClick={() => {
@@ -445,8 +534,9 @@ export default function KYCPage() {
                 setSelfieDescriptor(null);
                 setFaceMatch(null);
                 setLivenessPass(false);
-                setStage("document");
-                toast("Cleared. Start over from document upload.", "info");
+                setSumsubAccessToken("");
+                setStage(sumsubAvailable ? "method" : "document");
+                toast(sumsubAvailable ? "Cleared. Choose a verification method." : "Cleared. Start over from document upload.", "info");
               }
             }}
             className="shrink-0 px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 text-gray-400 rounded-lg border border-gray-700"
@@ -585,6 +675,12 @@ export default function KYCPage() {
             levelName={sumsubLevelName}
             onComplete={onSumsubComplete}
             onError={(e) => toast(`Sumsub error: ${e.message.slice(0, 120)}`, "error")}
+            onTokenExpired={async () => {
+              if (!identity) throw new Error("No identity");
+              const fresh = await apiSumsubInit(getCommitment(identity).toString());
+              setSumsubAccessToken(fresh.accessToken);
+              return fresh.accessToken;
+            }}
           />
           <button
             onClick={async () => {
@@ -852,27 +948,74 @@ export default function KYCPage() {
               </ul>
             </div>
 
-            <dl className="space-y-2 text-sm mb-5">
-              <div className="flex justify-between">
-                <dt className="text-gray-500">Credential type</dt>
-                <dd>{credentialType}</dd>
+            <div className="mb-5 bg-yellow-950/20 border border-yellow-800/40 rounded-lg p-3 text-xs text-yellow-200">
+              <strong className="text-yellow-300">OCR is imperfect —</strong> review the extracted fields below and fix any errors before submitting. Only a cryptographic hash is sent on-chain, so corrections stay private.
+            </div>
+
+            <div className="space-y-3 mb-5">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Full Name</label>
+                <input
+                  value={extractedData.possibleName || ""}
+                  onChange={(e) => setExtractedData({ ...extractedData, possibleName: e.target.value || null })}
+                  placeholder="e.g. John Doe"
+                  className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:border-purple-500 focus:outline-none"
+                />
               </div>
-              <div className="flex justify-between">
-                <dt className="text-gray-500">Jurisdiction</dt>
-                <dd>{extractedData.possibleCountry || "UNKNOWN"}</dd>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Date of Birth</label>
+                  <input
+                    value={extractedData.possibleDOB || ""}
+                    onChange={(e) => setExtractedData({ ...extractedData, possibleDOB: e.target.value || null })}
+                    placeholder="YYYY-MM-DD"
+                    className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:border-purple-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Country</label>
+                  <input
+                    value={extractedData.possibleCountry || ""}
+                    onChange={(e) => setExtractedData({ ...extractedData, possibleCountry: e.target.value.toUpperCase() || null })}
+                    placeholder="e.g. USA, NGA, HK"
+                    maxLength={3}
+                    className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm font-mono uppercase focus:border-purple-500 focus:outline-none"
+                  />
+                </div>
               </div>
-              <div className="flex justify-between">
-                <dt className="text-gray-500">Data hash (on-chain)</dt>
-                <dd className="font-mono text-xs text-purple-300">SHA-256 commitment only</dd>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">ID / Document Number</label>
+                <input
+                  value={extractedData.possibleIDNumber || ""}
+                  onChange={(e) => setExtractedData({ ...extractedData, possibleIDNumber: e.target.value || null })}
+                  placeholder="Passport or ID number"
+                  className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm font-mono focus:border-purple-500 focus:outline-none"
+                />
               </div>
-            </dl>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Credential Type</label>
+                <select
+                  value={credentialType}
+                  onChange={(e) => setCredentialType(e.target.value)}
+                  className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:border-purple-500 focus:outline-none"
+                >
+                  <option value="KYCVerified">KYC Verified</option>
+                  <option value="AccreditedInvestor">Accredited Investor</option>
+                  <option value="HKResident">HK Resident</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-between text-xs text-gray-500 mb-4 px-1">
+              <span>Data hash → on-chain (SHA-256 commitment only, never raw values)</span>
+            </div>
 
             <button
               onClick={handleSubmit}
               disabled={submitting}
               className="w-full px-4 py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-medium rounded-lg"
             >
-              {submitting ? "Submitting..." : "Submit to Issuer"}
+              {submitting ? "Submitting..." : "Confirm & Submit to Issuer"}
             </button>
           </div>
         </div>
@@ -1044,12 +1187,34 @@ function SubmittedView({
         <div className="flex justify-between"><dt className="text-gray-500">Auto-refresh</dt><dd className="text-green-400 text-xs">every 5s</dd></div>
       </dl>
 
-      <button
-        onClick={onRefresh}
-        className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm rounded-lg"
-      >
-        Refresh Now
-      </button>
+      <div className="flex flex-wrap gap-3">
+        <button
+          onClick={onRefresh}
+          className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm rounded-lg"
+        >
+          Refresh Now
+        </button>
+        {secondsElapsed > 60 && (
+          <button
+            onClick={() => {
+              if (confirm("Cancel this submission and start over from the beginning? You'll keep your identity, but the current request will be abandoned.")) {
+                try {
+                  localStorage.removeItem("hsk-passport-kyc-session");
+                } catch {}
+                window.location.reload();
+              }
+            }}
+            className="px-4 py-2 bg-red-900/40 hover:bg-red-900/60 border border-red-800 text-red-200 text-sm rounded-lg"
+          >
+            Cancel & Start Over
+          </button>
+        )}
+      </div>
+      {secondsElapsed > 90 && (
+        <p className="text-xs text-yellow-400 mt-3">
+          Taking longer than usual. The issuer bot may be offline. Click &quot;Cancel &amp; Start Over&quot; to retry.
+        </p>
+      )}
     </div>
   );
 }

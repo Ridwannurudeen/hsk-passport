@@ -113,8 +113,8 @@ const tx = await myDApp.kycGatedFunction(proof);`}
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">HSKPassport</span>
-              <a href="https://hashkey-testnet.blockscout.com/address/0x79A0E1160FA829595f45f0479782095ed497d5E6" target="_blank" rel="noopener noreferrer" className="font-mono text-purple-300 text-xs hover:text-purple-200">
-                0x79A0...d5E6
+              <a href="https://hashkey-testnet.blockscout.com/address/0xb430F30376344303560c0554DC94766D780a5c64" target="_blank" rel="noopener noreferrer" className="font-mono text-purple-300 text-xs hover:text-purple-200">
+                0xb430...5c64
               </a>
             </div>
             <div className="flex justify-between">
@@ -125,14 +125,14 @@ const tx = await myDApp.kycGatedFunction(proof);`}
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">DemoIssuer</span>
-              <a href="https://hashkey-testnet.blockscout.com/address/0xD6CB3393B9e1E162ed3EF8187082511d20Be28d1" target="_blank" rel="noopener noreferrer" className="font-mono text-purple-300 text-xs hover:text-purple-200">
-                0xD6CB...28d1
+              <a href="https://hashkey-testnet.blockscout.com/address/0x77bE0CD574a3602923E2a0C3B42F01C11112A170" target="_blank" rel="noopener noreferrer" className="font-mono text-purple-300 text-xs hover:text-purple-200">
+                0x77bE...A170
               </a>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">GatedRWA (hSILVER)</span>
-              <a href="https://hashkey-testnet.blockscout.com/address/0xFc6bDE32f79ad43696abc6A2a6291bfA8AF1D249" target="_blank" rel="noopener noreferrer" className="font-mono text-purple-300 text-xs hover:text-purple-200">
-                0xFc6b...D249
+              <a href="https://hashkey-testnet.blockscout.com/address/0x5f7274C64C63Ea73144cf539aBF2504eB3208f25" target="_blank" rel="noopener noreferrer" className="font-mono text-purple-300 text-xs hover:text-purple-200">
+                0x5f72...8f25
               </a>
             </div>
           </div>
@@ -158,14 +158,14 @@ const tx = await myDApp.kycGatedFunction(proof);`}
               </thead>
               <tbody>
                 <tr className="border-b border-gray-800/50">
-                  <td className="px-6 py-3 font-mono text-purple-300">15</td>
+                  <td className="px-6 py-3 font-mono text-purple-300">20</td>
                   <td className="px-6 py-3 font-medium">KYC_VERIFIED</td>
                   <td className="px-6 py-3 text-gray-400">
                     User has passed standard KYC verification
                   </td>
                 </tr>
                 <tr className="border-b border-gray-800/50">
-                  <td className="px-6 py-3 font-mono text-purple-300">16</td>
+                  <td className="px-6 py-3 font-mono text-purple-300">21</td>
                   <td className="px-6 py-3 font-medium">
                     ACCREDITED_INVESTOR
                   </td>
@@ -173,11 +173,25 @@ const tx = await myDApp.kycGatedFunction(proof);`}
                     User is an accredited/professional investor
                   </td>
                 </tr>
-                <tr>
-                  <td className="px-6 py-3 font-mono text-purple-300">17</td>
+                <tr className="border-b border-gray-800/50">
+                  <td className="px-6 py-3 font-mono text-purple-300">22</td>
                   <td className="px-6 py-3 font-medium">HK_RESIDENT</td>
                   <td className="px-6 py-3 text-gray-400">
                     User is a Hong Kong resident
+                  </td>
+                </tr>
+                <tr className="border-b border-gray-800/50">
+                  <td className="px-6 py-3 font-mono text-purple-300">23</td>
+                  <td className="px-6 py-3 font-medium">SG_RESIDENT</td>
+                  <td className="px-6 py-3 text-gray-400">
+                    User is a Singapore resident
+                  </td>
+                </tr>
+                <tr>
+                  <td className="px-6 py-3 font-mono text-purple-300">24</td>
+                  <td className="px-6 py-3 font-medium">AE_RESIDENT</td>
+                  <td className="px-6 py-3 text-gray-400">
+                    User is a UAE resident
                   </td>
                 </tr>
               </tbody>

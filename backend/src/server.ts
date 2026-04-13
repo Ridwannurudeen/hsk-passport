@@ -20,6 +20,7 @@ import {
   sumsubConfig,
   createApplicant,
   getApplicantByExternalId,
+  getApplicantInfo,
   generateAccessToken,
   verifyWebhookSignature,
   type SumsubApplicant,
@@ -99,22 +100,105 @@ app.post("/api/kyc/submit", async (request, reply) => {
   return { id, status: "pending" };
 });
 
+interface KYCRow {
+  id: string;
+  identity_commitment: string;
+  wallet_address: string;
+  jurisdiction: string;
+  credential_type: string;
+  document_type: string | null;
+  status: string;
+  submitted_at: number;
+  reviewed_at: number | null;
+  reviewed_by: string | null;
+  rejection_reason: string | null;
+  tx_hash: string | null;
+}
+
+/** Strip personally identifiable fields from a KYC row for unauthenticated reads. */
+function redactKYC(row: KYCRow) {
+  return {
+    id: row.id,
+    identity_commitment: row.identity_commitment,
+    credential_type: row.credential_type,
+    document_type: row.document_type,
+    status: row.status,
+    submitted_at: row.submitted_at,
+    reviewed_at: row.reviewed_at,
+    tx_hash: row.tx_hash,
+    // wallet_address, jurisdiction, reviewed_by, rejection_reason withheld
+  };
+}
+
+/**
+ * Verify issuer authentication from request headers.
+ * Required headers: x-issuer-addr, x-issuer-sig, x-issuer-nonce
+ * Signed payload: "HSK Passport issuer read at <nonce>"
+ */
+async function authenticateIssuer(request: { headers: Record<string, string | string[] | undefined> }): Promise<boolean> {
+  const addr = request.headers["x-issuer-addr"] as string | undefined;
+  const sig = request.headers["x-issuer-sig"] as string | undefined;
+  const nonceRaw = request.headers["x-issuer-nonce"] as string | undefined;
+  if (!addr || !sig || !nonceRaw) return false;
+  const nonce = parseInt(nonceRaw, 10);
+  if (!Number.isFinite(nonce)) return false;
+  const age = Date.now() - nonce;
+  if (age < 0 || age > 5 * 60_000) return false;
+
+  const message = `HSK Passport issuer read at ${nonce}`;
+  let recovered: string;
+  try {
+    recovered = verifyMessage(message, sig);
+  } catch {
+    return false;
+  }
+  if (recovered.toLowerCase() !== addr.toLowerCase()) return false;
+
+  const provider = new JsonRpcProvider(CONFIG.rpcUrl);
+  const passport = new Contract(CONFIG.hskPassport, PASSPORT_READ_ABI, provider);
+  try {
+    return await passport.approvedIssuers(recovered);
+  } catch {
+    return false;
+  }
+}
+
 app.get("/api/kyc/queue", async (request) => {
   const { status } = request.query as { status?: string };
-  const queue = getKYCQueue(status);
-  return { queue, count: queue.length };
+  const queue = getKYCQueue(status) as KYCRow[];
+  const isIssuer = await authenticateIssuer(request);
+  if (!isIssuer) {
+    return {
+      queue: queue.map(redactKYC),
+      count: queue.length,
+      authenticated: false,
+      note: "Wallet/jurisdiction/reviewer fields withheld. Sign 'HSK Passport issuer read at <timestamp>' and send x-issuer-addr/x-issuer-sig/x-issuer-nonce headers for full access.",
+    };
+  }
+  return { queue, count: queue.length, authenticated: true };
 });
 
 app.get("/api/kyc/status/:commitment", async (request) => {
   const { commitment } = request.params as { commitment: string };
-  const req = getKYCByCommitment(commitment);
-  return req || { status: "none" };
+  const req = getKYCByCommitment(commitment) as KYCRow | undefined;
+  if (!req) return { status: "none" };
+  const isIssuer = await authenticateIssuer(request);
+  return isIssuer ? req : redactKYC(req);
 });
 
-app.get("/api/kyc/request/:id", async (request) => {
+app.get("/api/kyc/request/:id", async (request, reply) => {
   const { id } = request.params as { id: string };
-  const req = getKYCRequest(id);
-  return req || { error: "not found" };
+  const req = getKYCRequest(id) as KYCRow | undefined;
+  if (!req) {
+    reply.code(404);
+    return { error: "not found" };
+  }
+  const isIssuer = await authenticateIssuer(request);
+  if (!isIssuer) {
+    reply.code(401);
+    return { error: "issuer authentication required for per-request access" };
+  }
+  return req;
 });
 
 // ================================================================
@@ -283,6 +367,39 @@ app.get("/api/kyc/sumsub/status/:commitment", async (request, reply) => {
     reviewStatus: applicant.review?.reviewStatus || "init",
     reviewAnswer: applicant.review?.reviewResult?.reviewAnswer || null,
     rejectLabels: applicant.review?.reviewResult?.rejectLabels || [],
+  };
+});
+
+/**
+ * Return the verified fields extracted by Sumsub for a given commitment.
+ * Live proxy — we do not store this data on our side.
+ */
+app.get("/api/kyc/sumsub/data/:commitment", async (request, reply) => {
+  if (!sumsubConfig.configured) {
+    reply.code(501);
+    return { error: "Sumsub not configured on this server" };
+  }
+
+  const { commitment } = request.params as { commitment: string };
+  const applicant = await getApplicantByExternalId(commitment);
+  if (!applicant) return { status: "none" };
+
+  const reviewAnswer = applicant.review?.reviewResult?.reviewAnswer || null;
+  if (reviewAnswer !== "GREEN") {
+    return {
+      applicantId: applicant.id,
+      reviewStatus: applicant.review?.reviewStatus || "init",
+      reviewAnswer,
+      idDocs: [],
+    };
+  }
+
+  const info = await getApplicantInfo(applicant.id);
+  return {
+    applicantId: applicant.id,
+    reviewStatus: applicant.review?.reviewStatus || "completed",
+    reviewAnswer,
+    idDocs: info?.idDocs || [],
   };
 });
 

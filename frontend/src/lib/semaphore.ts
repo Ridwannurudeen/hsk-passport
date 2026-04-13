@@ -2,26 +2,108 @@ import { Identity } from "@semaphore-protocol/identity";
 import { Group } from "@semaphore-protocol/group";
 import { generateProof, SemaphoreProof } from "@semaphore-protocol/proof";
 
-const IDENTITY_STORAGE_KEY = "hsk-passport-identity";
+const LEGACY_IDENTITY_KEY = "hsk-passport-identity";
+const LEGACY_WALLET_KEY = "hsk-passport-identity-wallet";
+const IDENTITIES_MAP_KEY = "hsk-passport-identities";
+const ACTIVE_WALLET_KEY = "hsk-passport-active-wallet";
+const SESSION_STORAGE_KEY = "hsk-passport-kyc-session";
 
-export function createIdentityFromSignature(signature: string): Identity {
+type IdentityMap = Record<string, string>;
+
+function readMap(): IdentityMap {
+  try {
+    const raw = localStorage.getItem(IDENTITIES_MAP_KEY);
+    return raw ? (JSON.parse(raw) as IdentityMap) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeMap(map: IdentityMap): void {
+  localStorage.setItem(IDENTITIES_MAP_KEY, JSON.stringify(map));
+}
+
+/**
+ * One-time migration: if a pre-multi-wallet identity exists, move it into the map
+ * under its tagged wallet (or leave it as legacy if no tag).
+ */
+function migrateLegacy(): void {
+  const legacy = localStorage.getItem(LEGACY_IDENTITY_KEY);
+  if (!legacy) return;
+  const legacyWallet = localStorage.getItem(LEGACY_WALLET_KEY)?.toLowerCase();
+  if (legacyWallet) {
+    const map = readMap();
+    if (!map[legacyWallet]) map[legacyWallet] = legacy;
+    writeMap(map);
+  }
+  localStorage.removeItem(LEGACY_IDENTITY_KEY);
+  localStorage.removeItem(LEGACY_WALLET_KEY);
+}
+
+/** Save identity for a specific wallet, tagged so we can recover it next time that wallet connects. */
+export function createIdentityFromSignature(signature: string, walletAddress: string): Identity {
+  migrateLegacy();
   const identity = new Identity(signature);
-  localStorage.setItem(IDENTITY_STORAGE_KEY, identity.export());
+  const addr = walletAddress.toLowerCase();
+  const map = readMap();
+  map[addr] = identity.export();
+  writeMap(map);
+  localStorage.setItem(ACTIVE_WALLET_KEY, addr);
   return identity;
 }
 
-export function loadIdentity(): Identity | null {
-  const stored = localStorage.getItem(IDENTITY_STORAGE_KEY);
+/**
+ * Load the identity for a specific wallet address, or null if none stored.
+ * Side-effect: sets the active wallet so subsequent `loadIdentity()` (no-arg) returns the same one.
+ */
+export function loadIdentityForWallet(walletAddress: string): Identity | null {
+  migrateLegacy();
+  const addr = walletAddress.toLowerCase();
+  const map = readMap();
+  const stored = map[addr];
   if (!stored) return null;
   try {
-    return Identity.import(stored);
+    const id = Identity.import(stored);
+    localStorage.setItem(ACTIVE_WALLET_KEY, addr);
+    return id;
   } catch {
     return null;
   }
 }
 
+/**
+ * Load whichever identity is currently active (set by last successful create/load-for-wallet).
+ * Used by pages that don't have the wallet context yet (e.g. before MetaMask query finishes).
+ */
+export function loadIdentity(): Identity | null {
+  migrateLegacy();
+  const active = localStorage.getItem(ACTIVE_WALLET_KEY);
+  if (!active) return null;
+  return loadIdentityForWallet(active);
+}
+
+/** Wallet address of the currently active identity. */
+export function loadIdentityWallet(): string | null {
+  return localStorage.getItem(ACTIVE_WALLET_KEY)?.toLowerCase() || null;
+}
+
+/** Reset everything (all wallets' identities + KYC session). Rarely needed now that switching is automatic. */
 export function clearIdentity(): void {
-  localStorage.removeItem(IDENTITY_STORAGE_KEY);
+  localStorage.removeItem(IDENTITIES_MAP_KEY);
+  localStorage.removeItem(ACTIVE_WALLET_KEY);
+  localStorage.removeItem(LEGACY_IDENTITY_KEY);
+  localStorage.removeItem(LEGACY_WALLET_KEY);
+  localStorage.removeItem(SESSION_STORAGE_KEY);
+}
+
+/** Remove just the identity for a specific wallet (leaves other wallets' identities intact). */
+export function clearIdentityForWallet(walletAddress: string): void {
+  const addr = walletAddress.toLowerCase();
+  const map = readMap();
+  delete map[addr];
+  writeMap(map);
+  const active = localStorage.getItem(ACTIVE_WALLET_KEY);
+  if (active === addr) localStorage.removeItem(ACTIVE_WALLET_KEY);
 }
 
 export function getCommitment(identity: Identity): bigint {

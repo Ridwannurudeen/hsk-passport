@@ -133,7 +133,7 @@ export default function Home() {
 
     function mint(ISemaphore.SemaphoreProof calldata proof) external {
         require(proof.message == uint256(uint160(msg.sender)), "bind proof to caller");
-        require(passport.verifyCredential(15, proof), "KYC required"); // ← One line. Done.
+        require(passport.verifyCredential(20, proof), "KYC required"); // ← One line. Done.
         _mint(msg.sender, 100e18);
     }
 }`}</pre>

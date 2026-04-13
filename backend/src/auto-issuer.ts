@@ -73,11 +73,19 @@ async function tryAutoApprove(wallet: Wallet, req: KYCRow) {
 }
 
 export function startAutoIssuer() {
+  // Auto-issuer is a DEMO-ONLY convenience. It auto-approves pending KYC requests
+  // after MIN_AGE_MS without human review. Gate behind an explicit env flag so
+  // it never silently runs in a production deployment.
+  if (process.env.DEMO_AUTO_APPROVE !== "true") {
+    console.log("[auto-issuer] Disabled — set DEMO_AUTO_APPROVE=true to enable demo auto-approval.");
+    return;
+  }
+
   const walletOrNull = getIssuerWallet();
   if (!walletOrNull) return;
   const wallet: Wallet = walletOrNull;
 
-  console.log(`[auto-issuer] Started. Approving wallet: ${wallet.address}`);
+  console.log(`[auto-issuer] DEMO MODE — auto-approving after ${MIN_AGE_MS / 1000}s. Wallet: ${wallet.address}`);
 
   let running = false;
 

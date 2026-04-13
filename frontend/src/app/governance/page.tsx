@@ -4,13 +4,16 @@ export default function GovernancePage() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-12">
       <div className="mb-10">
-        <div className="inline-block px-3 py-1 mb-3 text-xs font-mono text-purple-400 border border-purple-800 rounded-full bg-purple-950/30">
-          Decentralized governance
+        <div className="inline-block px-3 py-1 mb-3 text-xs font-mono text-yellow-400 border border-yellow-800 rounded-full bg-yellow-950/30">
+          Roadmap — Phase 1 of 2 live
         </div>
         <h1 className="text-4xl font-bold mb-3">Governance</h1>
         <p className="text-lg text-gray-400 max-w-2xl">
-          HSK Passport parameters are governed by a 3-of-5 multi-sig with 48-hour timelock. No single address can change protocol rules unilaterally.
+          HSK Passport uses an OpenZeppelin TimelockController with a 48-hour delay on parameter changes, deployed and operational on testnet. Multi-sig proposer migration (3-of-5 Safe) is scheduled but not yet live — protocol ownership currently rests with the deployer wallet, tracked publicly on-chain.
         </p>
+        <div className="mt-4 p-4 bg-yellow-950/20 border border-yellow-900/40 rounded-lg text-sm text-yellow-200">
+          <strong className="text-yellow-300">Current status:</strong> Timelock deployed and operational. Multi-sig handoff and full parameter-change enforcement are part of the mainnet roadmap.
+        </div>
       </div>
 
       <section className="mb-10">

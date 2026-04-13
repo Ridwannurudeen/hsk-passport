@@ -57,9 +57,9 @@ export default function BridgePage() {
 
   async function ensureIdentity() {
     if (identity) return identity;
-    await connectWallet();
+    const { address: walletAddr } = await connectWallet();
     const sig = await signMessage("HSK Passport: Generate my Semaphore identity");
-    const id = createIdentityFromSignature(sig);
+    const id = createIdentityFromSignature(sig, walletAddr);
     setIdentity(id);
     return id;
   }

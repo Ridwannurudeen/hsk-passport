@@ -9,7 +9,7 @@ import {
   GROUPS,
   EXPLORER_URL,
 } from "@/lib/contracts";
-import { apiGetKYCQueue, apiReviewKYC, buildReviewMessage, type KYCRequest } from "@/lib/api";
+import { apiGetKYCQueue, apiReviewKYC, buildReviewMessage, buildIssuerReadMessage, type KYCRequest, type IssuerAuth } from "@/lib/api";
 import { useToast } from "@/components/Toast";
 
 const CREDENTIAL_TYPE_TO_GROUP: Record<string, number> = {
@@ -28,6 +28,7 @@ export default function IssuerPage() {
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState({ pending: 0, approved: 0, rejected: 0 });
   const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [issuerAuth, setIssuerAuth] = useState<IssuerAuth | null>(null);
 
   async function handleConnect() {
     try {
@@ -37,7 +38,13 @@ export default function IssuerPage() {
       const passport = new Contract(ADDRESSES.hskPassport, HSK_PASSPORT_ABI, signer);
       const approved = await passport.approvedIssuers(addr);
       setIsIssuer(approved);
-      if (!approved) {
+      if (approved) {
+        // Sign a read-auth message so the backend will return full PII (wallet, jurisdiction, etc.)
+        const nonce = Date.now();
+        const sig = await signer.signMessage(buildIssuerReadMessage(nonce));
+        setIssuerAuth({ address: addr, signature: sig, nonce });
+        toast("Authenticated as approved issuer — full queue data unlocked.", "success");
+      } else {
         toast("You are not an approved issuer. Connect as the protocol owner or contact an admin.", "error");
       }
     } catch (e) {
@@ -48,14 +55,27 @@ export default function IssuerPage() {
   async function refreshQueue() {
     setLoading(true);
     try {
+      // Re-sign auth if older than 4 minutes (5 min server window with margin)
+      let auth = issuerAuth;
+      if (auth && Date.now() - auth.nonce > 4 * 60_000) {
+        try {
+          const { signer, address: addr } = await connectWallet();
+          const nonce = Date.now();
+          const sig = await signer.signMessage(buildIssuerReadMessage(nonce));
+          auth = { address: addr, signature: sig, nonce };
+          setIssuerAuth(auth);
+        } catch {
+          auth = null;
+        }
+      }
       const [p, a, r] = await Promise.all([
-        apiGetKYCQueue("pending"),
-        apiGetKYCQueue("approved"),
-        apiGetKYCQueue("rejected"),
+        apiGetKYCQueue("pending", auth || undefined),
+        apiGetKYCQueue("approved", auth || undefined),
+        apiGetKYCQueue("rejected", auth || undefined),
       ]);
       setStats({ pending: p.count, approved: a.count, rejected: r.count });
 
-      const current = await apiGetKYCQueue(statusFilter || undefined);
+      const current = await apiGetKYCQueue(statusFilter || undefined, auth || undefined);
       setQueue(current.queue);
     } catch (e) {
       toast(`Failed to load queue: ${(e as Error).message}`, "error");
