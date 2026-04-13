@@ -48,6 +48,7 @@ export default function RootLayout({
                   <Link href="/demo" className="text-sm text-gray-400 hover:text-white transition-colors">Demo</Link>
                   <Link href="/developers" className="text-sm text-gray-400 hover:text-white transition-colors">Developers</Link>
                   <Link href="/partners" className="text-sm text-gray-400 hover:text-white transition-colors">Partners</Link>
+                  <Link href="/roadmap" className="text-sm text-gray-400 hover:text-white transition-colors">Roadmap</Link>
                   <Link href="/stats" className="text-sm text-gray-400 hover:text-white transition-colors">Stats</Link>
                 </div>
               </div>

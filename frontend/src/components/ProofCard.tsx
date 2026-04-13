@@ -38,17 +38,24 @@ export function ProofCard({ merkleTreeDepth, nullifier, merkleTreeRoot, groupSiz
       </div>
 
       <div className="mt-4 pt-3 border-t border-purple-800/50">
-        {groupSize < 5 ? (
-          <p className="text-xs text-yellow-400">
-            Anonymity set: <span className="font-semibold">{groupSize}</span> member{groupSize === 1 ? "" : "s"}.
-            {groupSize < 3
-              ? " Warning: anonymity set is too small for meaningful privacy. In production, groups should have 10+ members."
-              : " Note: small anonymity set. Privacy improves as more members join the group."}
+        {groupSize < 50 ? (
+          <div className="text-xs">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="px-1.5 py-0.5 rounded bg-yellow-900/40 text-yellow-300 border border-yellow-800 text-[10px] font-semibold">LOW ANONYMITY</span>
+              <span className="text-yellow-400 font-semibold">{groupSize} member{groupSize === 1 ? "" : "s"}</span>
+            </div>
+            <p className="text-gray-400">
+              At this size, a statistical attacker could narrow you down. Production enforces a ≥1,000 floor (see{" "}
+              <a href="/roadmap" className="text-purple-300 underline hover:text-purple-200">roadmap</a>). This is a testnet demo with a small user base.
+            </p>
+          </div>
+        ) : groupSize < 1000 ? (
+          <p className="text-xs text-gray-400">
+            Anonymity set: <span className="text-yellow-300 font-semibold">{groupSize}</span> members. Moderate privacy — production target is 10,000+ per jurisdiction.
           </p>
         ) : (
           <p className="text-xs text-gray-400">
-            Anonymity set: <span className="text-purple-300 font-semibold">{groupSize}</span> members.
-            The verifier cannot determine which member generated this proof.
+            Anonymity set: <span className="text-green-300 font-semibold">{groupSize}</span> members. Strong privacy — verifier cannot narrow you down.
           </p>
         )}
       </div>

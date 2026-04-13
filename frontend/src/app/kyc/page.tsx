@@ -159,10 +159,13 @@ export default function KYCPage() {
           if (session.stage) setStage(session.stage as Stage);
           toast("Restored your verification progress", "info");
         } else {
-          setStage(sumsubEnabled ? "method" : "document");
+          if (sumsubEnabled) {
+            await startSumsubFlowFor(stored);
+          } else {
+            setStage("document");
+          }
         }
       } else {
-        // No identity for this wallet yet — clean slate, show the "create identity" stage.
         if (identity) {
           resetPerWalletState();
           setIdentity(null);
@@ -210,23 +213,37 @@ export default function KYCPage() {
     try {
       const { address: walletAddr } = await connectWallet();
       setCurrentWallet(walletAddr.toLowerCase());
-      // If this wallet already has an identity in this browser, just load it silently.
       const existing = loadIdentityForWallet(walletAddr);
-      if (existing) {
-        setIdentity(existing);
-        await checkStatus(existing);
-        setStage(sumsubAvailable ? "method" : "document");
+      let id = existing;
+      if (!id) {
+        const sig = await signMessage("HSK Passport: Generate my Semaphore identity");
+        id = createIdentityFromSignature(sig, walletAddr);
+        toast("Identity created. Starting KYC verification...", "success");
+      } else {
         toast("Identity loaded for this wallet.", "success");
-        return;
       }
-      const sig = await signMessage("HSK Passport: Generate my Semaphore identity");
-      const id = createIdentityFromSignature(sig, walletAddr);
       setIdentity(id);
       await checkStatus(id);
-      setStage(sumsubAvailable ? "method" : "document");
-      toast("Identity created. Choose your verification method.", "success");
+      // Sumsub is the primary verification path. In-browser flow is available via /research.
+      if (sumsubAvailable) {
+        await startSumsubFlowFor(id);
+      } else {
+        setStage("document");
+      }
     } catch (e) {
       toast(`Failed: ${(e as Error).message.slice(0, 100)}`, "error");
+    }
+  }
+
+  async function startSumsubFlowFor(id: Identity) {
+    try {
+      const init = await apiSumsubInit(getCommitment(id).toString());
+      setSumsubAccessToken(init.accessToken);
+      setSumsubLevelName(init.levelName);
+      setMethod("sumsub");
+      setStage("sumsub");
+    } catch (e) {
+      toast(`Sumsub init failed: ${(e as Error).message.slice(0, 150)}`, "error");
     }
   }
 
@@ -546,9 +563,22 @@ export default function KYCPage() {
         )}
       </div>
 
-      {/* Privacy guarantee */}
-      <div className="mb-6 bg-gradient-to-br from-green-950/30 to-gray-900 border border-green-800/50 rounded-xl p-4 text-sm text-gray-300">
-        <strong className="font-semibold text-green-400">🔒 Zero data sent to servers.</strong> Document OCR runs via Tesseract.js in your browser. Face matching uses face-api.js loaded from our CDN. Only a cryptographic hash of extracted fields is submitted to the issuer — never the images or raw data.
+      {/* Primary path disclosure */}
+      <div className="mb-6 bg-gradient-to-br from-purple-950/30 to-gray-900 border border-purple-800/50 rounded-xl p-4 text-sm text-gray-300 flex items-start gap-3">
+        <div className="text-2xl">🛡️</div>
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <strong className="font-semibold text-purple-300">KYC via Sumsub</strong>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-yellow-900/40 text-yellow-300 border border-yellow-800">SANDBOX MODE</span>
+          </div>
+          <p className="text-xs text-gray-400">
+            Sumsub is the same KYC provider HashKey Exchange uses. Your documents are verified by a regulated provider — they never touch our servers. HSK Passport only learns that verification succeeded, then issues a zero-knowledge credential bound to your wallet.
+          </p>
+          <p className="text-[11px] text-gray-500 mt-1.5">
+            This demo uses Sumsub&apos;s sandbox — production deployments enable iBeta L2 liveness, document authenticity checks, and internal face dedup.{" "}
+            <a href="/research" className="text-purple-400 hover:text-purple-300 underline">See the research-mode in-browser flow →</a>
+          </p>
+        </div>
       </div>
 
       {/* Progress */}
