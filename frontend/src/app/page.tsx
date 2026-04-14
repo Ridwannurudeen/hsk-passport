@@ -17,70 +17,141 @@ export default function Home() {
           HERO
          ============================================================ */}
       <section className="relative overflow-hidden bg-grid-fade">
-        {/* Animated gradient orbs */}
+        {/* Single ambient orb behind the headline */}
         <div
           className="orb"
           style={{
-            top: "-10%",
-            left: "10%",
-            width: "520px",
-            height: "520px",
+            top: "-15%",
+            left: "-5%",
+            width: "640px",
+            height: "640px",
             background: "radial-gradient(circle, var(--accent-glow) 0%, transparent 70%)",
           }}
         />
-        <div
-          className="orb"
-          style={{
-            top: "20%",
-            right: "-5%",
-            width: "420px",
-            height: "420px",
-            background: "radial-gradient(circle, rgba(122, 155, 255, 0.15) 0%, transparent 70%)",
-            animationDelay: "-6s",
-          }}
-        />
 
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-20 sm:pt-28 pb-16 sm:pb-24">
-          <div className="max-w-3xl anim-fade-up">
-            <div className="badge mb-7">
-              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "var(--success)" }} />
-              <span>v5 live · 45 tests · real Sumsub wired</span>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 pt-20 sm:pt-24 pb-16 sm:pb-20">
+          <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] gap-10 lg:gap-14 items-center">
+            {/* Left: hero text */}
+            <div className="anim-fade-up">
+              <div className="badge mb-7">
+                <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "var(--success)" }} />
+                <span>v5 live · 45 tests · real Sumsub wired</span>
+              </div>
+              <h1 className="display-1 mb-6">
+                The default compliance layer for
+                <br />
+                <span
+                  className="bg-clip-text text-transparent gradient-shift"
+                  style={{
+                    backgroundImage: "linear-gradient(110deg, var(--accent-primary), #8fb2ff 40%, var(--accent-primary))",
+                  }}
+                >
+                  regulated apps on HashKey Chain.
+                </span>
+              </h1>
+              <p
+                className="text-[17px] sm:text-[19px] leading-[1.55] mb-4 max-w-[58ch]"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                Verify once with a trusted issuer. Privately prove KYC, accreditation, or jurisdiction to any HashKey Chain dApp. Reveal nothing on-chain.
+              </p>
+              <p
+                className="text-[15px] sm:text-[16px] leading-[1.55] mb-9 max-w-[56ch] italic"
+                style={{ color: "var(--text-muted)" }}
+              >
+                We&apos;re not replacing HashKey&apos;s compliance stack — we&apos;re making it reusable and private across the ecosystem.
+              </p>
+              <div className="flex flex-wrap items-center gap-3 anim-fade-up anim-delay-2">
+                <Link href="/composer" className="btn btn-accent">
+                  Open the Policy Composer
+                  <ArrowIcon />
+                </Link>
+                <Link href="/kyc" className="btn btn-secondary">
+                  Get verified
+                </Link>
+                <Link href="/demo" className="btn btn-ghost link-hover">
+                  Watch the live ZK proof flow →
+                </Link>
+              </div>
             </div>
-            <h1 className="display-1 mb-6">
-              The default compliance layer for
-              <br />
-              <span
-                className="bg-clip-text text-transparent gradient-shift"
+
+            {/* Right: browser-frame product mockup */}
+            <div className="relative anim-fade-up anim-delay-3">
+              {/* Glow halo behind the mockup */}
+              <div
+                aria-hidden
+                className="absolute -inset-8 rounded-[36px] pointer-events-none opacity-70"
                 style={{
-                  backgroundImage: "linear-gradient(110deg, var(--accent-primary), #8fb2ff 40%, var(--accent-primary))",
+                  background: "radial-gradient(ellipse at 50% 30%, var(--accent-glow), transparent 70%)",
+                  filter: "blur(40px)",
+                }}
+              />
+
+              <Link
+                href="/composer"
+                className="relative group block rounded-2xl overflow-hidden transition-transform hover:-translate-y-1"
+                style={{
+                  border: "1px solid var(--border-default)",
+                  background: "var(--bg-elevated)",
+                  boxShadow: "0 30px 80px -30px rgba(0,0,0,0.45), 0 12px 32px -12px var(--accent-glow), inset 0 1px 0 0 rgba(255,255,255,0.04)",
                 }}
               >
-                regulated apps on HashKey Chain.
-              </span>
-            </h1>
-            <p
-              className="text-[17px] sm:text-[19px] leading-[1.55] mb-4 max-w-[60ch]"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              Verify once with a trusted issuer. Privately prove KYC, accreditation, or jurisdiction to any HashKey Chain dApp. Reveal nothing on-chain.
-            </p>
-            <p
-              className="text-[15px] sm:text-[16px] leading-[1.55] mb-10 max-w-[58ch] italic"
-              style={{ color: "var(--text-muted)" }}
-            >
-              We&apos;re not replacing HashKey&apos;s compliance stack — we&apos;re making it reusable and private across the ecosystem.
-            </p>
-            <div className="flex flex-wrap items-center gap-3 anim-fade-up anim-delay-2">
-              <Link href="/composer" className="btn btn-accent">
-                Open the Policy Composer
-                <ArrowIcon />
+                {/* Browser chrome */}
+                <div
+                  className="flex items-center gap-2 px-4 py-3 border-b"
+                  style={{ borderColor: "var(--border-muted)", background: "color-mix(in srgb, var(--bg-elevated) 70%, var(--bg-canvas))" }}
+                >
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#ed6a5e" }} />
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#f4bf4f" }} />
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#62c554" }} />
+                  <div
+                    className="ml-3 flex-1 max-w-[420px] mx-auto rounded-md text-[11px] font-mono py-1 px-3 truncate text-center"
+                    style={{
+                      background: "var(--bg-inset)",
+                      color: "var(--text-muted)",
+                      border: "1px solid var(--border-muted)",
+                    }}
+                  >
+                    hskpassport.gudman.xyz/composer
+                  </div>
+                  <span className="hidden sm:inline-flex items-center gap-1 text-[10px] eyebrow" style={{ color: "var(--text-muted)" }}>
+                    <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "var(--success)" }} />
+                    live
+                  </span>
+                </div>
+
+                {/* Composer screenshot */}
+                <div className="relative bg-white">
+                  <img
+                    src="/composer-hero.png"
+                    alt="Live preview of the Compliance Policy Composer generating Solidity, React, and Hardhat test code from one-click presets"
+                    className="block w-full h-auto select-none transition-transform duration-700 group-hover:scale-[1.01]"
+                    width="1800"
+                    height="1100"
+                    loading="eager"
+                  />
+                  {/* Subtle gradient overlay at bottom for depth */}
+                  <div
+                    aria-hidden
+                    className="absolute inset-x-0 bottom-0 h-24 pointer-events-none"
+                    style={{ background: "linear-gradient(to top, var(--bg-elevated), transparent)" }}
+                  />
+                </div>
               </Link>
-              <Link href="/kyc" className="btn btn-secondary">
-                Get verified
-              </Link>
-              <Link href="/demo" className="btn btn-ghost link-hover">
-                Watch the live ZK proof flow →
-              </Link>
+
+              {/* Floating caption pill under mockup */}
+              <div
+                className="hidden sm:flex absolute -bottom-3 left-1/2 -translate-x-1/2 items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-medium"
+                style={{
+                  background: "var(--bg-elevated)",
+                  border: "1px solid var(--border-default)",
+                  color: "var(--text-secondary)",
+                  boxShadow: "0 8px 24px -8px rgba(0,0,0,0.3)",
+                }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--accent-primary)" }} />
+                Generates Solidity + React + tests in 30 seconds
+              </div>
             </div>
           </div>
 
