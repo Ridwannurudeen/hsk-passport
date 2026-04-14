@@ -155,13 +155,18 @@ const valid = await passport.verifyProof(15, proof);`}</pre>
           <div className="text-xs text-gray-500 mb-3 font-mono">HashKey Chain Testnet (chain ID 133)</div>
           <dl className="space-y-2 text-sm">
             {[
-              { label: "HSKPassport", address: "0xb430F30376344303560c0554DC94766D780a5c64" },
+              { label: "HSKPassport", address: "0x7d2E692A08f2fb0724238396e0436106b4FbD792" },
               { label: "CredentialRegistry", address: "0x20265dAe4711B3CeF88D7078bf1290f815279De1" },
               { label: "Semaphore", address: "0xd09e8Aec6B6A36588E7A105f606A9fe9a134CFE9" },
-              { label: "DemoIssuer", address: "0xD6CB3393B9e1E162ed3EF8187082511d20Be28d1" },
-              { label: "GatedRWA (hSILVER)", address: "0xFc6bDE32f79ad43696abc6A2a6291bfA8AF1D249" },
-              { label: "KYCGatedAirdrop (hPILOT)", address: "0x02F84538E05b66FD207923675f48B70541bBb01c" },
-              { label: "KYCGatedLending", address: "0x5430c4A4180492D5D0ce059355e82176F8AF9A20" },
+              { label: "IssuerRegistry", address: "0x5BbAe6e90b82c7c51EbA9cA6D844D698dE2eb504" },
+              { label: "Timelock (48h)", address: "0xb07Bc78559CbDe44c047b1dC3028d13c4f863D8A" },
+              { label: "DemoIssuer", address: "0xBf7d566B8077A098F6844fb6b827D2A4118C88C3" },
+              { label: "HashKeyDIDBridge", address: "0xF072D06adcA2B6d5941bde6cc87f41feC5F5Ea7a" },
+              { label: "HashKeyKYCImporter", address: "0x5431ae6D2f5c3Ad3373B7B4DD4066000D681f5B8" },
+              { label: "GatedRWA (hSILVER)", address: "0xb6955cb3e442c4222fFc3b92c322851109d0b9c9" },
+              { label: "KYCGatedAirdrop (hPILOT)", address: "0x71c96016CBCAeE7B2Edc8b40Fec45de1d16Fb4b8" },
+              { label: "KYCGatedLending", address: "0x37179886986bd35a4d580f157f55f249c43A0BFD" },
+              { label: "JurisdictionGatedPool", address: "0x305f5F0b44d541785305DaDb372f118A9284Ce4D" },
             ].map((c) => (
               <div key={c.address} className="flex items-center justify-between py-1 border-b border-gray-800/50 last:border-0">
                 <dt className="text-gray-400">{c.label}</dt>
@@ -177,11 +182,13 @@ const valid = await passport.verifyProof(15, proof);`}</pre>
           </dl>
         </div>
 
-        <div className="grid grid-cols-3 gap-3 mt-4 text-sm">
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-3 mt-4 text-sm">
           {[
-            { name: "KYC Verified", id: 15 },
-            { name: "Accredited Investor", id: 16 },
-            { name: "HK Resident", id: 17 },
+            { name: "KYC Verified", id: 25 },
+            { name: "Accredited Investor", id: 26 },
+            { name: "HK Resident", id: 27 },
+            { name: "SG Resident", id: 28 },
+            { name: "AE Resident", id: 29 },
           ].map((g) => (
             <div key={g.id} className="bg-gray-900 border border-gray-800 rounded-lg p-3 text-center">
               <div className="text-2xl font-bold text-purple-400">{g.id}</div>
