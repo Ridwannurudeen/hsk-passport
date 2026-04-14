@@ -8,12 +8,12 @@ Verify once with a trusted issuer. Privately prove KYC, accreditation, or jurisd
 
 [![Live demo](https://img.shields.io/badge/live-hskpassport.gudman.xyz-4f7cff?style=flat-square)](https://hskpassport.gudman.xyz)
 [![Policy Composer](https://img.shields.io/badge/Policy_Composer-try_it-4f7cff?style=flat-square)](https://hskpassport.gudman.xyz/composer)
-[![npm](https://img.shields.io/npm/v/hsk-passport-sdk?style=flat-square&color=4f7cff)](https://www.npmjs.com/package/hsk-passport-sdk)
+[![npm](https://img.shields.io/npm/v/hsk-passport-sdk?style=flat-square&color=4f7cff&label=sdk)](https://www.npmjs.com/package/hsk-passport-sdk)
 [![Tests](https://img.shields.io/badge/tests-45_passing-22c25e?style=flat-square)](#tests)
-[![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
-[![HashKey Chain](https://img.shields.io/badge/HashKey_Chain-testnet-8fb2ff?style=flat-square)](https://hashkey-testnet.blockscout.com/address/0x7d2E692A08f2fb0724238396e0436106b4FbD792)
+[![Audits](https://img.shields.io/badge/audits-3_rounds-22c25e?style=flat-square)](audits/)
+[![License](https://img.shields.io/badge/license-MIT-4f7cff?style=flat-square)](LICENSE)
 
-<p align="center"><em>We're not replacing HashKey's compliance stack — we're making it reusable and private across the ecosystem.</em></p>
+<p><em>We're not replacing HashKey's compliance stack — we're making it reusable and private across the ecosystem.</em></p>
 
 <a href="https://hskpassport.gudman.xyz">
   <img src="docs/screenshots/home.png" alt="HSK Passport homepage" width="100%" />
@@ -23,91 +23,47 @@ Verify once with a trusted issuer. Privately prove KYC, accreditation, or jurisd
 
 ---
 
-## TL;DR
+## Table of contents
 
-- **Problem**: Every regulated dApp on HashKey Chain rebuilds KYC from scratch and leaks identity on-chain.
-- **Solution**: A user verifies once via Sumsub *(the same KYC provider HashKey Exchange uses)*. They get a Semaphore zero-knowledge credential bound to their wallet. Any HashKey Chain dApp can then verify eligibility in a single `require` line — and learn nothing about the user.
-- **Why it wins**: The only submission with real Sumsub wired end-to-end, an interactive Policy Composer that generates Solidity + React + tests in 30 seconds, and three rounds of documented audit fixes across 8 live contracts + 45 passing tests.
+- [What is this?](#what-is-this)
+- [Quick start](#quick-start)
+- [Architecture](#architecture)
+- [The Policy Composer](#the-policy-composer)
+- [How it compares](#how-it-compares)
+- [Deployed contracts](#deployed-contracts)
+- [Install & run locally](#install--run-locally)
+- [Security](#security)
+- [Audits](#audits)
+- [Tests](#tests)
+- [Related work](#related-work)
+- [Repo layout](#repo-layout)
+- [License](#license)
+
+---
+
+## What is this?
+
+Every regulated dApp on HashKey Chain — silver-backed RWAs, tokenized funds, accredited DeFi — needs KYC. Today every team rebuilds it from scratch and leaks identity on-chain.
+
+HSK Passport is a reusable on-chain layer that turns HashKey's existing compliance infrastructure (Sumsub, the `.key` DID, Exchange KYC SBTs) into zero-knowledge credentials that any dApp can verify with a single `require` line.
+
+**In one sentence**: A user verifies once via Sumsub, gets a Semaphore ZK credential bound to their wallet, and proves eligibility to any compliant dApp — without revealing identity on-chain.
 
 Built for the [HashKey Chain Horizon Hackathon 2026](https://dorahacks.io/hackathon/2045) — **ZKID Track**.
 
-## Try it in 30 seconds
-
-| | |
-|---|---|
-| 🌐 Live app | https://hskpassport.gudman.xyz |
-| 🧱 Policy Composer | https://hskpassport.gudman.xyz/composer |
-| 🎥 Interactive demo | https://hskpassport.gudman.xyz/demo |
-| 📦 SDK | `npm i hsk-passport-sdk` — [npm page](https://www.npmjs.com/package/hsk-passport-sdk) |
-| 🔗 Main contract | [`0x7d2E…D792`](https://hashkey-testnet.blockscout.com/address/0x7d2E692A08f2fb0724238396e0436106b4FbD792) |
-
 ---
 
-## Architecture
+## Quick start
 
-<p align="center">
-  <img src="docs/architecture.svg" alt="HSK Passport architecture" width="100%"/>
-</p>
+Integrate HSK Passport into any HashKey Chain dApp in three steps.
 
-1. User verifies with Sumsub — documents never touch HSK Passport servers.
-2. Sumsub fires a webhook to the issuer; the issuer wallet adds the user's identity commitment to an on-chain credential group.
-3. The user generates a Groth16 ZK proof in their browser (WASM).
-4. Any dApp calls `passport.verifyCredential(groupId, proof)` and gets a yes/no boolean in ~241k gas — learning nothing about the user.
+**1. Install the SDK**
 
----
+```bash
+npm install hsk-passport-sdk ethers
+```
 
-## The Policy Composer — the strategic anchor
-
-No other ZKID submission has this. The Composer turns HSK Passport from a protocol into an **adoption tool**. Any dApp builder ticks compliance rules:
-
-- KYC verified
-- Accredited investor
-- Jurisdiction in `{HK, SG, AE}`
-
-And gets back a ready-to-deploy Solidity contract, a React frontend component, and a Hardhat test — all in 30 seconds.
-
-<a href="https://hskpassport.gudman.xyz/composer">
-  <img src="docs/screenshots/composer.png" alt="Policy Composer" width="100%"/>
-</a>
-
-**Presets**: `Private RWA Allowlist` · `Accredited DeFi Pool` · `APAC Regional RWA` · `Institutional Tier` — one click, every compliance pattern.
-
----
-
-## How we compare
-
-| | HSK Passport | Most competitors |
-|---|:---:|:---:|
-| Real Sumsub integration wired end-to-end | ✅ | ❌ (mocked / simulated) |
-| Policy Composer generating Solidity + React + tests | ✅ | ❌ |
-| HashKey DID bridge + HashKey Exchange KYC importer | ✅ | ❌ |
-| On-chain credential expiry (`verifyCredentialWithExpiry`) | ✅ | ❌ |
-| Issuer slashing via 48h Timelock | ✅ | ❌ |
-| Raw-body HMAC webhook verification | ✅ | ❌ |
-| Redacted KYC queue + signed-read auth | ✅ | ❌ |
-| Dark/light theme + design-token system | ✅ | ❌ |
-| Three audit rounds documented publicly | ✅ | ❌ |
-| Honest threat model at `/roadmap` | ✅ | ❌ |
-
----
-
-## The demo flow (one minute)
-
-1. `/kyc` → connect wallet → Sumsub sandbox widget runs (same provider HashKey Exchange uses).
-2. Webhook fires → backend auto-issues the credential on-chain.
-3. `/composer` → tick `KYC + (HK || SG || AE)` → copy the generated Solidity.
-4. `/demo` → generate ZK proof in-browser → mint `hSILVER` through the gated dApp.
-5. `/user` → "Verified Identity" card fetched live from Sumsub *(zero stored on our side)*.
-
-<a href="https://hskpassport.gudman.xyz/demo">
-  <img src="docs/screenshots/demo.png" alt="Interactive ZK proof demo" width="100%"/>
-</a>
-
----
-
-## Developer integration
-
-Gate any function behind ZK KYC in one `require`:
+**2. Gate any Solidity function with one `require`**
 
 ```solidity
 import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphore.sol";
@@ -122,32 +78,83 @@ contract MyRWA {
         IHSKPassport(0x7d2E692A08f2fb0724238396e0436106b4FbD792);
 
     function mint(ISemaphore.SemaphoreProof calldata proof) external {
-        // 1. Bind proof to caller — prevents front-running.
         require(proof.message == uint256(uint160(msg.sender)), "bind to caller");
-        // 2. Check KYC credential.
         require(passport.verifyCredential(25, proof), "KYC required");
-        // 3. Your logic.
         _mint(msg.sender, 100e18);
     }
 }
 ```
 
-Frontend:
+**3. Generate a proof in your frontend**
 
 ```ts
 import { HSKPassport } from "hsk-passport-sdk";
 
 const passport = HSKPassport.connect("hashkey-testnet", signer);
 const identity = passport.createIdentity(walletSignature);
-const callerAddress = await signer.getAddress();
-const proof = await passport.generateProof(identity, 25, "mint-rwa", BigInt(callerAddress));
+const caller = await signer.getAddress();
+const proof = await passport.generateProof(identity, 25, "mint-rwa", BigInt(caller));
+
+await myRwa.mint(proof);
 ```
 
-Or use the [**Policy Composer**](https://hskpassport.gudman.xyz/composer) to generate the entire integration in 30 seconds.
+Prefer checkboxes? Generate the same integration — Solidity, React, Hardhat test — in 30 seconds at [**the Policy Composer**](https://hskpassport.gudman.xyz/composer).
 
 ---
 
-## What's deployed (HashKey Chain testnet, v5)
+## Architecture
+
+<p align="center">
+  <img src="docs/architecture.svg" alt="HSK Passport architecture" width="100%"/>
+</p>
+
+1. **User** verifies with Sumsub — documents never touch HSK Passport servers.
+2. **Issuer** receives Sumsub's GREEN webhook and adds the user's identity commitment to an on-chain credential group.
+3. **User** generates a Groth16 ZK proof in-browser (WASM) that proves group membership without revealing which member.
+4. **dApp** calls `passport.verifyCredential(groupId, proof)` and gets a yes/no boolean in ~241k gas — learning nothing about the user.
+
+Caller-bound proofs prevent front-running. Per-action nullifiers prevent sybil attacks within a scope. Credentials are revocable, expirable (on-chain), and governance-controlled (48h timelock).
+
+---
+
+## The Policy Composer
+
+<a href="https://hskpassport.gudman.xyz/composer">
+  <img src="docs/screenshots/composer.png" alt="Policy Composer" width="100%"/>
+</a>
+
+The Composer turns HSK Passport from a protocol into an **adoption tool**. Any dApp builder ticks compliance rules:
+
+- KYC verified
+- Accredited investor
+- Jurisdiction in `{HK, SG, AE}`
+
+And gets back a ready-to-deploy Solidity contract, a React gate component, and a Hardhat test. Four one-click presets cover the common patterns: *Private RWA Allowlist · Accredited DeFi Pool · APAC Regional RWA · Institutional Tier*.
+
+Try it live: https://hskpassport.gudman.xyz/composer
+
+---
+
+## How it compares
+
+| | HSK Passport | Most competitors |
+|---|:---:|:---:|
+| Real Sumsub integration wired end-to-end | ✅ | ❌ (mocked / simulated) |
+| Policy Composer generating Solidity + React + tests | ✅ | ❌ |
+| HashKey DID bridge + HashKey Exchange KYC importer | ✅ | ❌ |
+| On-chain credential expiry (`verifyCredentialWithExpiry`) | ✅ | ❌ |
+| Issuer slashing via 48h Timelock | ✅ | ❌ |
+| Raw-body HMAC webhook verification | ✅ | ❌ |
+| Redacted KYC queue + signed-read auth with nonce replay protection | ✅ | ❌ |
+| Dark/light theme + design-token system | ✅ | ❌ |
+| Three audit rounds documented publicly in [`audits/`](audits/) | ✅ | ❌ |
+| Honest threat model at `/roadmap` | ✅ | ❌ |
+
+---
+
+## Deployed contracts
+
+HashKey Chain testnet (chain id 133), v5:
 
 | Contract | Address |
 |---|---|
@@ -163,32 +170,79 @@ Or use the [**Policy Composer**](https://hskpassport.gudman.xyz/composer) to gen
 | KYCGatedLending | [`0x3717…0BFD`](https://hashkey-testnet.blockscout.com/address/0x37179886986bd35a4d580f157f55f249c43A0BFD) |
 | JurisdictionGatedPool | [`0x305f…Ce4D`](https://hashkey-testnet.blockscout.com/address/0x305f5F0b44d541785305DaDb372f118A9284Ce4D) |
 
-**Credential groups** *(default validity)*: KYC_VERIFIED `25` (180 d) · ACCREDITED_INVESTOR `26` (365 d) · HK_RESIDENT `27` · SG_RESIDENT `28` · AE_RESIDENT `29` (no expiry).
+**Credential groups** *(default validity)*: `KYC_VERIFIED 25 (180 d)` · `ACCREDITED_INVESTOR 26 (365 d)` · `HK_RESIDENT 27` · `SG_RESIDENT 28` · `AE_RESIDENT 29` *(residency never expires)*.
 
 ---
 
-## Security — what we enforce today
+## Install & run locally
+
+Requires Node 20+.
+
+**Contracts** (Hardhat, 45 passing tests):
+
+```bash
+cd contracts
+npm install
+npx hardhat test
+# Deploy to testnet (requires PRIVATE_KEY env + funded HSK)
+npx hardhat run scripts/deploy.ts --network hashkey-testnet
+```
+
+**Backend** (Fastify + SQLite indexer):
+
+```bash
+cd backend
+npm install
+# env: RPC_URL, ISSUER_PRIVATE_KEY, SUMSUB_APP_TOKEN, SUMSUB_SECRET_KEY,
+#      SUMSUB_WEBHOOK_SECRET, ALLOWED_ORIGINS
+npx tsx src/server.ts
+# API lives on :4021
+```
+
+**Frontend** (Next.js 16):
+
+```bash
+cd frontend
+npm install
+npm run dev
+# App lives on :3000
+```
+
+**SDK** (published, but can be built locally):
+
+```bash
+cd sdk
+npm install
+npm run build
+```
+
+---
+
+## Security
 
 - **Caller-bound proofs** — `proof.message == uint256(uint160(msg.sender))` on every gated call prevents front-running.
 - **Per-group delegate isolation** — delegates for one group cannot issue in another.
 - **Issuer offboarding** — revoking an issuer immediately freezes all their groups and any delegate-issued credentials.
 - **Anti-sybil bridges** — DID and KYC importers enforce one-source → one-commitment.
 - **Revocation-aware proofs** — client filters `CredentialRevoked` events; revoked credentials fail verification.
-- **Single-use nonce** on signed-read endpoints prevents issuer-auth replay within the 5-min window.
+- **Single-use nonces** on signed-read endpoints prevent issuer-auth replay within the 5-min window.
 - **Raw-body HMAC webhook verification** — Sumsub signatures checked over the original bytes, not a JSON re-stringification.
 - **CORS lockdown** — only whitelisted origins.
 - **Issuer slashing via 48h Timelock** — misissuance forfeits stake through governance review.
 
-Three documented audit rounds, all HIGH and MEDIUM findings closed. See [SECURITY.md](SECURITY.md) and the `/roadmap` page for the full threat model.
+Vulnerability disclosure: [SECURITY.md](SECURITY.md). Threat model: [`/roadmap`](https://hskpassport.gudman.xyz/roadmap).
 
 ---
 
-## Honest status
+## Audits
 
-- ✅ **Production-shape**: Sumsub flow, ZK proof generation, on-chain verification, issuer review, credential expiry, HashKey ecosystem bridges.
-- ⚠ **Clearly labeled roadmap at [/roadmap](https://hskpassport.gudman.xyz/roadmap)**: blind-issuance for backend-correlation resistance, formal audit, anonymity-set floor enforcement, cross-chain availability, biometric-bound identities.
+Three internal audit rounds, 25 findings total, all HIGH / MEDIUM closed before submission. Detailed evidence in [`audits/`](audits/):
 
-We document what we don't yet protect against. Most KYC-gated protocols don't.
+- [Round 1 — Contracts & initial design](audits/round-1.md)
+- [Round 2 — Privacy-safe backend, Composer, per-wallet identities](audits/round-2.md)
+- [Round 3 — Security hardening from full independent review](audits/round-3.md)
+
+A formal third-party audit (Trail of Bits / OpenZeppelin / Spearbit) is planned for mainnet and noted on the [public roadmap](https://hskpassport.gudman.xyz/roadmap).
 
 ---
 
@@ -199,39 +253,44 @@ $ npm test
   45 passing
 ```
 
-Coverage includes the full security-invariant suite: issuer offboarding, delegate escalation, anti-sybil bridges, credential expiry enforcement, slashing authority.
+The suite includes `SecurityInvariants.test.ts`, `CredentialExpiry.test.ts`, and `IssuerSlashing.test.ts` — each targeted at the specific invariants that closed the audit findings above.
 
 ---
 
-## Tech stack
+## Related work
 
-- **ZK**: Semaphore v4 (Groth16, EdDSA, LeanIMT); bn128 precompiles verified on HashKey Chain.
-- **Contracts**: Solidity 0.8.24, Hardhat, OpenZeppelin `TimelockController` + `Ownable`.
-- **Frontend**: Next.js 16, TypeScript, Tailwind v4, ethers v6; design-token system with dark/light theme.
-- **Backend**: Fastify + better-sqlite3 indexer; Sumsub HMAC raw-body webhook verification; signed-read auth.
-- **KYC provider**: Sumsub (real integration — same provider HashKey Exchange uses).
+HSK Passport builds on and composes with:
+
+- **[Semaphore v4](https://semaphore.pse.dev/)** — the ZK primitive for anonymous group membership (PSE / Ethereum Foundation).
+- **[W3C Verifiable Credentials Data Model](https://www.w3.org/TR/vc-data-model-2.0/)** — schema shape for the credential registry.
+- **[OpenZeppelin TimelockController](https://docs.openzeppelin.com/contracts/5.x/governance#timelock)** — governance delay mechanism.
+- **[Sumsub](https://sumsub.com)** — the real KYC provider; same one HashKey Exchange uses.
+
+Identity projects in adjacent spaces: [Polygon ID / Privado ID](https://www.privado.id/), [World ID](https://world.org/), [Civic](https://www.civic.com/), [Holonym / Human.tech](https://human.tech/), [Zupass](https://zupass.org/), [Passport by Human.tech](https://passport.human.tech/). HSK Passport is HashKey-Chain-native and optimized for regulated RWA / institutional DeFi on that chain specifically.
 
 ---
 
 ## Repo layout
 
 ```
-contracts/     Solidity, Hardhat tests (45 passing), deploy scripts (v5)
+contracts/     Solidity + Hardhat tests (45 passing) + deploy scripts
 backend/       Fastify + SQLite indexer, Sumsub client, auto-issuer
-frontend/      Next.js 16 app: /kyc, /composer, /demo, /user, /issuer, /bridge, …
+frontend/      Next.js 16 app: /kyc, /composer, /demo, /user, /issuer, …
 sdk/           TypeScript SDK (published as `hsk-passport-sdk` on npm)
-docs/          Architecture diagram, screenshots
+audits/        Three audit rounds with findings and closure evidence
+docs/          Architecture diagram, screenshots, demo script
+schemas/       W3C VC credential schemas (KYC / accredited / HK resident)
 ```
 
 ## Links
 
-- 🌐 Live demo — https://hskpassport.gudman.xyz
-- 🧱 Policy Composer — https://hskpassport.gudman.xyz/composer
-- 🗺 Roadmap & threat model — https://hskpassport.gudman.xyz/roadmap
-- 📦 SDK — https://www.npmjs.com/package/hsk-passport-sdk
-- 📖 Protocol spec — [PROTOCOL.md](PROTOCOL.md)
-- 🛡 Security policy — [SECURITY.md](SECURITY.md)
+- Live app — https://hskpassport.gudman.xyz
+- Policy Composer — https://hskpassport.gudman.xyz/composer
+- Roadmap & threat model — https://hskpassport.gudman.xyz/roadmap
+- SDK — https://www.npmjs.com/package/hsk-passport-sdk
+- Protocol spec — [PROTOCOL.md](PROTOCOL.md)
+- Security policy — [SECURITY.md](SECURITY.md)
 
 ## License
 
-MIT — use, fork, integrate. The default compliance layer should be public goods.
+[MIT](LICENSE) — use, fork, integrate. The default compliance layer should be public goods.
