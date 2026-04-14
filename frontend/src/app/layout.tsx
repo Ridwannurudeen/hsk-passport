@@ -139,6 +139,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                 ] },
                 { title: "Resources", items: [
                   ["Roadmap", "/roadmap"], ["Governance", "/governance"], ["Research", "/research"], ["Partners", "/partners"],
+                  ["Testnet faucet ↗", "https://faucet.hsk.xyz"],
+                  ["Block explorer ↗", "https://hashkey-testnet.blockscout.com"],
                 ] },
               ].map((col) => (
                 <div key={col.title}>

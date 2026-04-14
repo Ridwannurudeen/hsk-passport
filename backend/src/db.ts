@@ -40,12 +40,31 @@ db.exec(`
     reviewed_at INTEGER,
     reviewed_by TEXT,
     rejection_reason TEXT,
-    tx_hash TEXT
+    tx_hash TEXT,
+    notify_email TEXT,
+    notified_at INTEGER
   );
 
   CREATE INDEX IF NOT EXISTS idx_kyc_status ON kyc_requests(status, submitted_at);
   CREATE INDEX IF NOT EXISTS idx_kyc_commitment ON kyc_requests(identity_commitment);
   CREATE INDEX IF NOT EXISTS idx_kyc_wallet ON kyc_requests(wallet_address);
+`);
+
+// Lightweight migration: add the email-notification columns if they don't exist yet
+// (SQLite doesn't support ADD COLUMN IF NOT EXISTS)
+for (const col of [
+  ["notify_email", "TEXT"],
+  ["notified_at", "INTEGER"],
+]) {
+  try {
+    db.exec(`ALTER TABLE kyc_requests ADD COLUMN ${col[0]} ${col[1]}`);
+  } catch (e) {
+    const msg = (e as Error).message || "";
+    if (!msg.includes("duplicate column")) throw e;
+  }
+}
+
+db.exec(`
 
   CREATE TABLE IF NOT EXISTS proof_verifications (
     nullifier TEXT PRIMARY KEY,
@@ -146,11 +165,12 @@ export function insertKYCRequest(req: {
   jurisdiction: string;
   credentialType: string;
   documentType?: string;
+  notifyEmail?: string;
 }) {
   db.prepare(
     `INSERT INTO kyc_requests
-     (id, identity_commitment, wallet_address, jurisdiction, credential_type, document_type, status, submitted_at)
-     VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)`
+     (id, identity_commitment, wallet_address, jurisdiction, credential_type, document_type, status, submitted_at, notify_email)
+     VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)`
   ).run(
     req.id,
     req.commitment,
@@ -158,8 +178,13 @@ export function insertKYCRequest(req: {
     req.jurisdiction,
     req.credentialType,
     req.documentType || null,
-    Date.now()
+    Date.now(),
+    req.notifyEmail || null
   );
+}
+
+export function markKYCNotified(id: string) {
+  db.prepare("UPDATE kyc_requests SET notified_at = ? WHERE id = ?").run(Date.now(), id);
 }
 
 export function getKYCQueue(status?: string) {

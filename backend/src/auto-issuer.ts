@@ -1,6 +1,7 @@
 import { JsonRpcProvider, Wallet, Contract } from "ethers";
 import { CONFIG } from "./config.js";
-import { db, updateKYCStatus, getKYCQueue } from "./db.js";
+import { db, updateKYCStatus, getKYCQueue, markKYCNotified } from "./db.js";
+import { notifyCredentialApproved, emailConfig } from "./notify.js";
 
 const PASSPORT_ABI = [
   "function issueCredential(uint256 groupId, uint256 identityCommitment)",
@@ -37,6 +38,8 @@ interface KYCRow {
   credential_type: string;
   status: string;
   submitted_at: number;
+  notify_email?: string | null;
+  notified_at?: number | null;
 }
 
 async function tryAutoApprove(wallet: Wallet, req: KYCRow) {
@@ -70,6 +73,19 @@ async function tryAutoApprove(wallet: Wallet, req: KYCRow) {
   console.log(`[auto-issuer] Issued in tx ${receipt?.hash.slice(0, 12)}...`);
 
   updateKYCStatus(req.id, "approved", wallet.address, { txHash: tx.hash });
+
+  // Email the user with the on-chain tx hash if they opted in.
+  if (req.notify_email && emailConfig.enabled && !req.notified_at) {
+    notifyCredentialApproved({
+      email: req.notify_email,
+      credentialType: req.credential_type,
+      txHash: tx.hash,
+      commitment: req.identity_commitment,
+    }).then((r) => {
+      if (r.ok) markKYCNotified(req.id);
+      else console.warn(`[auto-issuer] notify email failed for ${req.id.slice(0, 8)}: ${r.error}`);
+    });
+  }
 }
 
 export function startAutoIssuer() {

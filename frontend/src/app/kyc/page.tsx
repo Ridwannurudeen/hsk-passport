@@ -50,6 +50,7 @@ export default function KYCPage() {
   const [method, setMethod] = useState<Method>("sumsub");
   const [sumsubAvailable, setSumsubAvailable] = useState<boolean>(false);
   const [sumsubAccessToken, setSumsubAccessToken] = useState<string>("");
+  const [notifyEmail, setNotifyEmail] = useState<string>("");
   const [sumsubLevelName, setSumsubLevelName] = useState<string>("");
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [credentialType, setCredentialType] = useState("KYCVerified");
@@ -237,7 +238,7 @@ export default function KYCPage() {
 
   async function startSumsubFlowFor(id: Identity) {
     try {
-      const init = await apiSumsubInit(getCommitment(id).toString());
+      const init = await apiSumsubInit(getCommitment(id).toString(), notifyEmail || undefined);
       setSumsubAccessToken(init.accessToken);
       setSumsubLevelName(init.levelName);
       setMethod("sumsub");
@@ -250,7 +251,7 @@ export default function KYCPage() {
   async function startSumsubFlow() {
     if (!identity) return;
     try {
-      const init = await apiSumsubInit(getCommitment(identity).toString());
+      const init = await apiSumsubInit(getCommitment(identity).toString(), notifyEmail || undefined);
       setSumsubAccessToken(init.accessToken);
       setSumsubLevelName(init.levelName);
       setMethod("sumsub");
@@ -581,6 +582,20 @@ export default function KYCPage() {
         </div>
       </div>
 
+      {/* Faucet helper */}
+      <div className="mb-6 bg-gray-900/60 border border-gray-800 rounded-xl px-4 py-3 text-xs text-gray-400 flex items-center justify-between gap-3 flex-wrap">
+        <span>Need testnet HSK? Get some for gas before issuing your credential on-chain.</span>
+        <a
+          href="https://faucet.hsk.xyz"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-gray-800 hover:bg-gray-700 text-gray-100 border border-gray-700 transition-colors"
+        >
+          Open HashKey Testnet faucet
+          <span aria-hidden>↗</span>
+        </a>
+      </div>
+
       {/* Progress */}
       <div className="mb-8 flex items-center gap-2">
         {stages.slice(0, 5).map((s, i) => (
@@ -604,6 +619,26 @@ export default function KYCPage() {
           <p className="text-sm text-gray-400 mb-4">
             Connect your wallet and sign a message to generate a Semaphore identity. Deterministic from your signature — never leaves your browser.
           </p>
+
+          <div className="mb-5">
+            <label htmlFor="notify-email" className="block text-xs font-medium text-gray-300 mb-1.5">
+              Email me when verification is complete <span className="text-gray-500 font-normal">(optional)</span>
+            </label>
+            <input
+              id="notify-email"
+              type="email"
+              autoComplete="email"
+              inputMode="email"
+              value={notifyEmail}
+              onChange={(e) => setNotifyEmail(e.target.value)}
+              placeholder="you@example.com"
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none"
+            />
+            <p className="text-[11px] text-gray-500 mt-1.5">
+              We&apos;ll send one transactional email when your credential is issued (or rejected) — never marketing. Stored only against your verification request, never on-chain.
+            </p>
+          </div>
+
           <button
             onClick={handleCreateIdentity}
             className="px-6 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-lg transition-colors"

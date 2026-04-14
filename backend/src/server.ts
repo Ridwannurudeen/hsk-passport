@@ -25,6 +25,8 @@ import {
   verifyWebhookSignature,
   type SumsubApplicant,
 } from "./sumsub.js";
+import { emailConfig, notifyCredentialApproved, notifyCredentialRejected } from "./notify.js";
+import { markKYCNotified } from "./db.js";
 
 const app = Fastify({ logger: { level: "info" } });
 
@@ -101,6 +103,7 @@ app.post("/api/kyc/submit", async (request, reply) => {
     jurisdiction?: string;
     credentialType?: string;
     documentType?: string;
+    notifyEmail?: string;
   };
 
   if (!body.commitment || !body.wallet || !body.jurisdiction || !body.credentialType) {
@@ -119,6 +122,10 @@ app.post("/api/kyc/submit", async (request, reply) => {
     reply.code(400);
     return { error: "jurisdiction/credentialType too long" };
   }
+  if (body.notifyEmail && (body.notifyEmail.length > 254 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(body.notifyEmail))) {
+    reply.code(400);
+    return { error: "notifyEmail is not a valid email address" };
+  }
 
   // Check for existing pending request
   const existing = getKYCByCommitment(body.commitment) as any;
@@ -134,6 +141,7 @@ app.post("/api/kyc/submit", async (request, reply) => {
     jurisdiction: body.jurisdiction,
     credentialType: body.credentialType,
     documentType: body.documentType,
+    notifyEmail: body.notifyEmail,
   });
 
   return { id, status: "pending" };
@@ -380,10 +388,14 @@ app.post("/api/kyc/sumsub/init", async (request, reply) => {
     return { error: "Sumsub not configured on this server" };
   }
 
-  const body = request.body as { commitment?: string };
+  const body = request.body as { commitment?: string; notifyEmail?: string };
   if (!body.commitment || !/^\d+$/.test(body.commitment)) {
     reply.code(400);
     return { error: "missing or invalid commitment (must be numeric string)" };
+  }
+  if (body.notifyEmail && (body.notifyEmail.length > 254 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(body.notifyEmail))) {
+    reply.code(400);
+    return { error: "notifyEmail is not a valid email address" };
   }
 
   try {
@@ -391,6 +403,23 @@ app.post("/api/kyc/sumsub/init", async (request, reply) => {
     let applicant = await getApplicantByExternalId(body.commitment);
     if (!applicant) {
       applicant = await createApplicant(body.commitment);
+    }
+
+    // If user provided an email and we haven't stored a request for this commitment yet,
+    // create a placeholder so the webhook can find the email later.
+    if (body.notifyEmail) {
+      const existing = getKYCByCommitment(body.commitment) as { id?: string; notify_email?: string } | undefined;
+      if (!existing) {
+        insertKYCRequest({
+          id: randomUUID(),
+          commitment: body.commitment,
+          wallet: "sumsub-pending",
+          jurisdiction: "PENDING",
+          credentialType: "KYCVerified",
+          documentType: `sumsub:${(applicant.id || "").slice(0, 10)}`,
+          notifyEmail: body.notifyEmail,
+        });
+      }
     }
 
     // Generate fresh access token for the Web SDK
@@ -496,12 +525,16 @@ app.post("/api/kyc/sumsub/webhook", async (request, reply) => {
 
   console.log("[sumsub] webhook:", event.type, event.externalUserId, event.reviewStatus, event.reviewResult?.reviewAnswer);
 
-  // Handle applicantReviewed: if GREEN, auto-create a KYC request for the auto-issuer to process
+  // Handle applicantReviewed: GREEN → auto-issue + email; RED → email rejection
   if (event.type === "applicantReviewed" && event.externalUserId) {
     const applicant = await getApplicantByExternalId(event.externalUserId);
-    if (applicant?.review?.reviewResult?.reviewAnswer === "GREEN") {
-      // If no existing DB record, create one so the auto-issuer picks it up
-      const existing = getKYCByCommitment(event.externalUserId) as { id?: string; status?: string } | undefined;
+    const answer = applicant?.review?.reviewResult?.reviewAnswer;
+    const existing = getKYCByCommitment(event.externalUserId) as
+      | { id?: string; status?: string; notify_email?: string | null; tx_hash?: string | null; credential_type?: string }
+      | undefined;
+
+    if (answer === "GREEN") {
+      // Make sure the auto-issuer has a record
       if (!existing) {
         insertKYCRequest({
           id: randomUUID(),
@@ -509,14 +542,40 @@ app.post("/api/kyc/sumsub/webhook", async (request, reply) => {
           wallet: "sumsub-verified",
           jurisdiction: "UNKNOWN",
           credentialType: "KYCVerified",
-          documentType: "sumsub:" + (applicant.id || "").slice(0, 10),
+          documentType: "sumsub:" + (applicant?.id || "").slice(0, 10),
         });
+      }
+      // Send approval email if we have one stored. Note: tx_hash will be filled in by
+      // the auto-issuer after on-chain issuance — we send a "verified" email now
+      // and rely on the user dashboard for the final tx link if email arrives first.
+      if (existing?.notify_email) {
+        const result = await notifyCredentialApproved({
+          email: existing.notify_email,
+          credentialType: existing.credential_type || "KYCVerified",
+          txHash: existing.tx_hash || null,
+          commitment: event.externalUserId,
+        });
+        if (result.ok && existing.id) markKYCNotified(existing.id);
+        else if (!result.ok) console.warn("[notify] approval email failed:", result.error);
+      }
+    } else if (answer === "RED") {
+      const reasons = applicant?.review?.reviewResult?.rejectLabels?.join(", ");
+      if (existing?.notify_email) {
+        const result = await notifyCredentialRejected({
+          email: existing.notify_email,
+          credentialType: existing.credential_type || "KYCVerified",
+          reason: reasons,
+        });
+        if (result.ok && existing.id) markKYCNotified(existing.id);
+        else if (!result.ok) console.warn("[notify] rejection email failed:", result.error);
       }
     }
   }
 
   return { ok: true };
 });
+
+app.get("/api/notify/status", async () => ({ enabled: emailConfig.enabled, from: emailConfig.from }));
 
 // ================================================================
 // Start

@@ -134,7 +134,7 @@ export async function apiGetSumsubConfig(): Promise<{ enabled: boolean; levelNam
   return res.json();
 }
 
-export async function apiSumsubInit(commitment: string): Promise<{
+export async function apiSumsubInit(commitment: string, notifyEmail?: string): Promise<{
   applicantId: string;
   accessToken: string;
   levelName: string;
@@ -144,7 +144,7 @@ export async function apiSumsubInit(commitment: string): Promise<{
   const res = await fetch(`${apiBase()}/api/kyc/sumsub/init`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ commitment }),
+    body: JSON.stringify({ commitment, notifyEmail: notifyEmail || undefined }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
