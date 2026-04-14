@@ -1,4 +1,4 @@
-/** Deployed contract addresses per network */
+/** Deployed contract addresses per network (v5 — on-chain expiry + timelock-gated slashing) */
 export const DEPLOYMENTS = {
   "hashkey-testnet": {
     chainId: 133,
@@ -7,15 +7,24 @@ export const DEPLOYMENTS = {
     contracts: {
       semaphore: "0xd09e8Aec6B6A36588E7A105f606A9fe9a134CFE9",
       credentialRegistry: "0x20265dAe4711B3CeF88D7078bf1290f815279De1",
-      hskPassport: "0xb430F30376344303560c0554DC94766D780a5c64",
-      demoIssuer: "0x77bE0CD574a3602923E2a0C3B42F01C11112A170",
-      gatedRWA: "0x5f7274C64C63Ea73144cf539aBF2504eB3208f25",
+      hskPassport: "0x7d2E692A08f2fb0724238396e0436106b4FbD792",
+      demoIssuer: "0xBf7d566B8077A098F6844fb6b827D2A4118C88C3",
+      gatedRWA: "0xb6955cb3e442c4222fFc3b92c322851109d0b9c9",
+      kycGatedAirdrop: "0x71c96016CBCAeE7B2Edc8b40Fec45de1d16Fb4b8",
+      kycGatedLending: "0x37179886986bd35a4d580f157f55f249c43A0BFD",
+      jurisdictionGatedPool: "0x305f5F0b44d541785305DaDb372f118A9284Ce4D",
+      hashKeyDIDBridge: "0xF072D06adcA2B6d5941bde6cc87f41feC5F5Ea7a",
+      hashKeyKYCImporter: "0x5431ae6D2f5c3Ad3373B7B4DD4066000D681f5B8",
+      issuerRegistry: "0x5BbAe6e90b82c7c51EbA9cA6D844D698dE2eb504",
+      timelock: "0xb07Bc78559CbDe44c047b1dC3028d13c4f863D8A",
     },
-    deployBlock: 26410000,
+    deployBlock: 26800000,
     groups: {
-      KYC_VERIFIED: 20,
-      ACCREDITED_INVESTOR: 21,
-      HK_RESIDENT: 22,
+      KYC_VERIFIED: 25,
+      ACCREDITED_INVESTOR: 26,
+      HK_RESIDENT: 27,
+      SG_RESIDENT: 28,
+      AE_RESIDENT: 29,
     },
   },
 } as const;
