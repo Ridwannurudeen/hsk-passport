@@ -90,10 +90,10 @@ export default function Home() {
             style={{ background: "var(--border-muted)", border: "1px solid var(--border-muted)" }}
           >
             {[
-              { value: stats?.activeCredentials ?? "—", label: "Credentials issued", sub: "testnet, live" },
-              { value: "45", label: "Passing tests", sub: "contracts + invariants" },
-              { value: "8", label: "Protocol contracts", sub: "deployed v5" },
-              { value: "0", label: "Bytes PII", sub: "ever on-chain" },
+              { value: "5", label: "Credential types", sub: "KYC · accredited · HK/SG/AE" },
+              { value: "11", label: "Contracts live", sub: "HashKey testnet, v5" },
+              { value: "45", label: "Passing tests", sub: "security invariants + expiry + slashing" },
+              { value: "0", label: "Bytes PII on-chain", sub: "by design" },
             ].map((s) => (
               <div key={s.label} className="p-6 sm:p-7" style={{ background: "var(--bg-canvas)" }}>
                 <div className="display-2 tabular mb-1.5" style={{ color: "var(--text-primary)" }}>{s.value}</div>

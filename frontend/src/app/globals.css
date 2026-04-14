@@ -423,6 +423,71 @@ body {
 }
 
 /* ==========================================================================
+   Legacy Tailwind color → design-token bridge
+   Pages built before the design token system used hardcoded
+   bg-gray-*/border-gray-*/text-purple-* classes. These overrides map them
+   to our theme-aware tokens so every page automatically supports light/dark
+   without rewriting JSX.
+   ========================================================================== */
+
+:root[data-theme="light"] .bg-gray-950 { background-color: var(--bg-canvas) !important; }
+:root[data-theme="light"] .bg-gray-900 { background-color: var(--bg-elevated) !important; }
+:root[data-theme="light"] .bg-gray-800 { background-color: var(--bg-inset) !important; }
+:root[data-theme="light"] .bg-gray-800\/50 { background-color: var(--bg-subtle) !important; }
+:root[data-theme="light"] .bg-gray-900\/50 { background-color: var(--bg-subtle) !important; }
+:root[data-theme="light"] .bg-gray-900\/80 { background-color: var(--bg-subtle) !important; }
+
+:root[data-theme="light"] .border-gray-900 { border-color: var(--border-muted) !important; }
+:root[data-theme="light"] .border-gray-800 { border-color: var(--border-muted) !important; }
+:root[data-theme="light"] .border-gray-700 { border-color: var(--border-default) !important; }
+:root[data-theme="light"] .border-gray-800\/50 { border-color: var(--border-muted) !important; }
+
+:root[data-theme="light"] .text-white { color: var(--text-primary) !important; }
+:root[data-theme="light"] .text-gray-100 { color: var(--text-primary) !important; }
+:root[data-theme="light"] .text-gray-200 { color: var(--text-primary) !important; }
+:root[data-theme="light"] .text-gray-300 { color: var(--text-secondary) !important; }
+:root[data-theme="light"] .text-gray-400 { color: var(--text-secondary) !important; }
+:root[data-theme="light"] .text-gray-500 { color: var(--text-muted) !important; }
+:root[data-theme="light"] .text-gray-600 { color: var(--text-muted) !important; }
+
+/* Unify brand accent: map purple-* onto the new blue accent across all pages */
+.text-purple-300,
+.text-purple-400 { color: var(--accent-primary) !important; }
+.text-purple-400\/90 { color: var(--accent-primary) !important; }
+.hover\:text-purple-200:hover,
+.hover\:text-purple-300:hover { color: var(--accent-primary-hover) !important; }
+
+.bg-purple-500,
+.bg-purple-600,
+.bg-purple-700 { background-color: var(--accent-primary) !important; }
+.hover\:bg-purple-500:hover,
+.hover\:bg-purple-400:hover { background-color: var(--accent-primary-hover) !important; }
+
+.border-purple-700,
+.border-purple-800,
+.border-purple-900 { border-color: color-mix(in srgb, var(--accent-primary) 40%, transparent) !important; }
+.hover\:border-purple-700:hover,
+.hover\:border-purple-600:hover { border-color: var(--accent-primary) !important; }
+
+.bg-purple-900\/30,
+.bg-purple-900\/40,
+.bg-purple-950\/20,
+.bg-purple-950\/30 { background-color: var(--accent-subtle) !important; }
+
+/* Gradient "from-purple-* to-pink-*" cleanups — force single-accent look */
+.from-purple-400,
+.from-purple-500,
+.from-purple-600 { --tw-gradient-from: var(--accent-primary) !important; }
+.to-pink-400,
+.to-pink-500 { --tw-gradient-to: #8fb2ff !important; }
+
+/* Selection color also follows theme accent */
+::selection {
+  background-color: var(--accent-subtle);
+  color: var(--text-primary);
+}
+
+/* ==========================================================================
    Scrollbar — subtle
    ========================================================================== */
 
