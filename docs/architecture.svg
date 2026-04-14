@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520" width="1200" height="520" role="img" aria-label="HSK Passport architecture diagram">
+  <defs>
+    <linearGradient id="accent" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#4f7cff"/>
+      <stop offset="100%" stop-color="#7a9bff"/>
+    </linearGradient>
+    <filter id="soft" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="6" />
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#4f7cff"/>
+    </marker>
+    <style>
+      .bg      { fill: #0c0d10; }
+      .card    { fill: #14171c; stroke: #262a31; stroke-width: 1; }
+      .accent  { fill: url(#accent); }
+      .h       { font: 600 16px 'Inter', system-ui, sans-serif; fill: #f5f7fa; }
+      .sub     { font: 400 12px 'Inter', system-ui, sans-serif; fill: #a7afbc; }
+      .k       { font: 500 10px 'JetBrains Mono', ui-monospace, monospace; fill: #8fb2ff; letter-spacing: 0.1em; text-transform: uppercase; }
+      .tiny    { font: 400 11px 'Inter', system-ui, sans-serif; fill: #6c7380; }
+      .wire    { stroke: #4f7cff; stroke-width: 1.6; fill: none; }
+      .wire-muted { stroke: #333842; stroke-width: 1.2; fill: none; stroke-dasharray: 4 4; }
+      .label-bg { fill: #14171c; stroke: #262a31; }
+      .label    { font: 500 11px 'Inter', system-ui, sans-serif; fill: #f5f7fa; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1200" height="520"/>
+
+  <!-- subtle grid -->
+  <g opacity="0.05" stroke="#ffffff" stroke-width="1">
+    <path d="M 0 80 H 1200 M 0 160 H 1200 M 0 240 H 1200 M 0 320 H 1200 M 0 400 H 1200"/>
+    <path d="M 80 0 V 520 M 160 0 V 520 M 240 0 V 520 M 320 0 V 520 M 400 0 V 520 M 480 0 V 520 M 560 0 V 520 M 640 0 V 520 M 720 0 V 520 M 800 0 V 520 M 880 0 V 520 M 960 0 V 520 M 1040 0 V 520 M 1120 0 V 520"/>
+  </g>
+
+  <!-- Title -->
+  <text x="60" y="50" class="k" fill="#4f7cff">Architecture</text>
+  <text x="60" y="78" class="h" font-size="22">How HSK Passport works in one picture</text>
+
+  <!-- Column headers -->
+  <text x="150"  y="130" class="k" text-anchor="middle">Off-chain</text>
+  <text x="470"  y="130" class="k" text-anchor="middle">Issuer layer</text>
+  <text x="790"  y="130" class="k" text-anchor="middle">HashKey Chain</text>
+  <text x="1080" y="130" class="k" text-anchor="middle">dApp</text>
+
+  <!-- User card -->
+  <rect class="card" x="50" y="160" width="200" height="130" rx="14"/>
+  <circle class="accent" cx="90" cy="200" r="18"/>
+  <text x="120" y="205" class="h">User</text>
+  <text x="68" y="240" class="sub">1. Connects wallet, generates a Semaphore identity from signature. Completes KYC via Sumsub.</text>
+
+  <!-- Sumsub note -->
+  <rect class="card" x="50" y="320" width="200" height="90" rx="14" opacity="0.9"/>
+  <text x="68" y="345" class="k">Sumsub</text>
+  <text x="68" y="370" class="sub">Real KYC provider</text>
+  <text x="68" y="388" class="tiny">Same provider used by HashKey Exchange. Documents never touch HSK Passport servers.</text>
+
+  <!-- Issuer card -->
+  <rect class="card" x="360" y="160" width="220" height="150" rx="14"/>
+  <rect class="accent" x="380" y="180" width="28" height="28" rx="6" opacity="0.9"/>
+  <text x="418" y="200" class="h">Issuer</text>
+  <text x="378" y="240" class="sub">2. Sumsub webhook fires on GREEN. Issuer wallet adds the user's identity commitment to an on-chain credential group.</text>
+  <text x="378" y="290" class="tiny">Issuers are staked in IssuerRegistry; misissuance → 48h timelock slashing.</text>
+
+  <!-- HSK Passport chain card -->
+  <rect class="card" x="690" y="160" width="220" height="220" rx="14"/>
+  <rect class="accent" x="710" y="180" width="28" height="28" rx="6"/>
+  <text x="748" y="200" class="h">HSK Passport</text>
+  <text x="710" y="230" class="k">Semaphore v4</text>
+  <text x="710" y="256" class="sub">Credential groups</text>
+  <text x="710" y="278" class="sub">Groth16 verifier</text>
+  <text x="710" y="300" class="sub">Expiry enforcement</text>
+  <text x="710" y="322" class="sub">Timelock governance</text>
+  <line x1="710" y1="342" x2="890" y2="342" stroke="#262a31"/>
+  <text x="710" y="362" class="tiny">HashKey Chain testnet</text>
+  <text x="710" y="376" class="tiny">chain id 133</text>
+
+  <!-- dApp card -->
+  <rect class="card" x="1000" y="160" width="160" height="220" rx="14"/>
+  <rect class="accent" x="1020" y="180" width="28" height="28" rx="6" opacity="0.9"/>
+  <text x="1058" y="200" class="h">dApp</text>
+  <text x="1020" y="230" class="k">3. Verify</text>
+  <text x="1020" y="256" class="sub">passport.verify</text>
+  <text x="1020" y="272" class="sub">Credential()</text>
+  <text x="1020" y="298" class="tiny">Returns true/false. Learns nothing about the user's identity.</text>
+  <text x="1020" y="344" class="k">Examples</text>
+  <text x="1020" y="362" class="tiny">GatedRWA</text>
+  <text x="1020" y="376" class="tiny">AccreditedPool</text>
+
+  <!-- Arrows -->
+  <!-- User → Issuer (commitment, via Sumsub) -->
+  <path class="wire" d="M 255 225 Q 305 225 355 225" marker-end="url(#arrow)"/>
+  <text x="275" y="218" class="tiny" fill="#8fb2ff">commitment</text>
+
+  <!-- Sumsub → Issuer (webhook) -->
+  <path class="wire" d="M 255 360 Q 305 360 355 290" marker-end="url(#arrow)"/>
+  <text x="265" y="335" class="tiny" fill="#8fb2ff">webhook</text>
+
+  <!-- Issuer → HSK Passport (issueCredential) -->
+  <path class="wire" d="M 585 235 Q 635 235 685 235" marker-end="url(#arrow)"/>
+  <text x="595" y="228" class="tiny" fill="#8fb2ff">issueCredential()</text>
+
+  <!-- User → HSK Passport (ZK proof) -->
+  <path class="wire" d="M 150 295 Q 150 450 790 450 L 790 385" marker-end="url(#arrow)"/>
+  <text x="440" y="470" class="tiny" fill="#8fb2ff">6. ZK proof (in-browser WASM, bound to caller)</text>
+
+  <!-- HSK Passport ↔ dApp -->
+  <path class="wire" d="M 915 245 Q 955 245 995 245"/>
+  <text x="920" y="238" class="tiny" fill="#8fb2ff">yes / no</text>
+
+  <!-- User → dApp (call) -->
+  <path class="wire-muted" d="M 250 175 Q 625 60 1080 175" marker-end="url(#arrow)"/>
+  <text x="540" y="60" class="tiny">5. user.mint(proof)</text>
+
+  <!-- Footer callouts -->
+  <g transform="translate(60,480)">
+    <rect class="label-bg" x="0" y="0" width="180" height="24" rx="6"/>
+    <text x="12" y="16" class="label">0 bytes PII on-chain</text>
+  </g>
+  <g transform="translate(250,480)">
+    <rect class="label-bg" x="0" y="0" width="200" height="24" rx="6"/>
+    <text x="12" y="16" class="label">Caller-bound proofs · per-action nullifiers</text>
+  </g>
+  <g transform="translate(470,480)">
+    <rect class="label-bg" x="0" y="0" width="230" height="24" rx="6"/>
+    <text x="12" y="16" class="label">Revocable · expirable · composable policies</text>
+  </g>
+</svg>
