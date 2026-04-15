@@ -19,6 +19,7 @@ import {
   GROUPS,
   RPC_URL,
   EXPLORER_URL,
+  HSK_PASSPORT_ABI,
   HSK_PASSPORT_DEPLOY_BLOCK,
 } from "@/lib/contracts";
 import { apiGetGroupMembers } from "@/lib/api";
@@ -113,11 +114,20 @@ export default function DemoPage() {
     setLoadingText("Issuing KYC credential on-chain...");
     try {
       const { signer, address } = await connectWallet();
+      const commitment = getCommitment(identity);
 
-      // Check if already claimed
+      // Two-layer pre-check. The DemoIssuer tracks claims per wallet address,
+      // but the underlying HSKPassport tracks membership per commitment. A
+      // commitment can already be in the group (from a prior /kyc flow or a
+      // previous local-storage clear) while hasClaimed(wallet) is still false
+      // — calling selfIssue in that state reverts with CredentialAlreadyIssued.
       const demoIssuer = new Contract(ADDRESSES.demoIssuer, DEMO_ISSUER_ABI, signer);
-      const alreadyClaimed = await demoIssuer.hasClaimed(address);
-      if (alreadyClaimed) {
+      const passport = new Contract(ADDRESSES.hskPassport, HSK_PASSPORT_ABI, signer);
+      const [alreadyClaimed, alreadyInGroup] = await Promise.all([
+        demoIssuer.hasClaimed(address),
+        passport.hasCredential(GROUPS.KYC_VERIFIED, commitment),
+      ]);
+      if (alreadyClaimed || alreadyInGroup) {
         completeStep(1);
         toast("Credential already issued! Moving to proof generation.", "info");
         setLoading(false);
@@ -125,15 +135,18 @@ export default function DemoPage() {
         return;
       }
 
-      const commitment = getCommitment(identity);
       const tx = await demoIssuer.selfIssue(commitment);
       setLoadingText("Waiting for transaction confirmation...");
       await tx.wait();
       completeStep(1);
       toast("KYC credential issued on-chain!", "success");
     } catch (err: unknown) {
-      const msg = (err as Error).message;
-      if (msg.includes("AlreadyClaimed")) {
+      const e = err as { message?: string; data?: string };
+      const msg = e.message || "";
+      const raw = typeof e.data === "string" ? e.data : "";
+      // 0xd3a56817 = CredentialAlreadyIssued() on HSKPassport. Can leak past
+      // the pre-check under wallet/account races.
+      if (msg.includes("AlreadyClaimed") || msg.includes("CredentialAlreadyIssued") || raw.startsWith("0xd3a56817")) {
         completeStep(1);
         toast("Credential already issued!", "info");
       } else if (msg.includes("user rejected")) {
