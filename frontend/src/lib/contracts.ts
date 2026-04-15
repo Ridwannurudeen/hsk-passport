@@ -25,7 +25,7 @@ export const ADDRESSES = {
 };
 
 // Block where v5 HSKPassport was deployed — use as fromBlock for event queries.
-export const HSK_PASSPORT_DEPLOY_BLOCK = 26800000;
+export const HSK_PASSPORT_DEPLOY_BLOCK = 26400000;
 
 export const GROUPS = {
   KYC_VERIFIED: 25,
