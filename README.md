@@ -257,6 +257,16 @@ The suite includes `SecurityInvariants.test.ts`, `CredentialExpiry.test.ts`, and
 
 ---
 
+## Works with HashKey Chain's official KYC stack
+
+HSK Passport is explicitly compatible with [**HashKey Chain's officially-recommended KYC system**](https://docs.hashkeychain.net/docs/Build-on-HashKey-Chain/Tools/KYC) — the `IKycSBT` soulbound-token interface served via https://kyc-testnet.hunyuankyc.com/.
+
+- [`contracts/HashKeyKycSBTAdapter.sol`](contracts/contracts/HashKeyKycSBTAdapter.sol) wraps the official `IKycSBT` interface and maps HashKey's 5 tiers (NONE/BASIC/ADVANCED/PREMIUM/ULTIMATE) onto HSK Passport's credential groups (KYC_VERIFIED, ACCREDITED_INVESTOR, residency).
+- [`contracts/HashKeyKYCImporter.sol`](contracts/contracts/HashKeyKYCImporter.sol) reads from the adapter — users who complete HashKey's native KYC can import their verification into HSK Passport's private credential pool **without re-submitting documents**.
+- Integration path: deploy `HashKeyKycSBTAdapter(officialKycSBTAddress)` → point `HashKeyKYCImporter.kycSbt` at the adapter → users call `importKYC(commitment)` to bridge their HashKey KYC into a zero-knowledge credential.
+
+In the hackathon demo we wire this to a mock SBT (because individual judges haven't completed hunyuankyc KYC) — but the interface match is verbatim from HashKey's published `IKycSBT` spec.
+
 ## Related work
 
 HSK Passport builds on and composes with:
