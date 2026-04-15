@@ -162,8 +162,8 @@ export default function Home() {
           >
             {[
               { value: "5", label: "Credential types", sub: "KYC · accredited · HK/SG/AE" },
-              { value: "11", label: "Contracts live", sub: "HashKey testnet, v5" },
-              { value: "45", label: "Passing tests", sub: "security invariants + expiry + slashing" },
+              { value: "13", label: "Contracts live", sub: "HashKey testnet, v5 + IKycSBT bridge" },
+              { value: "55", label: "Passing tests", sub: "security invariants + expiry + slashing + IKycSBT" },
               { value: "0", label: "Bytes PII on-chain", sub: "by design" },
             ].map((s) => (
               <div key={s.label} className="p-6 sm:p-7" style={{ background: "var(--bg-canvas)" }}>

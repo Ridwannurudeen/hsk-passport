@@ -9,7 +9,7 @@ Verify once with a trusted issuer. Privately prove KYC, accreditation, or jurisd
 [![Live demo](https://img.shields.io/badge/live-hskpassport.gudman.xyz-4f7cff?style=flat-square)](https://hskpassport.gudman.xyz)
 [![Policy Composer](https://img.shields.io/badge/Policy_Composer-try_it-4f7cff?style=flat-square)](https://hskpassport.gudman.xyz/composer)
 [![npm](https://img.shields.io/npm/v/hsk-passport-sdk?style=flat-square&color=4f7cff&label=sdk)](https://www.npmjs.com/package/hsk-passport-sdk)
-[![Tests](https://img.shields.io/badge/tests-45_passing-22c25e?style=flat-square)](#tests)
+[![Tests](https://img.shields.io/badge/tests-55_passing-22c25e?style=flat-square)](#tests)
 [![Audits](https://img.shields.io/badge/audits-3_rounds-22c25e?style=flat-square)](audits/)
 [![License](https://img.shields.io/badge/license-MIT-4f7cff?style=flat-square)](LICENSE)
 
@@ -165,6 +165,8 @@ HashKey Chain testnet (chain id 133), v5:
 | Timelock (48h) | [`0xb07B…3D8A`](https://hashkey-testnet.blockscout.com/address/0xb07Bc78559CbDe44c047b1dC3028d13c4f863D8A) |
 | HashKeyDIDBridge | [`0xF072…Ea7a`](https://hashkey-testnet.blockscout.com/address/0xF072D06adcA2B6d5941bde6cc87f41feC5F5Ea7a) |
 | HashKeyKYCImporter | [`0x5431…f5B8`](https://hashkey-testnet.blockscout.com/address/0x5431ae6D2f5c3Ad3373B7B4DD4066000D681f5B8) |
+| HashKeyKycSBTAdapter *(official IKycSBT bridge)* | [`0xba9c…f794`](https://hashkey-testnet.blockscout.com/address/0xba9c4239A35DA84700ff8c11b35c15e00F6ff794) |
+| MockKycSBT *(IKycSBT reference impl)* | [`0x6185…45cD`](https://hashkey-testnet.blockscout.com/address/0x6185225D7cFF75191F93713b44EA09c31de545cD) |
 | GatedRWA (hSILVER) | [`0xb695…b9c9`](https://hashkey-testnet.blockscout.com/address/0xb6955cb3e442c4222fFc3b92c322851109d0b9c9) |
 | KYCGatedAirdrop (hPILOT) | [`0x71c9…b4b8`](https://hashkey-testnet.blockscout.com/address/0x71c96016CBCAeE7B2Edc8b40Fec45de1d16Fb4b8) |
 | KYCGatedLending | [`0x3717…0BFD`](https://hashkey-testnet.blockscout.com/address/0x37179886986bd35a4d580f157f55f249c43A0BFD) |
@@ -259,13 +261,17 @@ The suite includes `SecurityInvariants.test.ts`, `CredentialExpiry.test.ts`, and
 
 ## Works with HashKey Chain's official KYC stack
 
-HSK Passport is explicitly compatible with [**HashKey Chain's officially-recommended KYC system**](https://docs.hashkeychain.net/docs/Build-on-HashKey-Chain/Tools/KYC) — the `IKycSBT` soulbound-token interface served via https://kyc-testnet.hunyuankyc.com/.
+HSK Passport is live-compatible with [**HashKey Chain's officially-recommended KYC system**](https://docs.hashkeychain.net/docs/Build-on-HashKey-Chain/Tools/KYC) — the `IKycSBT` soulbound-token interface served via https://kyc-testnet.hunyuankyc.com/. The full bridge is deployed on testnet today:
 
-- [`contracts/HashKeyKycSBTAdapter.sol`](contracts/contracts/HashKeyKycSBTAdapter.sol) wraps the official `IKycSBT` interface and maps HashKey's 5 tiers (NONE/BASIC/ADVANCED/PREMIUM/ULTIMATE) onto HSK Passport's credential groups (KYC_VERIFIED, ACCREDITED_INVESTOR, residency).
-- [`contracts/HashKeyKYCImporter.sol`](contracts/contracts/HashKeyKYCImporter.sol) reads from the adapter — users who complete HashKey's native KYC can import their verification into HSK Passport's private credential pool **without re-submitting documents**.
-- Integration path: deploy `HashKeyKycSBTAdapter(officialKycSBTAddress)` → point `HashKeyKYCImporter.kycSbt` at the adapter → users call `importKYC(commitment)` to bridge their HashKey KYC into a zero-knowledge credential.
+| Contract | Address | Role |
+|---|---|---|
+| MockKycSBT *(interface reference)* | [`0x6185…45cD`](https://hashkey-testnet.blockscout.com/address/0x6185225D7cFF75191F93713b44EA09c31de545cD) | Implements HashKey's `IKycSBT` interface verbatim — same enums, same function signatures from the official docs |
+| HashKeyKycSBTAdapter | [`0xba9c…f794`](https://hashkey-testnet.blockscout.com/address/0xba9c4239A35DA84700ff8c11b35c15e00F6ff794) | Reads `IKycSBT.getKycInfo()` and maps HashKey's 5 tiers (NONE/BASIC/ADVANCED/PREMIUM/ULTIMATE) onto HSK Passport's credential groups |
+| HashKeyKYCImporter | [`0x5431…f5B8`](https://hashkey-testnet.blockscout.com/address/0x5431ae6D2f5c3Ad3373B7B4DD4066000D681f5B8) | Reads from the adapter → issues HSK Passport credentials without re-collecting documents |
 
-In the hackathon demo we wire this to a mock SBT (because individual judges haven't completed hunyuankyc KYC) — but the interface match is verbatim from HashKey's published `IKycSBT` spec.
+**Integration path**: deploy `HashKeyKycSBTAdapter(officialKycSBTAddress)` → point `HashKeyKYCImporter.setKYCSbt(adapter)` → users with an existing HashKey KYC SBT call `importKYC(commitment)` to bridge their verification into a private zero-knowledge credential.
+
+The hackathon deployment uses `MockKycSBT` because we cannot complete KYC at hunyuankyc on behalf of judges. When HashKey publishes the production `IKycSBT` address, a single transaction — `adapter = new HashKeyKycSBTAdapter(prodAddr); importer.setKYCSbt(adapter)` — flips the entire pipeline onto real HashKey-verified users. Interface is byte-for-byte compatible (verified by `contracts/test/KycSBTAdapter.test.ts` — 10 passing tests including the full end-to-end flow).
 
 ## Related work
 
