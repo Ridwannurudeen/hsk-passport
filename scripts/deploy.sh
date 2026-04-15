@@ -64,7 +64,8 @@ if [[ "$skip_backend" -eq 0 ]]; then
   ssh "$HOST" bash -s <<EOF
 set -euo pipefail
 cd "$REMOTE_DIR/backend"
-npm ci --silent --omit=dev 2>&1 | tail -3 || npm install --silent --omit=dev 2>&1 | tail -3
+# Need devDeps (typescript) to compile. Runtime only reads dist/.
+npm ci --silent 2>&1 | tail -3 || npm install --silent 2>&1 | tail -3
 npx tsc
 systemctl restart $BACKEND_SERVICE
 sleep 2
