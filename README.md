@@ -29,6 +29,7 @@ Verify once with a trusted issuer. Privately prove KYC, accreditation, or jurisd
 - [Quick start](#quick-start)
 - [Architecture](#architecture)
 - [The Policy Composer](#the-policy-composer)
+- [Works with HashKey Chain's official KYC stack](#works-with-hashkey-chains-official-kyc-stack)
 - [How it compares](#how-it-compares)
 - [Deployed contracts](#deployed-contracts)
 - [Install & run locally](#install--run-locally)
@@ -135,6 +136,14 @@ Try it live: https://hskpassport.gudman.xyz/composer
 
 ---
 
+## Works with HashKey Chain's official KYC stack
+
+HSK Passport is live-compatible with [HashKey Chain's officially-recommended KYC system](https://docs.hashkeychain.net/docs/Build-on-HashKey-Chain/Tools/KYC) — the `IKycSBT` soulbound-token interface served via https://kyc-testnet.hunyuankyc.com/.
+
+The `HashKeyKycSBTAdapter` *(deployed on testnet — see [Deployed contracts](#deployed-contracts))* reads HashKey's `IKycSBT` byte-for-byte and maps the 5 KYC tiers (NONE / BASIC / ADVANCED / PREMIUM / ULTIMATE) onto HSK Passport's credential groups. When hunyuankyc publishes the production address, a single `importer.setKYCSbt(adapter)` call flips the entire pipeline onto real HashKey-verified users — no code change. Interface compliance is proven end-to-end by `contracts/test/KycSBTAdapter.test.ts` (10 passing tests).
+
+---
+
 ## How it compares
 
 | | HSK Passport | Most competitors |
@@ -180,7 +189,7 @@ HashKey Chain testnet (chain id 133), v5:
 
 Requires Node 20+.
 
-**Contracts** (Hardhat, 45 passing tests):
+**Contracts** (Hardhat, 55 passing tests):
 
 ```bash
 cd contracts
@@ -252,26 +261,14 @@ A formal third-party audit (Trail of Bits / OpenZeppelin / Spearbit) is planned 
 
 ```
 $ npm test
-  45 passing
+  55 passing
 ```
 
-The suite includes `SecurityInvariants.test.ts`, `CredentialExpiry.test.ts`, and `IssuerSlashing.test.ts` — each targeted at the specific invariants that closed the audit findings above.
+The suite includes `SecurityInvariants.test.ts`, `CredentialExpiry.test.ts`, `IssuerSlashing.test.ts`, and `KycSBTAdapter.test.ts` — each targeted at the specific invariants that closed the audit findings or proved an officially-recommended-product integration.
 
 ---
 
-## Works with HashKey Chain's official KYC stack
-
-HSK Passport is live-compatible with [**HashKey Chain's officially-recommended KYC system**](https://docs.hashkeychain.net/docs/Build-on-HashKey-Chain/Tools/KYC) — the `IKycSBT` soulbound-token interface served via https://kyc-testnet.hunyuankyc.com/. The full bridge is deployed on testnet today:
-
-| Contract | Address | Role |
-|---|---|---|
-| MockKycSBT *(interface reference)* | [`0x6185…45cD`](https://hashkey-testnet.blockscout.com/address/0x6185225D7cFF75191F93713b44EA09c31de545cD) | Implements HashKey's `IKycSBT` interface verbatim — same enums, same function signatures from the official docs |
-| HashKeyKycSBTAdapter | [`0xba9c…f794`](https://hashkey-testnet.blockscout.com/address/0xba9c4239A35DA84700ff8c11b35c15e00F6ff794) | Reads `IKycSBT.getKycInfo()` and maps HashKey's 5 tiers (NONE/BASIC/ADVANCED/PREMIUM/ULTIMATE) onto HSK Passport's credential groups |
-| HashKeyKYCImporter | [`0x5431…f5B8`](https://hashkey-testnet.blockscout.com/address/0x5431ae6D2f5c3Ad3373B7B4DD4066000D681f5B8) | Reads from the adapter → issues HSK Passport credentials without re-collecting documents |
-
-**Integration path**: deploy `HashKeyKycSBTAdapter(officialKycSBTAddress)` → point `HashKeyKYCImporter.setKYCSbt(adapter)` → users with an existing HashKey KYC SBT call `importKYC(commitment)` to bridge their verification into a private zero-knowledge credential.
-
-The hackathon deployment uses `MockKycSBT` because we cannot complete KYC at hunyuankyc on behalf of judges. When HashKey publishes the production `IKycSBT` address, a single transaction — `adapter = new HashKeyKycSBTAdapter(prodAddr); importer.setKYCSbt(adapter)` — flips the entire pipeline onto real HashKey-verified users. Interface is byte-for-byte compatible (verified by `contracts/test/KycSBTAdapter.test.ts` — 10 passing tests including the full end-to-end flow).
+---
 
 ## Related work
 
@@ -289,12 +286,12 @@ Identity projects in adjacent spaces: [Polygon ID / Privado ID](https://www.priv
 ## Repo layout
 
 ```
-contracts/     Solidity + Hardhat tests (45 passing) + deploy scripts
-backend/       Fastify + SQLite indexer, Sumsub client, auto-issuer
+contracts/     Solidity + Hardhat tests (55 passing) + deploy scripts
+backend/       Fastify + SQLite indexer, Sumsub client, auto-issuer, notify
 frontend/      Next.js 16 app: /kyc, /composer, /demo, /user, /issuer, …
 sdk/           TypeScript SDK (published as `hsk-passport-sdk` on npm)
 audits/        Three audit rounds with findings and closure evidence
-docs/          Architecture diagram, screenshots, demo script
+docs/          Architecture diagram, screenshots, demo script, branding
 schemas/       W3C VC credential schemas (KYC / accredited / HK resident)
 ```
 
