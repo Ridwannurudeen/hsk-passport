@@ -224,6 +224,19 @@ export default function UserPage() {
                   </button>
                 </div>
               </div>
+              <div className="flex items-center justify-between gap-3 mt-2 px-3 py-2 rounded-lg bg-gray-800/60 border border-gray-800">
+                <span className="text-xs text-gray-400">
+                  Need testnet HSK for gas?
+                </span>
+                <a
+                  href="https://faucet.hsk.xyz"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs font-medium text-purple-300 hover:text-purple-200"
+                >
+                  Open testnet faucet ↗
+                </a>
+              </div>
             </div>
           </div>
           )}
