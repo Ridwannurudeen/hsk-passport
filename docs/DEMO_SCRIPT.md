@@ -31,7 +31,7 @@
 **Voiceover:**
 > "Every regulated dApp on HashKey Chain — silver-backed RWAs, tokenized funds, accredited DeFi — needs KYC. Today, every team rebuilds it from scratch and leaks identity on-chain. HSK Passport is the default compliance layer that fixes both."
 
-**Visual:** Slow scroll showing the hero, the metric row (45 tests, 0 PII), and the standards strip. Emphasize "real Sumsub wired" badge.
+**Visual:** Slow scroll showing the hero, the metric row (55 tests, 0 PII), and the standards strip. Emphasize "real Sumsub wired" badge.
 
 ---
 
@@ -184,7 +184,7 @@ Built for the HashKey Chain Horizon Hackathon 2026 — ZKID Track.
 
 Stack: Semaphore v4 ZK · Sumsub real KYC · OpenZeppelin Timelock governance · Next.js + Tailwind frontend · Fastify + SQLite indexer.
 
-Tech depth: 15 contracts, 45 passing tests, 3 rounds of audit fixes documented at /roadmap.
+Tech depth: 17 contracts, 55 passing tests, 3 rounds of audit fixes documented at /roadmap.
 
 Thanks to @HSKChain @HashKeyHSK @HashKeyCapital for the hackathon and the platform.
 ```

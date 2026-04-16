@@ -1,14 +1,14 @@
 # Audit History
 
-HSK Passport has been through **three rounds of security review** during development. All HIGH and MEDIUM findings have been closed before submission. Low/informational items are tracked in [/roadmap](https://hskpassport.gudman.xyz/roadmap).
+HSK Passport has been through **three rounds of security review** during development. All CRITICAL, HIGH, and MEDIUM findings have been closed before submission. Low/informational items are tracked in [/roadmap](https://hskpassport.gudman.xyz/roadmap).
 
-| Round | Scope | HIGH findings | MEDIUM findings | Status |
-|-------|-------|:---:|:---:|:---:|
-| [Round 1](round-1.md) | Contracts, initial design | 4 | 5 | ✅ Closed |
-| [Round 2](round-2.md) | Audit-fix deployment (v4) + bridge expansion | 3 | 4 | ✅ Closed |
-| [Round 3](round-3.md) | Backend + frontend after v5 redeploy | 4 | 5 | ✅ Closed |
+| Round | Scope | CRITICAL | HIGH | MEDIUM | Status |
+|-------|-------|:---:|:---:|:---:|:---:|
+| [Round 1](round-1.md) | Contracts, initial design | — | 4 | 5 | ✅ Closed |
+| [Round 2](round-2.md) | Audit-fix deployment (v4) + bridge expansion | — | 3 | 5 | ✅ Closed |
+| [Round 3](round-3.md) | Backend + frontend after v5 redeploy | 2 | 2 | 5 | ✅ Closed |
 
-**Total**: 25 findings reviewed, 25 closed before submission. Evidence lives in this folder.
+**Total**: 26 findings reviewed, 26 closed before submission. Evidence lives in this folder.
 
 ## Threat model
 

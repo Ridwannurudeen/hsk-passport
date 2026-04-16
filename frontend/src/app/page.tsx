@@ -35,7 +35,7 @@ export default function Home() {
             <div className="anim-fade-up">
               <div className="badge mb-7">
                 <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "var(--success)" }} />
-                <span>v5 live · 45 tests · real Sumsub wired</span>
+                <span>v5 live · 55 tests · real Sumsub wired</span>
               </div>
               <h1 className="display-1 mb-6">
                 The default compliance layer for

@@ -153,7 +153,7 @@ The `HashKeyKycSBTAdapter` *(deployed on testnet — see [Deployed contracts](#d
 | HashKey DID bridge + HashKey Exchange KYC importer | ✅ | ❌ |
 | On-chain credential expiry (`verifyCredentialWithExpiry`) | ✅ | ❌ |
 | Issuer slashing via 48h Timelock | ✅ | ❌ |
-| Raw-body HMAC webhook verification | ✅ | ❌ |
+| Raw-body HMAC webhook verification *(hardened in [audit Round 3 C1](audits/round-3.md))* | ✅ | ❌ |
 | Redacted KYC queue + signed-read auth with nonce replay protection | ✅ | ❌ |
 | Dark/light theme + design-token system | ✅ | ❌ |
 | Three audit rounds documented publicly in [`audits/`](audits/) | ✅ | ❌ |
@@ -247,7 +247,7 @@ Vulnerability disclosure: [SECURITY.md](SECURITY.md). Threat model: [`/roadmap`]
 
 ## Audits
 
-Three internal audit rounds, 25 findings total, all HIGH / MEDIUM closed before submission. Detailed evidence in [`audits/`](audits/):
+Three internal audit rounds, 26 findings total (including 2 CRITICAL caught in Round 3), all CRITICAL / HIGH / MEDIUM closed before submission. Detailed evidence in [`audits/`](audits/):
 
 - [Round 1 — Contracts & initial design](audits/round-1.md)
 - [Round 2 — Privacy-safe backend, Composer, per-wallet identities](audits/round-2.md)

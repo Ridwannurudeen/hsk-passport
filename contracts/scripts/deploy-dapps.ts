@@ -11,6 +11,22 @@ const V5 = {
 async function main() {
   const passport = await ethers.getContractAt("HSKPassport", V5.hskPassport);
 
+  // Precondition: the v5 groups (25..29) must already exist on this deployment.
+  // They are created by `deploy.ts` + the four createCredentialGroup calls that
+  // happened across v1..v5 of the passport. A fresh local deploy will have
+  // groups 0..4 instead, so fail fast with a clear message rather than binding
+  // dApps to nonexistent group IDs.
+  for (const [name, id] of Object.entries(V5.groups)) {
+    const g = await passport.credentialGroups(id);
+    if (g.issuer === ethers.ZeroAddress) {
+      throw new Error(
+        `Group ${id} (${name}) does not exist on HSKPassport ${V5.hskPassport}. ` +
+        `This script assumes the v5 group numbering (25..29) from the live testnet deployment. ` +
+        `For a fresh deployment, either redeploy over the v5 contract or edit V5.groups to match your genesis group IDs.`
+      );
+    }
+  }
+
   console.log("[JurisdictionGatedPool]");
   const Pool = await ethers.getContractFactory("JurisdictionGatedPool", {
     libraries: { JurisdictionSetVerifier: V5.jurisdictionSetVerifier },

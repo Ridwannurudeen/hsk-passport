@@ -1,9 +1,10 @@
 # HSK Passport Protocol Specification
 
-**Version**: 1.0.0
-**Status**: Draft
-**Chain**: HashKey Chain (OP Stack L2, Chain ID 177/133)
-**ZK Backend**: Semaphore v4 (Groth16 proofs, bn128 curve)
+**Spec version**: 1.1.0
+**Deployed protocol version**: v5 (testnet)
+**Status**: Testnet — mainnet launch Q2 2026
+**Chain**: HashKey Chain (OP Stack L2 — testnet chain ID 133, mainnet chain ID 177)
+**ZK Backend**: Semaphore v4 (Groth16 proofs, bn128 curve, Poseidon hash, LeanIMT)
 
 ---
 
@@ -194,19 +195,22 @@ Proofs are bound to a `message` parameter. dApps should include the caller's add
 
 ---
 
-## 7. Contract Addresses (HashKey Chain Testnet)
+## 7. Contract Addresses (HashKey Chain Testnet, v5)
 
 | Contract | Address |
 |----------|---------|
-| SemaphoreVerifier | `0xe874E5DE61fa40dAf82e8916489d1B7071aC3b9A` |
-| PoseidonT3 | `0x3B574ED5c34F8CE27E1D6960b69dec3003071301` |
-| Semaphore | `0xd09e8Aec6B6A36588E7A105f606A9fe9a134CFE9` |
+| HSKPassport | `0x7d2E692A08f2fb0724238396e0436106b4FbD792` |
+| Semaphore v4 | `0xd09e8Aec6B6A36588E7A105f606A9fe9a134CFE9` |
 | CredentialRegistry | `0x20265dAe4711B3CeF88D7078bf1290f815279De1` |
-| HSKPassport | `0xb430F30376344303560c0554DC94766D780a5c64` |
-| DemoIssuer | `0x77bE0CD574a3602923E2a0C3B42F01C11112A170` |
-| GatedRWA (hSILVER) | `0x5f7274C64C63Ea73144cf539aBF2504eB3208f25` |
-| KYCGatedAirdrop | `0xdf399c83cc316b518836df37F7aB54e2b2ada9f9` |
-| KYCGatedLending | `0x5B3107e67B6439A22dDC21e547f75855A3e70deD` |
-| HashKeyDIDBridge | `0x0cB4c519F984A2f43c1ca217CDB5095dB3b3A2a5` |
-| HashKeyKYCImporter | `0x7A40694Eda3046706Fe89db771e88Cf3A979A117` |
-| JurisdictionGatedPool | `0xA7C937D3D269267590bF9d411B066C57AC8462ec` |
+| IssuerRegistry | `0x5BbAe6e90b82c7c51EbA9cA6D844D698dE2eb504` |
+| Timelock (48h) | `0xb07Bc78559CbDe44c047b1dC3028d13c4f863D8A` |
+| HashKeyDIDBridge | `0xF072D06adcA2B6d5941bde6cc87f41feC5F5Ea7a` |
+| HashKeyKYCImporter | `0x5431ae6D2f5c3Ad3373B7B4DD4066000D681f5B8` |
+| HashKeyKycSBTAdapter | `0xba9c4239A35DA84700ff8c11b35c15e00F6ff794` |
+| MockKycSBT | `0x6185225D7cFF75191F93713b44EA09c31de545cD` |
+| GatedRWA (hSILVER) | `0xb6955cb3e442c4222fFc3b92c322851109d0b9c9` |
+| KYCGatedAirdrop (hPILOT) | `0x71c96016CBCAeE7B2Edc8b40Fec45de1d16Fb4b8` |
+| KYCGatedLending | `0x37179886986bd35a4d580f157f55f249c43A0BFD` |
+| JurisdictionGatedPool | `0x305f5F0b44d541785305DaDb372f118A9284Ce4D` |
+
+**Credential groups** *(default validity)*: `KYC_VERIFIED 25 (180 d)` · `ACCREDITED_INVESTOR 26 (365 d)` · `HK_RESIDENT 27` · `SG_RESIDENT 28` · `AE_RESIDENT 29` *(residency never expires)*.

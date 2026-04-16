@@ -4,9 +4,9 @@
 
 | Version | Status |
 |---------|--------|
-| v3.x (current testnet) | Active |
-| v2.x | Deprecated — use v3 |
-| v1.x | Deprecated — use v3 |
+| v5 (current testnet) | Active |
+| v4 | Deprecated — use v5 |
+| v1.x – v3.x | Deprecated — use v5 |
 
 ## Reporting a Vulnerability
 
@@ -58,6 +58,7 @@ These are documented trade-offs, not vulnerabilities:
 
 ## Audit Status
 
-- **No formal audit** has been performed at this time. This is testnet-only code.
-- 26 Hardhat tests cover the critical surface: issuance, revocation, delegate isolation, proof verification, nullifier reuse, caller binding.
-- Before mainnet deployment, a third-party audit is planned (see ROADMAP.md Q2 2026).
+- **No formal third-party audit** has been performed at this time. This is testnet-only code.
+- Three internal audit rounds completed (26 findings total, including 2 CRITICAL caught in Round 3 — all CRITICAL / HIGH / MEDIUM closed). Evidence in [`audits/`](audits/).
+- 55 Hardhat tests cover the critical surface: issuance, revocation, delegate isolation, proof verification, nullifier reuse, caller binding, credential expiry, issuer slashing, and `IKycSBT` interface compliance.
+- Before mainnet deployment, a formal third-party audit is planned (see ROADMAP.md Q2 2026).

@@ -34,19 +34,19 @@ const identity = passport.createIdentity(sig);
 
 // 3. Check what credentials the user holds
 const creds = await passport.getCredentials(identity);
-// [{ groupId: 15, groupName: "KYC_VERIFIED", hasCredential: true, ... }]
+// [{ groupId: 25, groupName: "KYC_VERIFIED", hasCredential: true, ... }]
 
 // 4. Generate a ZK proof for a credential
 const callerAddress = await signer.getAddress();
 const proof = await passport.generateProof(
   identity,
-  15,                      // KYC_VERIFIED group
+  25,                      // KYC_VERIFIED group
   "mint-my-token",         // action scope (for sybil resistance)
   BigInt(callerAddress)    // message bound to caller (prevents front-running)
 );
 
 // 5. Verify on-chain (read-only)
-const valid = await passport.verifyProof(15, proof);
+const valid = await passport.verifyProof(25, proof);
 ```
 
 ## React Component
@@ -55,7 +55,7 @@ const valid = await passport.verifyProof(15, proof);
 import { HSKPassportGate } from "hsk-passport-sdk/react";
 
 <HSKPassportGate
-  groupId={15}                   // KYC_VERIFIED
+  groupId={25}                   // KYC_VERIFIED
   scope="mint-silver-token"
   identitySecret={walletSignature}
   signer={signer}
@@ -87,9 +87,9 @@ interface IHSKPassport {
 
 contract MyRWAToken {
     IHSKPassport public constant passport =
-        IHSKPassport(0xb430F30376344303560c0554DC94766D780a5c64);
+        IHSKPassport(0x7d2E692A08f2fb0724238396e0436106b4FbD792);
 
-    uint256 public constant KYC_GROUP = 15;
+    uint256 public constant KYC_GROUP = 25;
     mapping(uint256 => bool) public usedNullifiers;
 
     function kycMint(ISemaphore.SemaphoreProof calldata proof) external {
@@ -136,8 +136,8 @@ Get the credential status of an identity across all configured groups.
 Returns `CredentialStatus[]`:
 ```typescript
 [
-  { groupId: 15, groupName: "KYC_VERIFIED", hasCredential: boolean, schemaHash: string },
-  { groupId: 16, groupName: "ACCREDITED_INVESTOR", hasCredential: boolean, schemaHash: string },
+  { groupId: 25, groupName: "KYC_VERIFIED", hasCredential: boolean, schemaHash: string },
+  { groupId: 26, groupName: "ACCREDITED_INVESTOR", hasCredential: boolean, schemaHash: string },
   ...
 ]
 ```
@@ -201,12 +201,16 @@ const passport = HSKPassport.connect("hashkey-testnet");
 
 | Contract | Address |
 |----------|---------|
-| HSKPassport | `0xb430F30376344303560c0554DC94766D780a5c64` |
+| HSKPassport | `0x7d2E692A08f2fb0724238396e0436106b4FbD792` |
+| Semaphore v4 | `0xd09e8Aec6B6A36588E7A105f606A9fe9a134CFE9` |
 | CredentialRegistry | `0x20265dAe4711B3CeF88D7078bf1290f815279De1` |
-| CredentialExpiry | `0x11fF27Bf3F0Bbf45a5dC43210359c56E45E97770` |
-| CredentialReputation | `0x39cc2a483Cc22Cf7B461759404642Fa528df96D7` |
-| HashKeyDIDBridge | `0x37e855626a5cF51e808F96efe4455Dc225724472` |
-| IssuerRegistry | `0x79682C30670f374BD13F40C78c828a32F47582b3` |
+| IssuerRegistry | `0x5BbAe6e90b82c7c51EbA9cA6D844D698dE2eb504` |
+| Timelock (48h) | `0xb07Bc78559CbDe44c047b1dC3028d13c4f863D8A` |
+| HashKeyDIDBridge | `0xF072D06adcA2B6d5941bde6cc87f41feC5F5Ea7a` |
+| HashKeyKYCImporter | `0x5431ae6D2f5c3Ad3373B7B4DD4066000D681f5B8` |
+| HashKeyKycSBTAdapter | `0xba9c4239A35DA84700ff8c11b35c15e00F6ff794` |
+
+**Credential groups** *(default validity)*: `KYC_VERIFIED 25 (180 d)` · `ACCREDITED_INVESTOR 26 (365 d)` · `HK_RESIDENT 27` · `SG_RESIDENT 28` · `AE_RESIDENT 29` *(residency never expires)*.
 
 ### HashKey Chain Mainnet
 

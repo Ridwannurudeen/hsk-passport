@@ -40,6 +40,6 @@
 
 ## Verification
 
-All 25 findings across the three rounds are covered by:
+All 26 findings across the three rounds are covered by:
 - **Test suite**: 45 passing tests including the `SecurityInvariants.test.ts`, `CredentialExpiry.test.ts`, `IssuerSlashing.test.ts` files specifically added to lock in the fixes.
 - **Runtime sanity**: production endpoints on `https://hskpassport.gudman.xyz/api/*` confirmed to redact PII, reject replayed nonces, and enforce CORS.
