@@ -125,6 +125,10 @@ Caller-bound proofs prevent front-running. Per-action nullifiers prevent sybil a
 
 > Try it live: [**/demo/fresh**](https://hskpassport.gudman.xyz/demo/fresh) · real browser-side Groth16 proof → real on-chain verification on HashKey testnet in ~5 seconds.
 
+<a href="https://hskpassport.gudman.xyz/demo/fresh">
+  <img src="docs/screenshots/demo-fresh-v6.png" alt="Credential Freshness live ZK demo" width="100%"/>
+</a>
+
 Earlier releases enforced credential expiry at the *group* level: the contract required that the group's oldest possible member had not lapsed. That was an approximation — a dApp could not actually know whether the specific anonymous prover's credential was still fresh. v6 closes that gap with a **real per-prover ZK range proof**.
 
 A new circuit — [`circuits/src/credential_freshness.circom`](circuits/src/credential_freshness.circom) — proves four things at once:
