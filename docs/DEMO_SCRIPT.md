@@ -1,9 +1,9 @@
 # HSK Passport — Demo Video Script
 
-**Target length:** 2:30 — 3:00 minutes
+**Target length:** 2:45 — 3:00 minutes
 **Resolution:** 1080p, 30fps
 **Format:** Screen recording with voiceover (no face cam needed)
-**Anchor:** Composer is the flagship — show it twice
+**Anchors:** Composer (the adoption moat) + v6 per-prover ZK freshness (the technical moat)
 
 ---
 
@@ -12,11 +12,12 @@
 - [ ] Open a fresh **Chrome incognito window**
 - [ ] Install MetaMask in the incognito window only (no other extensions)
 - [ ] Create a brand-new MetaMask account labeled "demo"
-- [ ] Fund with HashKey testnet HSK from https://faucet.hsk.xyz (a few HSK is plenty)
+- [ ] Fund with HashKey testnet HSK from <https://faucet.hsk.xyz>
 - [ ] Switch MetaMask to **HashKey Chain testnet**
 - [ ] In DevTools console: `localStorage.clear()` then close DevTools
-- [ ] Open https://hskpassport.gudman.xyz in the tab
-- [ ] Have a second tab ready: `ssh root@75.119.153.252 "journalctl -u hsk-passport-api -f"` showing live backend logs
+- [ ] Open <https://hskpassport.gudman.xyz> in the tab
+- [ ] Have a second terminal tab ready: `ssh root@75.119.153.252 "journalctl -u hsk-passport-api -f"` showing live backend logs
+- [ ] Have a third Blockscout tab ready: <https://hashkey-testnet.blockscout.com/address/0xFF790dE1537a84220cD12ef648650034D4725fBb> (HSKPassportFreshness contract) — for showing the v6 on-chain verify event
 - [ ] Open OBS or screen recorder, set capture region to just the browser window (hide MetaMask popups in corner)
 - [ ] Test audio levels — speak naturally, headset mic recommended
 
@@ -26,34 +27,34 @@
 
 ### 00:00 — 00:15 — Hook (15 sec)
 
-**On screen:** Homepage hero (https://hskpassport.gudman.xyz/)
+**On screen:** Homepage hero (<https://hskpassport.gudman.xyz/>)
 
 **Voiceover:**
-> "Every regulated dApp on HashKey Chain — silver-backed RWAs, tokenized funds, accredited DeFi — needs KYC. Today, every team rebuilds it from scratch and leaks identity on-chain. HSK Passport is the default compliance layer that fixes both."
+> "Every regulated dApp on HashKey Chain — silver-backed RWAs, tokenized funds, accredited DeFi — needs KYC. Today every team rebuilds it from scratch and leaks identity on-chain. HSK Passport is the compliance layer that fixes both."
 
-**Visual:** Slow scroll showing the hero, the metric row (55 tests, 0 PII), and the standards strip. Emphasize "real Sumsub wired" badge.
+**Visual:** Slow scroll showing the hero badge (*v6 live · 74 tests · real Sumsub + ZK freshness*), the metric row (5 / 16 / 74 / 0), and the standards strip. Emphasize the badge text.
 
 ---
 
-### 00:15 — 00:50 — The Composer is the headline (35 sec)
+### 00:15 — 00:45 — The Composer is the adoption moat (30 sec)
 
 **On screen:** Navigate to `/composer`
 
 **Voiceover:**
-> "Here's what makes HSK Passport adoptable. Any dApp builder picks compliance rules — KYC verified, accredited investor, jurisdictions — and we generate the Solidity contract, React component, and Hardhat test."
+> "Here's what makes HSK Passport adoptable. Any dApp builder picks compliance rules — KYC, accredited investor, jurisdictions — and we generate the Solidity contract, React gate component, and Hardhat test."
 
 **Visual:**
 1. Click the **"APAC Regional RWA"** preset card → all the checkboxes flip on, dApp name updates
-2. Watch the right-hand code panels regenerate live with the new policy
-3. Scroll down to show the generated Solidity contract — point at the `gatedAction` function with caller-bound proof + KYC check + jurisdiction set proof
-4. Click the "Copy" button on the Solidity block
+2. Right-hand code panels regenerate live with the new policy
+3. Scroll to the generated Solidity contract — point at the `gatedAction` function with caller-bound proof + KYC check + jurisdiction set proof
+4. Click "Copy" on the Solidity block
 
 **Voiceover continues:**
-> "Tick a preset. Copy the code. You just integrated KYC + accredited + jurisdiction gating into your dApp in 30 seconds. That's the inevitability — compliance you can copy-paste."
+> "Tick a preset. Copy the code. You just integrated KYC plus jurisdiction gating into your dApp in thirty seconds. That's the inevitability — compliance you can copy-paste."
 
 ---
 
-### 00:50 — 01:20 — Real Sumsub KYC (30 sec)
+### 00:45 — 01:15 — Real Sumsub, real webhook (30 sec)
 
 **On screen:** Navigate to `/kyc`
 
@@ -61,38 +62,42 @@
 > "Now from the user side. We use Sumsub — the same regulated KYC provider HashKey Exchange uses. Most other ZKID submissions simulate KYC. We actually wire it."
 
 **Visual:**
-1. Click "Get verified" — wallet signature popup, sign
+1. Click "Connect & Create Identity" — wallet signature popup, sign
 2. Sumsub widget loads (the SANDBOX MODE badge is visible — be honest)
-3. Use Sumsub sandbox test applicant: any fake passport, sandbox auto-approves in seconds
-4. Switch to backend logs tab → `[sumsub] webhook applicantReviewed GREEN externalUserId=...`
-5. Then `[auto-issuer] issuing credential for commitment ...`
-6. Switch to Blockscout tab showing the on-chain `CredentialIssued` event
+3. Use Sumsub sandbox test applicant — any fake passport, sandbox auto-approves in seconds
+4. Cut to the terminal tab → `[sumsub] webhook applicantReviewed GREEN externalUserId=...`
+5. Then → `[auto-issuer] issuing credential for commitment ...`
+6. Cut to Blockscout tab showing the on-chain `CredentialIssued` event
 
 **Voiceover continues:**
-> "Sumsub fires the webhook. HSK Passport verifies the HMAC over the raw bytes — that's a real audit fix, not security theater. The auto-issuer mints the credential on-chain. Zero documents touch our servers."
+> "Sumsub fires the webhook. HSK Passport verifies the HMAC over the raw bytes — that's a real audit-round-three fix, not security theater. The auto-issuer mints the credential on-chain. Zero documents touch our servers."
 
 ---
 
-### 01:20 — 01:50 — Anonymous proof + mint (30 sec)
+### 01:15 — 02:00 — v6 per-prover ZK freshness — the technical moat (45 sec)
 
-**On screen:** Navigate to `/demo`
+**On screen:** Navigate to `/demo/fresh` (click "Fresh ZK · v6" in the nav)
 
 **Voiceover:**
-> "The credential exists on-chain. Now the user proves they hold it without revealing which member of the group they are."
+> "Here's where we stop following the zkID playbook and build something no other submission has. Every ZK identity protocol I've seen either ignores credential expiry or enforces it at the group level — which tells a dApp nothing about the individual prover. We wrote a custom Circom circuit that proves the specific prover's credential is within the freshness window, without revealing when they were issued."
 
 **Visual:**
-1. Click "Generate proof" — show the proof generation status (~15 seconds, in-browser WASM)
-2. Show the ProofCard — point at the anonymity-set warning if shown
-3. Click "Mint hSILVER" — MetaMask popup, confirm
-4. Show the success state with on-chain tx hash
-5. Click the explorer link → Blockscout tab opens showing the gated mint succeeded
+1. Show the page — point at the *Live · seeded credential, on-chain verify* mode toggle
+2. Point at the scenario card: "issuanceTime (on-chain): 2026-03-18 · 30 days ago", tree root, group 25
+3. Click **Generate proof**
+4. The new 5-step progress UI kicks in — *Deriving identity commitment → Building Merkle inclusion proof → Encoding Poseidon hashes → Generating Groth16 proof over 4,665 wires → Serializing*
+5. Around 4.5 seconds in, it completes with the green "Proof generated in X ms" box showing nullifier + merkleRoot
+6. Click **Verify proof**
+7. Green banner: *"Proof accepted on-chain. HSKPassportFreshness.previewVerifyFresh() returned true. Proof is valid, nullifier unused, merkleRoot in registry history."*
+8. Click the Composer link in the banner → Blockscout opens on the deployed HSKPassportFreshness contract
+9. (Optional) drag the freshness-window slider below 30 and click Generate again — the circuit refuses to prove, friendly amber banner shown. Brief pause, then reset.
 
 **Voiceover continues:**
-> "Proof bound to the caller — no front-running. Per-action nullifier — no sybil. The dApp just learned 'this user is KYC verified' — nothing else. The mint succeeded, the user got their token, and their identity stays private."
+> "A real Groth16 proof. Generated in your browser in under five seconds. Verified against a Solidity verifier deployed on HashKey testnet — the green checkmark you just saw came from the chain, not from us. And when the credential is outside the freshness window, the circuit mathematically refuses to prove it. That's the privacy-preserving expiry check. Per-prover, not per-group. Live today."
 
 ---
 
-### 01:50 — 02:15 — The user dashboard (25 sec)
+### 02:00 — 02:20 — User dashboard (20 sec)
 
 **On screen:** Navigate to `/user` → Verified Data tab
 
@@ -109,34 +114,32 @@
 
 ---
 
-### 02:15 — 02:45 — The strategic anchor (30 sec)
+### 02:20 — 02:45 — The strategic moat (25 sec)
 
-**On screen:** Back to `/composer` — click another preset (e.g. "Accredited DeFi Pool")
+**On screen:** Back to homepage → scroll to the "Five things no other zkID submission has live today" section
 
 **Voiceover:**
-> "Back to the Composer. Watch how the policy changes. KYC plus accredited investor. New contract generated. New tests. Same SDK call on the frontend. This is what makes HSK Passport the default — any HashKey dApp can be regulated in 10 minutes."
+> "Five things that together make HSK Passport the compliance layer regulated dApps on HashKey Chain can actually deploy today. Real Sumsub, wired. HashKey's own KYC SBT bridged. A Policy Composer that generates real code. A v6 per-prover ZK expiry proof. A published SDK and a forty-eight-hour timelock for every owner action. The primitives are all here. The inevitability is that every regulated dApp on this chain adopts them."
 
 **Visual:**
-- Click preset, watch code regenerate
-- Briefly show the Solidity output diff
-- Cut to the README showing the competitive table
-
-**Voiceover continues:**
-> "We're not replacing HashKey's compliance stack. We're making it reusable, private, and copy-pasteable across the entire ecosystem."
+- Scroll through the 5-card section slowly, one card at a time
+- Land on the Governance link at the bottom of card 05 — briefly show the 48h timelock contract on Blockscout
 
 ---
 
 ### 02:45 — 03:00 — Closing card (15 sec)
 
 **On screen:** Static end card with:
+
 - HSK Passport logo (top-left)
-- "Default compliance layer for HashKey Chain"
+- "The compliance layer for HashKey Chain — v6 · per-prover ZK freshness"
 - URL: `hskpassport.gudman.xyz`
+- Demo: `hskpassport.gudman.xyz/demo/fresh`
 - GitHub: `github.com/Ridwannurudeen/hsk-passport`
 - HashKey Chain Horizon Hackathon — ZKID Track
 
 **Voiceover:**
-> "HSK Passport. The default compliance layer for HashKey Chain. Live now at hskpassport-dot-gudman-dot-xyz. Built for the Horizon ZKID track."
+> "HSK Passport. The compliance layer for HashKey Chain. Live now at hskpassport-dot-gudman-dot-xyz. Built for the Horizon ZKID track."
 
 ---
 
@@ -148,13 +151,14 @@
 - **Audio:** Re-record any section where you stumbled. Don't try to fix in editing.
 - **Background noise:** Mute notifications, close Slack/Discord/Teams.
 - **MetaMask popups:** Either crop them out via OBS region capture, OR use the burner wallet so they're disposable to show.
+- **v6 proof section is the wow moment** — slow it down, let the 5-step progress play through on screen.
 
 ## Post-production (optional)
 
 - **Cuts only**, no transitions/effects
-- Add a title overlay for each section: "01 · Composer", "02 · Real Sumsub", "03 · Anonymous mint"
-- Captions help — auto-generate via YouTube studio after upload
-- Export as MP4 H.264, ~6-10 Mbps, 1080p
+- Title overlay per section: "01 · Composer", "02 · Real Sumsub", "03 · v6 ZK freshness", "04 · Dashboard", "05 · The moat"
+- Captions help — auto-generate via YouTube Studio after upload
+- Export as MP4 H.264, ~6–10 Mbps, 1080p
 
 ## Upload + share
 
@@ -171,20 +175,34 @@
 ## Description template (paste under the YouTube video)
 
 ```
-HSK Passport — the default compliance layer for regulated apps on HashKey Chain.
+HSK Passport — the compliance layer for regulated apps on HashKey Chain.
 
-Verify once with Sumsub (the same KYC provider HashKey Exchange uses). Privately prove KYC, accreditation, or jurisdiction to any HashKey dApp via zero-knowledge proofs. Reveal nothing on-chain.
+Verify once with Sumsub (the same KYC provider HashKey Exchange uses).
+Privately prove KYC, accreditation, or jurisdiction to any HashKey dApp
+via zero-knowledge proofs. Reveal nothing on-chain.
 
-Live demo: https://hskpassport.gudman.xyz
-Policy Composer: https://hskpassport.gudman.xyz/composer
-GitHub: https://github.com/Ridwannurudeen/hsk-passport
-SDK on npm: https://www.npmjs.com/package/hsk-passport-sdk
+v6 adds a per-prover ZK credential-freshness proof — a custom Circom
+circuit and an on-chain Solidity verifier that lets a dApp enforce
+"this credential was issued within the last N days" without revealing
+the exact issuance time. Live on testnet.
+
+Live demo:    https://hskpassport.gudman.xyz
+Try v6 ZK:    https://hskpassport.gudman.xyz/demo/fresh
+Composer:     https://hskpassport.gudman.xyz/composer
+GitHub:       https://github.com/Ridwannurudeen/hsk-passport
+SDK on npm:   https://www.npmjs.com/package/hsk-passport-sdk
 
 Built for the HashKey Chain Horizon Hackathon 2026 — ZKID Track.
 
-Stack: Semaphore v4 ZK · Sumsub real KYC · OpenZeppelin Timelock governance · Next.js + Tailwind frontend · Fastify + SQLite indexer.
+Stack: Semaphore v4 + custom Circom v6 freshness circuit + Groth16 on
+bn128 precompiles + Sumsub real KYC + OpenZeppelin Timelock + Next.js 16
++ Fastify + SQLite indexer.
 
-Tech depth: 17 contracts, 55 passing tests, 3 rounds of audit fixes documented at /roadmap.
+Tech depth: 16 contracts on HashKey testnet (v5 + v6 freshness stack),
+74 passing Hardhat tests (including 6 end-to-end ZK tests that generate
+real Groth16 proofs and verify them via the deployed Solidity verifier),
+3 rounds of internal audit fixes documented at /roadmap.
 
-Thanks to @HSKChain @HashKeyHSK @HashKeyCapital for the hackathon and the platform.
+Thanks to @HSKChain @HashKeyHSK @HashKeyCapital for the hackathon and
+the platform.
 ```
