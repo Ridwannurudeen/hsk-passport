@@ -9,6 +9,21 @@ export { DEPLOYMENTS, type NetworkName } from "./addresses";
 export { Identity } from "@semaphore-protocol/identity";
 export type { SemaphoreProof } from "@semaphore-protocol/proof";
 
+// Per-prover ZK credential-freshness (additive; unrelated to the Semaphore identity path above).
+export {
+  FreshnessTree,
+  FRESHNESS_TREE_DEPTH,
+  DEFAULT_ARTEFACTS,
+  createFreshnessIdentity,
+  generateFreshnessProof,
+  HSKPassportFreshnessClient,
+  type FreshnessIdentity,
+  type FreshnessMerkleProof,
+  type FreshnessProof,
+  type ArtefactUrls,
+  type FreshnessClientOptions,
+} from "./freshness";
+
 /** Credential status for a specific group */
 export interface CredentialStatus {
   groupId: number;

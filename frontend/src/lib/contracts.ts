@@ -112,6 +112,44 @@ export const CREDENTIAL_REGISTRY_ABI = [
   "function isRevoked(bytes32 schemaHash, uint256 identityCommitment) view returns (bool)",
 ] as const;
 
+// ---------------------------------------------------------------------------
+// Credential-freshness ZK (additive, v6 — per-prover expiry range proof).
+// Addresses are populated after running `scripts/deploy-freshness.ts` on the
+// target network. While zero, the /demo/fresh page falls back to "simulated"
+// mode (proofs still generated in-browser to prove the pipeline works).
+// ---------------------------------------------------------------------------
+
+export const FRESHNESS_ADDRESSES = {
+  freshnessRegistry: "0xd251ecAD1a863299BAD2E25B93377B736a753938",
+  freshnessVerifier: "0x59A03fF053464150b066e78d22AEc2F69D081394",
+  hskPassportFreshness: "0xFF790dE1537a84220cD12ef648650034D4725fBb",
+};
+
+export const FRESHNESS_ARTEFACTS = {
+  wasm: "/freshness/credential_freshness.wasm",
+  zkey: "/freshness/credential_freshness.zkey",
+  vkey: "/freshness/verification_key.json",
+} as const;
+
+export const FRESHNESS_REGISTRY_ABI = [
+  "function currentRoot(uint256 groupId) view returns (uint256)",
+  "function leafCount(uint256 groupId) view returns (uint256)",
+  "function isKnownRoot(uint256 groupId, uint256 root) view returns (bool)",
+  "function groupIssuer(uint256 groupId, address issuer) view returns (bool)",
+  "function addLeaf(uint256 groupId, uint256 leaf, uint256 newRoot)",
+  "event LeafAdded(uint256 indexed groupId, uint256 indexed leaf, uint256 newRoot, uint256 indexed index)",
+] as const;
+
+export const HSK_PASSPORT_FRESHNESS_ABI = [
+  "function verifyFresh(uint256 groupId, uint256 merkleRoot, uint256 earliestAcceptable, uint256 scope, uint256 nullifier, uint256[2] proofA, uint256[2][2] proofB, uint256[2] proofC)",
+  "function previewVerifyFresh(uint256 groupId, uint256 merkleRoot, uint256 earliestAcceptable, uint256 scope, uint256 nullifier, uint256[2] proofA, uint256[2][2] proofB, uint256[2] proofC) view returns (bool)",
+  "function nullifierConsumed(uint256, uint256) view returns (bool)",
+  "event FreshnessProofVerified(uint256 indexed groupId, uint256 indexed scope, uint256 indexed nullifier, uint256 earliestAcceptable)",
+  "error UnknownRoot()",
+  "error NullifierAlreadyUsed()",
+  "error InvalidProof()",
+] as const;
+
 export const SEMAPHORE_ABI = [
   "function groupCounter() view returns (uint256)",
   "function getMerkleTreeRoot(uint256 groupId) view returns (uint256)",

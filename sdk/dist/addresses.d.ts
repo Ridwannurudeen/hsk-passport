@@ -17,6 +17,9 @@ export declare const DEPLOYMENTS: {
             readonly hashKeyKYCImporter: "0x5431ae6D2f5c3Ad3373B7B4DD4066000D681f5B8";
             readonly issuerRegistry: "0x5BbAe6e90b82c7c51EbA9cA6D844D698dE2eb504";
             readonly timelock: "0xb07Bc78559CbDe44c047b1dC3028d13c4f863D8A";
+            readonly freshnessRegistry: "0xd251ecAD1a863299BAD2E25B93377B736a753938";
+            readonly freshnessVerifier: "0x59A03fF053464150b066e78d22AEc2F69D081394";
+            readonly hskPassportFreshness: "0xFF790dE1537a84220cD12ef648650034D4725fBb";
         };
         readonly deployBlock: 26800000;
         readonly groups: {

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.HSKPassport = exports.Identity = exports.DEPLOYMENTS = void 0;
+exports.HSKPassport = exports.HSKPassportFreshnessClient = exports.generateFreshnessProof = exports.createFreshnessIdentity = exports.DEFAULT_ARTEFACTS = exports.FRESHNESS_TREE_DEPTH = exports.FreshnessTree = exports.Identity = exports.DEPLOYMENTS = void 0;
 const ethers_1 = require("ethers");
 const identity_1 = require("@semaphore-protocol/identity");
 const group_1 = require("@semaphore-protocol/group");
@@ -11,6 +11,14 @@ var addresses_2 = require("./addresses");
 Object.defineProperty(exports, "DEPLOYMENTS", { enumerable: true, get: function () { return addresses_2.DEPLOYMENTS; } });
 var identity_2 = require("@semaphore-protocol/identity");
 Object.defineProperty(exports, "Identity", { enumerable: true, get: function () { return identity_2.Identity; } });
+// Per-prover ZK credential-freshness (additive; unrelated to the Semaphore identity path above).
+var freshness_1 = require("./freshness");
+Object.defineProperty(exports, "FreshnessTree", { enumerable: true, get: function () { return freshness_1.FreshnessTree; } });
+Object.defineProperty(exports, "FRESHNESS_TREE_DEPTH", { enumerable: true, get: function () { return freshness_1.FRESHNESS_TREE_DEPTH; } });
+Object.defineProperty(exports, "DEFAULT_ARTEFACTS", { enumerable: true, get: function () { return freshness_1.DEFAULT_ARTEFACTS; } });
+Object.defineProperty(exports, "createFreshnessIdentity", { enumerable: true, get: function () { return freshness_1.createFreshnessIdentity; } });
+Object.defineProperty(exports, "generateFreshnessProof", { enumerable: true, get: function () { return freshness_1.generateFreshnessProof; } });
+Object.defineProperty(exports, "HSKPassportFreshnessClient", { enumerable: true, get: function () { return freshness_1.HSKPassportFreshnessClient; } });
 /**
  * HSK Passport SDK — Privacy-preserving ZK credential verification for HashKey Chain
  *

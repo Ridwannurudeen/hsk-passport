@@ -9,8 +9,9 @@ Verify once with a trusted issuer. Privately prove KYC, accreditation, or jurisd
 [![Live demo](https://img.shields.io/badge/live-hskpassport.gudman.xyz-4f7cff?style=flat-square)](https://hskpassport.gudman.xyz)
 [![Policy Composer](https://img.shields.io/badge/Policy_Composer-try_it-4f7cff?style=flat-square)](https://hskpassport.gudman.xyz/composer)
 [![npm](https://img.shields.io/npm/v/hsk-passport-sdk?style=flat-square&color=4f7cff&label=sdk)](https://www.npmjs.com/package/hsk-passport-sdk)
-[![Tests](https://img.shields.io/badge/tests-55_passing-22c25e?style=flat-square)](#tests)
+[![Tests](https://img.shields.io/badge/tests-74_passing-22c25e?style=flat-square)](#tests)
 [![Audits](https://img.shields.io/badge/audits-3_internal_rounds-22c25e?style=flat-square)](audits/)
+[![ZK freshness](https://img.shields.io/badge/ZK_freshness-v6_live-4f7cff?style=flat-square)](https://hskpassport.gudman.xyz/demo/fresh)
 [![License](https://img.shields.io/badge/license-MIT-4f7cff?style=flat-square)](LICENSE)
 
 <p><em>We're not replacing HashKey's compliance stack — we're making it reusable and private across the ecosystem.</em></p>
@@ -28,6 +29,7 @@ Verify once with a trusted issuer. Privately prove KYC, accreditation, or jurisd
 - [What is this?](#what-is-this)
 - [Quick start](#quick-start)
 - [Architecture](#architecture)
+- [Per-prover credential freshness (v6)](#per-prover-credential-freshness-v6)
 - [The Policy Composer](#the-policy-composer)
 - [Works with HashKey Chain's official KYC stack](#works-with-hashkey-chains-official-kyc-stack)
 - [How it compares](#how-it-compares)
@@ -118,6 +120,39 @@ Caller-bound proofs prevent front-running. Per-action nullifiers prevent sybil a
 
 ---
 
+## Per-prover credential freshness (v6)
+
+> Try it live: [**/demo/fresh**](https://hskpassport.gudman.xyz/demo/fresh) · real browser-side Groth16 proof → real on-chain verification on HashKey testnet in ~5 seconds.
+
+Earlier releases enforced credential expiry at the *group* level: the contract required that the group's oldest possible member had not lapsed. That was an approximation — a dApp could not actually know whether the specific anonymous prover's credential was still fresh. v6 closes that gap with a **real per-prover ZK range proof**.
+
+A new circuit — [`circuits/src/credential_freshness.circom`](circuits/src/credential_freshness.circom) — proves four things at once:
+
+1. You derive a valid identity commitment from a private secret.
+2. That commitment was inserted into the `FreshnessRegistry`'s Merkle tree by an authorised issuer at some private `issuanceTime`.
+3. `issuanceTime >= earliestAcceptable` — the dApp-chosen freshness threshold.
+4. A unique `nullifier = Poseidon(secret, scope)` — prevents replay within the dApp's scope.
+
+Nothing about your identity or the exact issuance time leaks. The dApp learns only: *"this prover holds a credential that was issued after the threshold."*
+
+**Circuit stats** — depth-16 Poseidon Merkle + 64-bit comparator, 4,665 wires, 3 public inputs, 1 public output. Groth16 with Hermez ptau 14 (universal) plus a **single-contributor** circuit-specific zkey — hackathon-appropriate; a multi-party circuit ceremony is on the roadmap for mainnet. Browser-side proof generation: ~4.5 seconds (headless Chrome, measured across 5 runs).
+
+**Architecture — additive, no changes to v5**
+
+- [`FreshnessRegistry.sol`](contracts/contracts/freshness/FreshnessRegistry.sol) — per-group rolling Merkle-root history (100 entries), authorised issuers only, two-step ownership.
+- [`FreshnessVerifier.sol`](contracts/contracts/freshness/FreshnessVerifier.sol) — snarkjs-generated Groth16 verifier, pragma-aligned.
+- [`HSKPassportFreshness.sol`](contracts/contracts/freshness/HSKPassportFreshness.sol) — composer that wires registry + verifier + nullifier replay protection. Exposes `verifyFresh` (state-changing, marks nullifier) and `previewVerifyFresh` (read-only).
+
+The existing `HSKPassport` at `0x7d2E…D792` is untouched. dApps opt into the new flow by calling `HSKPassportFreshness.verifyFresh(...)` instead of — or in addition to — the legacy `verifyCredentialWithExpiry`.
+
+**Tested end-to-end**
+
+- 13 Hardhat tests cover the registry (access control, rolling window, group isolation, two-step ownership).
+- 6 Hardhat tests generate real Groth16 proofs against the compiled circuit and submit them to the deployed verifier — happy path, replay, expiry, unknown root, tampered signals, cross-scope isolation.
+- 5 headless-browser runs of [`/demo/fresh`](https://hskpassport.gudman.xyz/demo/fresh) confirm `previewVerifyFresh()` returns `true` on-chain with 100% determinism.
+
+---
+
 ## The Policy Composer
 
 <a href="https://hskpassport.gudman.xyz/composer">
@@ -151,7 +186,7 @@ The `HashKeyKycSBTAdapter` *(deployed on testnet — see [Deployed contracts](#d
 | Real Sumsub integration wired end-to-end | ✅ | ❌ (mocked / simulated) |
 | Policy Composer generating Solidity + React + tests | ✅ | ❌ |
 | HashKey DID bridge + HashKey Exchange KYC importer | ✅ | ❌ |
-| On-chain credential expiry (`verifyCredentialWithExpiry`) | ✅ | ❌ |
+| Per-prover on-chain credential expiry (real ZK range proof, v6) | ✅ | ❌ |
 | Issuer slashing via 48h Timelock | ✅ | ❌ |
 | Raw-body HMAC webhook verification *(hardened in [audit Round 3 C1](audits/round-3.md))* | ✅ | ❌ |
 | Redacted KYC queue + signed-read auth with nonce replay protection | ✅ | ❌ |
@@ -180,6 +215,14 @@ HashKey Chain testnet (chain id 133), v5:
 | KYCGatedAirdrop (hPILOT) | [`0x71c9…b4b8`](https://hashkey-testnet.blockscout.com/address/0x71c96016CBCAeE7B2Edc8b40Fec45de1d16Fb4b8) |
 | KYCGatedLending | [`0x3717…0BFD`](https://hashkey-testnet.blockscout.com/address/0x37179886986bd35a4d580f157f55f249c43A0BFD) |
 | JurisdictionGatedPool | [`0x305f…Ce4D`](https://hashkey-testnet.blockscout.com/address/0x305f5F0b44d541785305DaDb372f118A9284Ce4D) |
+
+**v6 — Credential freshness ZK:**
+
+| Contract | Address |
+|---|---|
+| FreshnessRegistry | [`0xd251…3938`](https://hashkey-testnet.blockscout.com/address/0xd251ecAD1a863299BAD2E25B93377B736a753938) |
+| FreshnessVerifier (Groth16) | [`0x59A0…1394`](https://hashkey-testnet.blockscout.com/address/0x59A03fF053464150b066e78d22AEc2F69D081394) |
+| HSKPassportFreshness | [`0xFF79…5fBb`](https://hashkey-testnet.blockscout.com/address/0xFF790dE1537a84220cD12ef648650034D4725fBb) |
 
 **Credential groups** *(default validity)*: `KYC_VERIFIED 25 (180 d)` · `ACCREDITED_INVESTOR 26 (365 d)` · `HK_RESIDENT 27` · `SG_RESIDENT 28` · `AE_RESIDENT 29` *(residency never expires)*.
 
@@ -227,6 +270,23 @@ npm install
 npm run build
 ```
 
+**Circuits** (ZK freshness — optional, requires circom 2.1.9 + snarkjs):
+
+```bash
+# Assumes circom is on PATH and contracts/node_modules/circomlib is present
+node circuits/scripts/build.js
+# Output: circuits/build/credential_freshness.{r1cs,wasm,zkey},
+#         contracts/contracts/freshness/FreshnessVerifier.sol,
+#         frontend/public/freshness/{wasm,zkey,vkey}
+
+# Deploy + seed the demo credential (needs funded deployer + PRIVATE_KEY in contracts/.env)
+cd contracts
+npx hardhat run scripts/deploy-freshness.ts --network hashkey-testnet
+npx hardhat run scripts/seed-freshness-demo.ts --network hashkey-testnet
+```
+
+Pre-built artefacts are committed under [`circuits/build/`](circuits/build/) so the demo runs without rebuilding.
+
 ---
 
 ## Security
@@ -261,10 +321,12 @@ A formal third-party audit (Trail of Bits / OpenZeppelin / Spearbit) is planned 
 
 ```
 $ npm test
-  55 passing
+  74 passing
 ```
 
 The suite includes `SecurityInvariants.test.ts`, `CredentialExpiry.test.ts`, `IssuerSlashing.test.ts`, and `KycSBTAdapter.test.ts` — each targeted at the specific invariants that closed the audit findings or proved an officially-recommended-product integration.
+
+v6 adds **19 new tests**: `FreshnessRegistry.test.ts` (13 — access control, rolling root window, group isolation, two-step ownership) and `CredentialFreshnessZK.test.ts` (6 — real Groth16 proofs generated against the compiled circuit and verified by the deployed Solidity verifier: happy path, replay, expiry rejection, unknown root, tampered signals, cross-scope isolation).
 
 ---
 
@@ -286,9 +348,10 @@ Identity projects in adjacent spaces: [Polygon ID / Privado ID](https://www.priv
 ## Repo layout
 
 ```
-contracts/     Solidity + Hardhat tests (55 passing) + deploy scripts
+contracts/     Solidity + Hardhat tests (74 passing) + deploy scripts
+circuits/      v6 freshness ZK — credential_freshness.circom + build artefacts
 backend/       Fastify + SQLite indexer, Sumsub client, auto-issuer, notify
-frontend/      Next.js 16 app: /kyc, /composer, /demo, /user, /issuer, …
+frontend/      Next.js 16 app: /kyc, /composer, /demo, /demo/fresh, /user, /issuer, …
 sdk/           TypeScript SDK (published as `hsk-passport-sdk` on npm)
 audits/        Three audit rounds with findings and closure evidence
 docs/          Architecture diagram, screenshots, demo script, branding
