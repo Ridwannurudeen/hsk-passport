@@ -10,7 +10,7 @@ Verify once with a trusted issuer. Privately prove KYC, accreditation, or jurisd
 [![Policy Composer](https://img.shields.io/badge/Policy_Composer-try_it-4f7cff?style=flat-square)](https://hskpassport.gudman.xyz/composer)
 [![npm](https://img.shields.io/npm/v/hsk-passport-sdk?style=flat-square&color=4f7cff&label=sdk)](https://www.npmjs.com/package/hsk-passport-sdk)
 [![Tests](https://img.shields.io/badge/tests-55_passing-22c25e?style=flat-square)](#tests)
-[![Audits](https://img.shields.io/badge/audits-3_rounds-22c25e?style=flat-square)](audits/)
+[![Audits](https://img.shields.io/badge/audits-3_internal_rounds-22c25e?style=flat-square)](audits/)
 [![License](https://img.shields.io/badge/license-MIT-4f7cff?style=flat-square)](LICENSE)
 
 <p><em>We're not replacing HashKey's compliance stack — we're making it reusable and private across the ecosystem.</em></p>

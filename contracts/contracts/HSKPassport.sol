@@ -8,7 +8,16 @@ import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphore.so
 /// @dev Wraps Semaphore v4 with credential-specific group management, schema linking, and verification.
 contract HSKPassport {
     ISemaphore public immutable semaphore;
+    /// @dev In production deployments `owner` should be set to the HSK Passport
+    ///      Timelock so that every owner action (issuer approval/revocation,
+    ///      delegate revocation, group deactivation) is subject to the 48h
+    ///      governance delay. Single-EOA ownership is acceptable only on
+    ///      testnet / development.
     address public owner;
+    /// @dev Two-step ownership transfer: `transferOwnership` sets `pendingOwner`,
+    ///      and the new owner must call `acceptOwnership` to take control. This
+    ///      prevents accidentally transferring ownership to an unreachable address.
+    address public pendingOwner;
 
     struct CredentialGroup {
         string name;
@@ -49,12 +58,16 @@ contract HSKPassport {
     event ValidityPeriodSet(uint256 indexed groupId, uint256 validityPeriodSec);
 
     error NotOwner();
+    error NotPendingOwner();
     error NotApprovedIssuer();
     error NotGroupIssuerOrDelegate();
     error GroupNotActive();
     error CredentialAlreadyIssued();
     error CredentialNotIssued();
     error CredentialExpired();
+
+    event OwnershipTransferStarted(address indexed previousOwner, address indexed newOwner);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();
@@ -238,12 +251,15 @@ contract HSKPassport {
     }
 
     /// @notice Verify a ZK proof AND check the prover's credential hasn't expired.
-    /// @dev Because the prover is anonymous, we can't look up their individual issuance time — so
-    ///      the expiry check is against the *group*'s oldest possible member: if any credential
-    ///      currently on-chain could have expired, the group enters a "stale window" and this call
-    ///      reverts. Issuers must re-issue credentials before their validity period lapses.
-    /// @dev For per-credential expiry (preserving anonymity), use on-chain ZK range proofs in the
-    ///      validity period — see /roadmap for the per-credential ZK range proof milestone.
+    /// @dev IMPORTANT: This proves the GROUP's issuance window is still fresh, NOT the
+    ///      individual prover's credential freshness. Because the prover is anonymous, we
+    ///      cannot look up their personal issuance time — so the expiry check is against
+    ///      the *group*'s oldest possible member: if any credential currently on-chain
+    ///      could have expired, the group enters a "stale window" and this call reverts.
+    ///      Issuers must re-issue credentials before their validity period lapses.
+    /// @dev For per-credential expiry (preserving anonymity), use on-chain ZK range proofs
+    ///      in the validity period — see /roadmap for the per-credential ZK range proof
+    ///      milestone.
     function verifyCredentialWithExpiry(
         uint256 groupId,
         ISemaphore.SemaphoreProof calldata proof,
@@ -298,8 +314,22 @@ contract HSKPassport {
         return credentials[groupId][identityCommitment];
     }
 
-    /// @notice Transfer ownership
+    /// @notice Start a two-step ownership transfer. The new owner must subsequently
+    ///         call `acceptOwnership` to take control.
+    /// @dev In production the owner should be the HSK Passport Timelock — see the
+    ///      docstring on the `owner` storage variable.
     function transferOwnership(address newOwner) external onlyOwner {
-        owner = newOwner;
+        pendingOwner = newOwner;
+        emit OwnershipTransferStarted(owner, newOwner);
+    }
+
+    /// @notice Accept a pending ownership transfer. Must be called by the address
+    ///         that was previously set as `pendingOwner`.
+    function acceptOwnership() external {
+        if (msg.sender != pendingOwner) revert NotPendingOwner();
+        address previousOwner = owner;
+        owner = pendingOwner;
+        pendingOwner = address(0);
+        emit OwnershipTransferred(previousOwner, msg.sender);
     }
 }
