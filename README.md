@@ -40,6 +40,7 @@ Verify once with a trusted issuer. Privately prove KYC, accreditation, or jurisd
 - [Tests](#tests)
 - [Related work](#related-work)
 - [Repo layout](#repo-layout)
+- [Links](#links)
 - [License](#license)
 
 ---
@@ -143,13 +144,18 @@ Nothing about your identity or the exact issuance time leaks. The dApp learns on
 - [`FreshnessVerifier.sol`](contracts/contracts/freshness/FreshnessVerifier.sol) — snarkjs-generated Groth16 verifier, pragma-aligned.
 - [`HSKPassportFreshness.sol`](contracts/contracts/freshness/HSKPassportFreshness.sol) — composer that wires registry + verifier + nullifier replay protection. Exposes `verifyFresh` (state-changing, marks nullifier) and `previewVerifyFresh` (read-only).
 
-The existing `HSKPassport` at `0x7d2E…D792` is untouched. dApps opt into the new flow by calling `HSKPassportFreshness.verifyFresh(...)` instead of — or in addition to — the legacy `verifyCredentialWithExpiry`.
+The existing `HSKPassport` at `0x7d2E…D792` is untouched. dApps opt into the new flow by calling `HSKPassportFreshness.verifyFresh(...)` alongside the legacy `verifyCredentialWithExpiry`. A v5 issuer integrating v6 also posts `Poseidon(identityCommitment, issuanceTime)` into the `FreshnessRegistry` at issuance time — one additional small-storage tx per credential.
 
 **Tested end-to-end**
 
 - 13 Hardhat tests cover the registry (access control, rolling window, group isolation, two-step ownership).
-- 6 Hardhat tests generate real Groth16 proofs against the compiled circuit and submit them to the deployed verifier — happy path, replay, expiry, unknown root, tampered signals, cross-scope isolation.
-- 5 headless-browser runs of [`/demo/fresh`](https://hskpassport.gudman.xyz/demo/fresh) confirm `previewVerifyFresh()` returns `true` on-chain with 100% determinism.
+- 6 Hardhat tests generate real Groth16 proofs via snarkjs against the compiled circuit and verify them via the Solidity verifier (same bytecode as deployed on testnet) — happy path, replay, expiry rejection, unknown root, tampered signals, cross-scope isolation.
+- 5 headless-browser runs of [`/demo/fresh`](https://hskpassport.gudman.xyz/demo/fresh) confirm `previewVerifyFresh()` returns `true` on the live testnet contract with 100% determinism.
+
+**Status**
+
+- Circuit, contracts, tests, SDK, and frontend demo are all live.
+- Issuer-side auto-registration (backend `auto-issuer` calling `FreshnessRegistry.addLeaf` on every credential issuance) is scoped but **not yet wired** — today only the seeded demo credential exists on-chain. dApps that want v6 today can call `addLeaf` directly from their own issuance path.
 
 ---
 
@@ -232,7 +238,7 @@ HashKey Chain testnet (chain id 133), v5:
 
 Requires Node 20+.
 
-**Contracts** (Hardhat, 55 passing tests):
+**Contracts** (Hardhat, 74 passing tests):
 
 ```bash
 cd contracts
@@ -270,10 +276,13 @@ npm install
 npm run build
 ```
 
-**Circuits** (ZK freshness — optional, requires circom 2.1.9 + snarkjs):
+**Circuits** (ZK freshness — optional, requires circom ≥ 2.1.9):
 
 ```bash
-# Assumes circom is on PATH and contracts/node_modules/circomlib is present
+# Linux/macOS: circom on PATH. Windows: invoke via WSL — build.js handles
+# the path translation automatically. circomlib is installed as a dev-dep of
+# `contracts` and resolved via circom -l.
+cd contracts && npm install    # installs circomlib + snarkjs + poseidon-lite + @zk-kit/imt
 node circuits/scripts/build.js
 # Output: circuits/build/credential_freshness.{r1cs,wasm,zkey},
 #         contracts/contracts/freshness/FreshnessVerifier.sol,
@@ -326,9 +335,7 @@ $ npm test
 
 The suite includes `SecurityInvariants.test.ts`, `CredentialExpiry.test.ts`, `IssuerSlashing.test.ts`, and `KycSBTAdapter.test.ts` — each targeted at the specific invariants that closed the audit findings or proved an officially-recommended-product integration.
 
-v6 adds **19 new tests**: `FreshnessRegistry.test.ts` (13 — access control, rolling root window, group isolation, two-step ownership) and `CredentialFreshnessZK.test.ts` (6 — real Groth16 proofs generated against the compiled circuit and verified by the deployed Solidity verifier: happy path, replay, expiry rejection, unknown root, tampered signals, cross-scope isolation).
-
----
+v6 adds **19 new tests**: `FreshnessRegistry.test.ts` (13 — access control, rolling root window, group isolation, two-step ownership) and `CredentialFreshnessZK.test.ts` (6 — real Groth16 proofs generated against the compiled circuit and verified by the Solidity verifier contract, same bytecode as deployed on testnet: happy path, replay, expiry rejection, unknown root, tampered signals, cross-scope isolation).
 
 ---
 
