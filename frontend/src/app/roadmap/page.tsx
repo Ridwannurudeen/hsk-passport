@@ -10,18 +10,19 @@ export default function RoadmapPage() {
       </p>
 
       <Section title="Shipped — hackathon-grade, working on testnet" tone="green">
-        <Item label="Semaphore v4 ZK credentials" detail="Groth16 proofs, bn128 precompiles verified on HashKey Chain, 36 passing tests." />
+        <Item label="Semaphore v4 ZK credentials" detail="Groth16 proofs, bn128 precompiles verified on HashKey Chain, 74 passing tests." />
+        <Item label="Per-prover credential freshness (v6)" detail="Custom Circom circuit + FreshnessVerifier + HSKPassportFreshness deployed on testnet. Browser-side Groth16 proof ~4.5s, on-chain verification green (see /demo/fresh)." />
         <Item label="Sumsub KYC integration" detail="Real applicant creation, webhook verification, auto-issuance on GREEN. Sandbox mode for demo." />
         <Item label="Audit-class security hardening" detail="H1 issuer offboarding, H2 anti-sybil bridges, H3/H4 backend privacy, M1-M5 governance + delegate split." />
         <Item label="Composable compliance policies" detail="/composer generates Solidity contract + React gate + tests for any rule set." />
         <Item label="Privacy-safe backend" detail="KYC queue redacts PII unless the caller signs as an approved issuer." />
         <Item label="OpenZeppelin Timelock (48h delay)" detail="Deployed and wired to protocol ownership transfer." />
-        <Item label="SDK on npm" detail="hsk-passport-sdk v1.0.0 published; contracts library in-repo." />
+        <Item label="Issuer slashing via Timelock" detail="IssuerRegistry stake forfeit routed through Timelock authority; 3 Hardhat tests cover the flow (authority check, cap at available stake, IssuerSlashed emission)." />
+        <Item label="SDK on npm" detail="hsk-passport-sdk v1.1.0 published with v6 freshness module; contracts library in-repo." />
       </Section>
 
       <Section title="Q3 2026 — production hardening" tone="yellow">
-        <Item label="On-chain credential expiry enforcement" detail="verifyCredential() rejects expired credentials via the CredentialExpiry registry. Re-verification every 90-365 days per regulatory tier." />
-        <Item label="Issuer slashing activation" detail="IssuerRegistry stake forfeit on provable misissuance, routed through Safe → Timelock → execute." />
+        <Item label="Issuer-side v6 auto-registration" detail="Backend auto-issuer posts Poseidon(commitment, issuanceTime) to FreshnessRegistry at issuance time. Scoped but not yet wired — today only the seeded demo credential exists on-chain." />
         <Item label="Blind-signature issuance" detail="Backend never learns commitment ↔ Sumsub applicant mapping. Eliminates the backend-correlation risk." />
         <Item label="Multi-sig governance handoff" detail="3-of-5 Safe with core contributors as signers, timelock as executor." />
         <Item label="HSM-protected issuer keys" detail="YubiHSM or AWS CloudHSM for issuer private keys — no more .env secrets on VPS." />

@@ -35,7 +35,7 @@ export default function Home() {
             <div className="anim-fade-up">
               <div className="badge mb-7">
                 <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "var(--success)" }} />
-                <span>v5 live · 55 tests · real Sumsub wired</span>
+                <span>v6 live · 74 tests · real Sumsub + ZK freshness</span>
               </div>
               <h1 className="display-1 mb-6">
                 The default compliance layer for
@@ -162,8 +162,8 @@ export default function Home() {
           >
             {[
               { value: "5", label: "Credential types", sub: "KYC · accredited · HK/SG/AE" },
-              { value: "13", label: "Contracts live", sub: "HashKey testnet, v5 + IKycSBT bridge" },
-              { value: "55", label: "Passing tests", sub: "security invariants + expiry + slashing + IKycSBT" },
+              { value: "16", label: "Contracts live", sub: "HashKey testnet, v5 + IKycSBT + v6 freshness" },
+              { value: "74", label: "Passing tests", sub: "security invariants + expiry + slashing + ZK freshness" },
               { value: "0", label: "Bytes PII on-chain", sub: "by design" },
             ].map((s) => (
               <div key={s.label} className="p-6 sm:p-7" style={{ background: "var(--bg-canvas)" }}>

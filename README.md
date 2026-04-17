@@ -17,7 +17,7 @@ Verify once with a trusted issuer. Privately prove KYC, accreditation, or jurisd
 <p><em>We're not replacing HashKey's compliance stack — we're making it reusable and private across the ecosystem.</em></p>
 
 <a href="https://hskpassport.gudman.xyz">
-  <img src="docs/screenshots/home.png" alt="HSK Passport homepage" width="100%" />
+  <img src="docs/screenshots/home-final.png" alt="HSK Passport homepage" width="100%" />
 </a>
 
 </div>
@@ -162,7 +162,7 @@ The existing `HSKPassport` at `0x7d2E…D792` is untouched. dApps opt into the n
 ## The Policy Composer
 
 <a href="https://hskpassport.gudman.xyz/composer">
-  <img src="docs/screenshots/composer.png" alt="Policy Composer" width="100%"/>
+  <img src="docs/screenshots/composer-fresh.png" alt="Policy Composer" width="100%"/>
 </a>
 
 The Composer turns HSK Passport from a protocol into an **adoption tool**. Any dApp builder ticks compliance rules:

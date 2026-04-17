@@ -135,6 +135,25 @@ const tx = await myDApp.kycGatedFunction(proof);`}
                 0xb695...b9c9
               </a>
             </div>
+            <div className="pt-2 mt-2 border-t border-gray-800/50 text-xs uppercase tracking-wide text-gray-500">v6 — Credential freshness ZK</div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">FreshnessRegistry</span>
+              <a href="https://hashkey-testnet.blockscout.com/address/0xd251ecAD1a863299BAD2E25B93377B736a753938" target="_blank" rel="noopener noreferrer" className="font-mono text-purple-300 text-xs hover:text-purple-200">
+                0xd251...3938
+              </a>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">FreshnessVerifier</span>
+              <a href="https://hashkey-testnet.blockscout.com/address/0x59A03fF053464150b066e78d22AEc2F69D081394" target="_blank" rel="noopener noreferrer" className="font-mono text-purple-300 text-xs hover:text-purple-200">
+                0x59A0...1394
+              </a>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">HSKPassportFreshness</span>
+              <a href="https://hashkey-testnet.blockscout.com/address/0xFF790dE1537a84220cD12ef648650034D4725fBb" target="_blank" rel="noopener noreferrer" className="font-mono text-purple-300 text-xs hover:text-purple-200">
+                0xFF79...5fBb
+              </a>
+            </div>
           </div>
         </section>
 
@@ -158,14 +177,14 @@ const tx = await myDApp.kycGatedFunction(proof);`}
               </thead>
               <tbody>
                 <tr className="border-b border-gray-800/50">
-                  <td className="px-6 py-3 font-mono text-purple-300">20</td>
+                  <td className="px-6 py-3 font-mono text-purple-300">25</td>
                   <td className="px-6 py-3 font-medium">KYC_VERIFIED</td>
                   <td className="px-6 py-3 text-gray-400">
                     User has passed standard KYC verification
                   </td>
                 </tr>
                 <tr className="border-b border-gray-800/50">
-                  <td className="px-6 py-3 font-mono text-purple-300">21</td>
+                  <td className="px-6 py-3 font-mono text-purple-300">26</td>
                   <td className="px-6 py-3 font-medium">
                     ACCREDITED_INVESTOR
                   </td>
@@ -174,21 +193,21 @@ const tx = await myDApp.kycGatedFunction(proof);`}
                   </td>
                 </tr>
                 <tr className="border-b border-gray-800/50">
-                  <td className="px-6 py-3 font-mono text-purple-300">22</td>
+                  <td className="px-6 py-3 font-mono text-purple-300">27</td>
                   <td className="px-6 py-3 font-medium">HK_RESIDENT</td>
                   <td className="px-6 py-3 text-gray-400">
                     User is a Hong Kong resident
                   </td>
                 </tr>
                 <tr className="border-b border-gray-800/50">
-                  <td className="px-6 py-3 font-mono text-purple-300">23</td>
+                  <td className="px-6 py-3 font-mono text-purple-300">28</td>
                   <td className="px-6 py-3 font-medium">SG_RESIDENT</td>
                   <td className="px-6 py-3 text-gray-400">
                     User is a Singapore resident
                   </td>
                 </tr>
                 <tr>
-                  <td className="px-6 py-3 font-mono text-purple-300">24</td>
+                  <td className="px-6 py-3 font-mono text-purple-300">29</td>
                   <td className="px-6 py-3 font-medium">AE_RESIDENT</td>
                   <td className="px-6 py-3 text-gray-400">
                     User is a UAE resident

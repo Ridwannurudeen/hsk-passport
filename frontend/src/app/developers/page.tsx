@@ -167,6 +167,9 @@ const valid = await passport.verifyProof(15, proof);`}</pre>
               { label: "KYCGatedAirdrop (hPILOT)", address: "0x71c96016CBCAeE7B2Edc8b40Fec45de1d16Fb4b8" },
               { label: "KYCGatedLending", address: "0x37179886986bd35a4d580f157f55f249c43A0BFD" },
               { label: "JurisdictionGatedPool", address: "0x305f5F0b44d541785305DaDb372f118A9284Ce4D" },
+              { label: "FreshnessRegistry (v6)", address: "0xd251ecAD1a863299BAD2E25B93377B736a753938" },
+              { label: "FreshnessVerifier (v6)", address: "0x59A03fF053464150b066e78d22AEc2F69D081394" },
+              { label: "HSKPassportFreshness (v6)", address: "0xFF790dE1537a84220cD12ef648650034D4725fBb" },
             ].map((c) => (
               <div key={c.address} className="flex items-center justify-between py-1 border-b border-gray-800/50 last:border-0">
                 <dt className="text-gray-400">{c.label}</dt>
