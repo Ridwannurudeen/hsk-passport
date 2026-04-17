@@ -69,8 +69,8 @@ export default function Home() {
                 <Link href="/kyc" className="btn btn-secondary">
                   Get verified
                 </Link>
-                <Link href="/demo" className="btn btn-ghost link-hover">
-                  Watch the live ZK proof flow →
+                <Link href="/demo/fresh" className="btn btn-ghost link-hover">
+                  Live ZK freshness demo →
                 </Link>
               </div>
             </div>

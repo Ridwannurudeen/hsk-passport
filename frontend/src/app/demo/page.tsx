@@ -327,6 +327,23 @@ export default function DemoPage() {
         Experience the full HSK Passport flow: create identity, get a KYC credential, generate a ZK proof, and mint a token — all in under a minute.
       </p>
 
+      {/* v6 freshness ZK — cross-link to the newer per-prover ZK range proof demo */}
+      <a
+        href="/demo/fresh"
+        className="mb-6 flex items-center justify-between rounded-xl border border-purple-800/60 bg-gradient-to-br from-purple-950/40 to-gray-900 px-4 py-3 hover:border-purple-600/70 transition-colors"
+      >
+        <div>
+          <div className="text-xs font-mono text-purple-300 uppercase tracking-wide">v6 · new</div>
+          <div className="text-sm font-semibold text-white mt-0.5">
+            Per-prover credential-freshness ZK proof
+          </div>
+          <div className="text-xs text-gray-400 mt-0.5">
+            Real Groth16 proof in-browser (~4.5s) → on-chain verify on HashKey testnet.
+          </div>
+        </div>
+        <span className="text-purple-300 text-sm">Try /demo/fresh →</span>
+      </a>
+
       {/* Balance banner — shown if user already minted */}
       {Number(balance) > 0 && (
         <div className="mb-6 bg-gradient-to-br from-green-950/40 to-gray-900 border border-green-800/50 rounded-xl p-4 text-sm">

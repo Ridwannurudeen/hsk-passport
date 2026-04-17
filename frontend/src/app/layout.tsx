@@ -90,6 +90,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                   <NavLink href="/composer" highlight>Composer</NavLink>
                   <NavLink href="/kyc">Get verified</NavLink>
                   <NavLink href="/demo">Demo</NavLink>
+                  <NavLink href="/demo/fresh" highlight>Fresh ZK · v6</NavLink>
                   <NavLink href="/ecosystem">Ecosystem</NavLink>
                   <NavLink href="/developers">Developers</NavLink>
                   <NavLink href="/user" highlight>Dashboard</NavLink>
