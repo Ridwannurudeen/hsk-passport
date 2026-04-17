@@ -365,7 +365,7 @@ backend/       Fastify + SQLite indexer, Sumsub client, auto-issuer, notify
 frontend/      Next.js 16 app: /kyc, /composer, /demo, /demo/fresh, /user, /issuer, …
 sdk/           TypeScript SDK (published as `hsk-passport-sdk` on npm)
 audits/        Three audit rounds with findings and closure evidence
-docs/          Architecture diagram, screenshots, demo script, branding
+docs/          Architecture diagram, screenshots, branding
 schemas/       W3C VC credential schemas (KYC / accredited / HK resident)
 ```
 
