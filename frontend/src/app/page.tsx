@@ -265,70 +265,90 @@ export default function Home() {
       </section>
 
       {/* ============================================================
-          THREE AUDIENCES
+          WHAT NOBODY ELSE SHIPPED
          ============================================================ */}
       <section className="relative border-y" style={{ borderColor: "var(--border-muted)", background: "var(--bg-subtle)" }}>
         <div className="absolute inset-0 bg-dots opacity-50 pointer-events-none" />
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-24 sm:py-32">
-          <div className="max-w-2xl mb-14">
-            <div className="eyebrow mb-3" style={{ color: "var(--accent-primary)" }}>Who uses HSK Passport</div>
+          <div className="max-w-2xl mb-12">
+            <div className="eyebrow mb-3" style={{ color: "var(--accent-primary)" }}>What we actually shipped</div>
             <h2 className="display-2" style={{ color: "var(--text-primary)" }}>
-              One protocol. Three sides of the market.
+              Five things no other zkID submission has live today.
             </h2>
+            <p className="mt-4 text-[16px] leading-[1.6]" style={{ color: "var(--text-secondary)" }}>
+              Every regulated dApp has the same blockers: KYC provider wiring, identity-bridge integration, governance, an SDK that developers will actually install. We built all of them.
+            </p>
           </div>
-          <div className="grid md:grid-cols-3 gap-4">
+          <div className="grid md:grid-cols-2 gap-4">
             {[
               {
-                tag: "Users",
-                title: "Verify once, prove anywhere",
-                desc: "Complete KYC with Sumsub. Get a zero-knowledge credential bound to your wallet. Use it across every compliant dApp.",
+                num: "01",
+                title: "Real Sumsub KYC, wired end-to-end",
+                desc: "Same provider HashKey Exchange uses. HMAC-signed webhook with raw-body verification (hardened in audit Round 3). Auto-issuance on the GREEN callback.",
                 href: "/kyc",
-                cta: "Get verified",
-                icon: <UserIcon />,
+                cta: "Try the flow",
               },
               {
-                tag: "Developers",
-                title: "Ship compliant dApps in minutes",
-                desc: "SDK on npm, React gate component, Hardhat helpers. Policy Composer generates Solidity + React + tests.",
-                href: "/developers",
-                cta: "Developer docs",
-                icon: <CodeIcon />,
+                num: "02",
+                title: "HashKey IKycSBT + .key DID bridges",
+                desc: "The only submission that reads HashKey's official KYC soulbound-token byte-for-byte and mints credentials from .key DID holders. Live on testnet, 10 passing tests.",
+                href: "/bridge",
+                cta: "See the bridge",
               },
               {
-                tag: "Issuers",
-                title: "Regulated issuance, staked reputation",
-                desc: "Stake HSK, issue revocable credentials, earn reputation. Slashable via 48h timelock governance on misissuance.",
-                href: "/issuer",
-                cta: "Issuer dashboard",
-                icon: <ShieldIcon />,
+                num: "03",
+                title: "Policy Composer generates real code",
+                desc: "Tick KYC, accredited, or jurisdiction {HK, SG, AE}. Get back a deployable Solidity contract, a React gate, and a Hardhat test. 30 seconds, zero boilerplate.",
+                href: "/composer",
+                cta: "Generate a policy",
+              },
+              {
+                num: "04",
+                title: "Per-prover ZK credential expiry (v6)",
+                desc: "Custom Circom circuit + on-chain verifier. Prove your credential is fresh without revealing when it was issued. ~4.5s browser proof, real on-chain verify.",
+                href: "/demo/fresh",
+                cta: "Run the live demo",
+              },
+              {
+                num: "05",
+                title: "SDK on npm + 48h Timelock governance",
+                desc: "hsk-passport-sdk v1.1.0 live (freshness module included). Every owner action gated through an OpenZeppelin TimelockController — issuer slashing, schema edits, validity periods.",
+                href: "/governance",
+                cta: "Inspect governance",
               },
             ].map((card, i) => (
               <Link
-                key={card.tag}
+                key={card.num}
                 href={card.href}
-                className={`group relative p-6 rounded-2xl surface-interactive anim-fade-up anim-delay-${i + 1}`}
+                className={`group relative p-7 rounded-2xl surface-interactive anim-fade-up anim-delay-${(i % 3) + 1}`}
               >
-                <div className="mb-5">
+                <div className="flex items-start gap-5">
                   <div
-                    className="w-10 h-10 rounded-lg flex items-center justify-center"
-                    style={{ background: "var(--accent-subtle)", color: "var(--accent-primary)" }}
+                    className="text-[32px] font-mono leading-none select-none flex-none"
+                    style={{
+                      color: "transparent",
+                      backgroundImage: "linear-gradient(180deg, var(--accent-primary), var(--text-muted) 140%)",
+                      WebkitBackgroundClip: "text",
+                      backgroundClip: "text",
+                    }}
                   >
-                    {card.icon}
+                    {card.num}
                   </div>
-                </div>
-                <div className="eyebrow mb-2" style={{ color: "var(--text-muted)" }}>{card.tag}</div>
-                <h3 className="text-[18px] font-semibold mb-2 leading-snug" style={{ color: "var(--text-primary)" }}>
-                  {card.title}
-                </h3>
-                <p className="text-sm leading-relaxed mb-5" style={{ color: "var(--text-secondary)" }}>
-                  {card.desc}
-                </p>
-                <div
-                  className="text-sm font-medium flex items-center gap-1.5 link-hover group-hover:gap-2 transition-all"
-                  style={{ color: "var(--accent-primary)" }}
-                >
-                  {card.cta}
-                  <span>→</span>
+                  <div className="flex-1">
+                    <h3 className="text-[18px] font-semibold mb-2 leading-snug" style={{ color: "var(--text-primary)" }}>
+                      {card.title}
+                    </h3>
+                    <p className="text-sm leading-relaxed mb-4" style={{ color: "var(--text-secondary)" }}>
+                      {card.desc}
+                    </p>
+                    <div
+                      className="text-sm font-medium flex items-center gap-1.5 link-hover group-hover:gap-2 transition-all"
+                      style={{ color: "var(--accent-primary)" }}
+                    >
+                      {card.cta}
+                      <span>→</span>
+                    </div>
+                  </div>
                 </div>
               </Link>
             ))}
@@ -438,14 +458,15 @@ export default function Home() {
           />
           <div className="relative">
             <h2 className="display-2 mb-4" style={{ color: "var(--text-primary)" }}>
-              Ready to build compliant?
+              Three things every regulated dApp on HashKey needs. We built them.
             </h2>
             <p className="text-[17px] mb-8 max-w-xl mx-auto" style={{ color: "var(--text-secondary)" }}>
-              Mint a credential in under 2 minutes, or ship a compliance-gated dApp in under 10.
+              A KYC provider that actually gates access. An identity bridge to HashKey&apos;s own SBTs. Per-prover ZK expiry. Running today on testnet.
             </p>
             <div className="flex flex-wrap gap-3 justify-center">
-              <Link href="/kyc" className="btn btn-accent">Get verified</Link>
+              <Link href="/kyc" className="btn btn-accent">Get verified in 2 minutes</Link>
               <Link href="/composer" className="btn btn-secondary">Generate a policy</Link>
+              <Link href="/demo/fresh" className="btn btn-ghost link-hover">See the v6 ZK demo →</Link>
             </div>
           </div>
         </div>
@@ -470,28 +491,3 @@ function CheckIcon() {
   );
 }
 
-function UserIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
-    </svg>
-  );
-}
-
-function CodeIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="16 18 22 12 16 6" />
-      <polyline points="8 6 2 12 8 18" />
-    </svg>
-  );
-}
-
-function ShieldIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-    </svg>
-  );
-}

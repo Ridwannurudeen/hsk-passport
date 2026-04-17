@@ -113,6 +113,17 @@ export default function FreshDemoPage() {
   const [proveMs, setProveMs] = useState<number | null>(null);
   const [verifyResult, setVerifyResult] = useState<string | null>(null);
   const [verifyMode, setVerifyMode] = useState<"onchain" | "simulated" | null>(null);
+  const [progressStep, setProgressStep] = useState(0);
+
+  // Progress messages cycled during the ~4s proof generation so the user sees
+  // what the circuit is doing instead of a silent spinner.
+  const PROGRESS_STEPS = [
+    "Deriving identity commitment from secret…",
+    "Building Merkle inclusion proof (depth 16)…",
+    "Encoding Poseidon hashes (Keccak-free)…",
+    "Generating Groth16 proof over 4,665 wires…",
+    "Serializing proof for on-chain verifier…",
+  ];
 
   async function handleGenerate() {
     setError(null);
@@ -120,7 +131,20 @@ export default function FreshDemoPage() {
     setProveMs(null);
     setVerifyResult(null);
     setVerifyMode(null);
+    setProgressStep(0);
     setStage("generating");
+
+    // Cycle progress steps at a roughly even cadence while snarkjs runs.
+    // Step times are approximate; the real work happens inside fullProve.
+    const stepDelays = [350, 800, 600, 1600, 400];
+    const timers: number[] = [];
+    let cumulative = 0;
+    for (let i = 1; i < PROGRESS_STEPS.length; i++) {
+      cumulative += stepDelays[i - 1];
+      timers.push(
+        window.setTimeout(() => setProgressStep(i), cumulative)
+      );
+    }
 
     try {
       let identitySecret: bigint;
@@ -150,10 +174,13 @@ export default function FreshDemoPage() {
         zkeyUrl: FRESHNESS_ARTEFACTS.zkey,
       });
       const elapsed = performance.now() - t0;
+      timers.forEach((t) => window.clearTimeout(t));
+      setProgressStep(PROGRESS_STEPS.length - 1);
       setProof(p);
       setProveMs(elapsed);
       setStage("generated");
     } catch (e: unknown) {
+      timers.forEach((t) => window.clearTimeout(t));
       const msg = e instanceof Error ? e.message : String(e);
       if (/GreaterEqThan|constraint|Assert Failed/i.test(msg)) {
         setError(
@@ -356,6 +383,41 @@ export default function FreshDemoPage() {
         >
           {stage === "generating" ? "Generating proof…" : "Generate proof"}
         </button>
+        {stage === "generating" && (
+          <div className="mt-4 rounded-lg border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900">
+            <div className="mb-3 flex items-center gap-2 font-medium">
+              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              {PROGRESS_STEPS[progressStep]}
+            </div>
+            <ol className="space-y-1 text-xs">
+              {PROGRESS_STEPS.map((label, i) => {
+                const done = i < progressStep;
+                const active = i === progressStep;
+                return (
+                  <li key={label} className="flex items-start gap-2">
+                    <span
+                      className={`mt-0.5 inline-block h-4 w-4 flex-none rounded-full text-center text-[10px] leading-4 ${
+                        done
+                          ? "bg-green-500 text-white"
+                          : active
+                            ? "bg-indigo-500 text-white"
+                            : "bg-indigo-100 text-indigo-400"
+                      }`}
+                    >
+                      {done ? "✓" : i + 1}
+                    </span>
+                    <span className={done ? "text-indigo-700" : active ? "font-medium" : "text-indigo-400"}>
+                      {label}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        )}
         {proveMs !== null && proof && (
           <div className="mt-4 rounded-lg bg-green-50 p-4 text-sm text-green-900">
             <p className="font-medium">Proof generated in {proveMs.toFixed(0)} ms</p>
