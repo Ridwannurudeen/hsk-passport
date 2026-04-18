@@ -34,7 +34,7 @@ This does not replace HashKey's compliance stack. It makes it reusable, private,
 
 ### Policy Composer
 
-Generate a full compliance integration in 30 seconds at `/composer`. dApp builders tick rules and receive a deployable Solidity contract, React gate component, and Hardhat test. Four presets cover the common regulated patterns: Private RWA Allowlist (Reg D 506(c) style), Accredited DeFi Pool (accreditation-gated borrowing), APAC Regional RWA (jurisdiction-set proof over HK/SG/AE), and Institutional Tier (full KYC + accreditation + residency stack). **No other ZKID submission has this.** It turns HSK Passport from a protocol into an adoption tool — any HashKey dApp can be regulated in under 10 minutes.
+Generate a full compliance integration in 30 seconds at `/composer`. dApp builders tick rules and receive a deployable Solidity contract, React gate component, and Hardhat test. Four presets cover the common regulated patterns: Private RWA Allowlist (Reg D 506(c) style), Accredited DeFi Pool (accreditation-gated borrowing), APAC Regional RWA (jurisdiction-set proof over HK/SG/AE), and Institutional Tier (full KYC + accreditation + residency stack). It turns HSK Passport from a protocol into an adoption tool — any HashKey dApp can be regulated in under 10 minutes.
 
 ### Per-prover credential freshness (v6)
 

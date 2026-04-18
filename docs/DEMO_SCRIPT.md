@@ -59,7 +59,7 @@
 **On screen:** Navigate to `/kyc`
 
 **Voiceover:**
-> "Now from the user side. We use Sumsub — the same regulated KYC provider HashKey Exchange uses. Most other ZKID submissions simulate KYC. We actually wire it."
+> "Now from the user side. We use Sumsub — the same regulated KYC provider HashKey Exchange uses. Real applicant creation, real webhook, real on-chain auto-issuance. Sandbox mode for the demo, production tokens flip on for mainnet."
 
 **Visual:**
 1. Click "Connect & Create Identity" — wallet signature popup, sign
@@ -79,7 +79,7 @@
 **On screen:** Navigate to `/demo/fresh` (click "Fresh ZK · v6" in the nav)
 
 **Voiceover:**
-> "Here's where we stop following the zkID playbook and build something no other submission has. Every ZK identity protocol I've seen either ignores credential expiry or enforces it at the group level — which tells a dApp nothing about the individual prover. We wrote a custom Circom circuit that proves the specific prover's credential is within the freshness window, without revealing when they were issued."
+> "This is the part I'm most proud of. Most ZK identity protocols either ignore credential expiry or enforce it at the group level — which tells a dApp nothing about the individual prover's freshness. We wrote a custom Circom circuit that proves the specific prover's credential is within the freshness window, without revealing when it was issued."
 
 **Visual:**
 1. Show the page — point at the *Live · seeded credential, on-chain verify* mode toggle
@@ -116,7 +116,7 @@
 
 ### 02:20 — 02:45 — The strategic moat (25 sec)
 
-**On screen:** Back to homepage → scroll to the "Five things no other zkID submission has live today" section
+**On screen:** Back to homepage → scroll to the "Five primitives regulated dApps on HashKey Chain need" section
 
 **Voiceover:**
 > "Five things that together make HSK Passport the compliance layer regulated dApps on HashKey Chain can actually deploy today. Real Sumsub, wired. HashKey's own KYC SBT bridged. A Policy Composer that generates real code. A v6 per-prover ZK expiry proof. A published SDK and a forty-eight-hour timelock for every owner action. The primitives are all here. The inevitability is that every regulated dApp on this chain adopts them."

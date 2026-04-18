@@ -265,7 +265,7 @@ export default function Home() {
       </section>
 
       {/* ============================================================
-          WHAT NOBODY ELSE SHIPPED
+          WHAT WE SHIPPED
          ============================================================ */}
       <section className="relative border-y" style={{ borderColor: "var(--border-muted)", background: "var(--bg-subtle)" }}>
         <div className="absolute inset-0 bg-dots opacity-50 pointer-events-none" />
@@ -273,10 +273,10 @@ export default function Home() {
           <div className="max-w-2xl mb-12">
             <div className="eyebrow mb-3" style={{ color: "var(--accent-primary)" }}>What we actually shipped</div>
             <h2 className="display-2" style={{ color: "var(--text-primary)" }}>
-              Five things no other zkID submission has live today.
+              Five primitives regulated dApps on HashKey Chain need. We built them all.
             </h2>
             <p className="mt-4 text-[16px] leading-[1.6]" style={{ color: "var(--text-secondary)" }}>
-              Every regulated dApp has the same blockers: KYC provider wiring, identity-bridge integration, governance, an SDK that developers will actually install. We built all of them.
+              KYC provider wiring, a bridge to HashKey&apos;s own identity infrastructure, on-chain expiry enforcement, a policy-generation tool, and an installable SDK with governance baked in. Each one is live on testnet today.
             </p>
           </div>
           <div className="grid md:grid-cols-2 gap-4">
@@ -291,7 +291,7 @@ export default function Home() {
               {
                 num: "02",
                 title: "HashKey IKycSBT + .key DID bridges",
-                desc: "The only submission that reads HashKey's official KYC soulbound-token byte-for-byte and mints credentials from .key DID holders. Live on testnet, 10 passing tests.",
+                desc: "Deployed adapter that reads HashKey's official IKycSBT soulbound-token interface byte-for-byte, plus a .key DID bridge that mints credentials from HashKey DID holders. Both live on testnet, 10 passing adapter tests.",
                 href: "/bridge",
                 cta: "See the bridge",
               },
