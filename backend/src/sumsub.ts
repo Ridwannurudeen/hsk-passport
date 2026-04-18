@@ -1,8 +1,10 @@
 import crypto from "crypto";
 
 // Default to Sumsub sandbox so demo + local dev work out of the box.
-// Production deployments must set SUMSUB_BASE_URL=https://api.sumsub.com explicitly.
-const SUMSUB_BASE_URL = process.env.SUMSUB_BASE_URL || "https://api-stg.sumsub.com";
+// Sumsub uses ONE base host for both production and sandbox. Sandbox is
+// distinguished by the `sbx:` prefix on SUMSUB_APP_TOKEN, not by hostname.
+// The legacy `api-stg.sumsub.com` no longer resolves.
+const SUMSUB_BASE_URL = process.env.SUMSUB_BASE_URL || "https://api.sumsub.com";
 const SUMSUB_APP_TOKEN = process.env.SUMSUB_APP_TOKEN || "";
 const SUMSUB_SECRET_KEY = process.env.SUMSUB_SECRET_KEY || "";
 const SUMSUB_WEBHOOK_SECRET = process.env.SUMSUB_WEBHOOK_SECRET || "";
