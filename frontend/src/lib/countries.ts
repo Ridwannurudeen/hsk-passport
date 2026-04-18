@@ -134,3 +134,45 @@ export const COUNTRIES: Country[] = [
 export const COUNTRY_MAP: Record<string, string> = Object.fromEntries(
   COUNTRIES.map((c) => [c.code, c.name])
 );
+
+// ---------------------------------------------------------------------------
+// Sumsub integration — needs ISO 3166-1 alpha-3 codes, not the alpha-2 codes
+// used by the OCR flow above. Map the most common alpha-2 → alpha-3 codes so a
+// single dropdown value can drive both.
+// ---------------------------------------------------------------------------
+export const ALPHA2_TO_ALPHA3: Record<string, string> = {
+  HK: "HKG", SG: "SGP", AE: "ARE", US: "USA", GB: "GBR",
+  AU: "AUS", AT: "AUT", BE: "BEL", BR: "BRA", CA: "CAN",
+  CH: "CHE", CL: "CHL", CN: "CHN", CO: "COL", CZ: "CZE",
+  DE: "DEU", DK: "DNK", EG: "EGY", ES: "ESP", EE: "EST",
+  FI: "FIN", FR: "FRA", GH: "GHA", GR: "GRC", HU: "HUN",
+  ID: "IDN", IN: "IND", IE: "IRL", IL: "ISR", IT: "ITA",
+  JP: "JPN", KE: "KEN", KR: "KOR", LT: "LTU", LU: "LUX",
+  LV: "LVA", MX: "MEX", MY: "MYS", NG: "NGA", NL: "NLD",
+  NO: "NOR", NZ: "NZL", PK: "PAK", PE: "PER", PH: "PHL",
+  PL: "POL", PT: "PRT", RO: "ROU", SA: "SAU", SE: "SWE",
+  TH: "THA", TR: "TUR", TW: "TWN", UA: "UKR", VN: "VNM",
+  ZA: "ZAF", AR: "ARG", BD: "BGD", VE: "VEN", RU: "RUS",
+  AF: "AFG", AL: "ALB", DZ: "DZA", AO: "AGO", AM: "ARM",
+  AZ: "AZE", BH: "BHR", BY: "BLR", BO: "BOL", BA: "BIH",
+  BG: "BGR", KH: "KHM", CM: "CMR", CI: "CIV", HR: "HRV",
+  CY: "CYP", DO: "DOM", EC: "ECU", ET: "ETH", GE: "GEO",
+  GT: "GTM", HN: "HND", IS: "ISL", IR: "IRN", IQ: "IRQ",
+  JM: "JAM", JO: "JOR", KZ: "KAZ", KW: "KWT", KG: "KGZ",
+  LB: "LBN", LY: "LBY", MK: "MKD", MG: "MDG", MW: "MWI",
+  MT: "MLT", MA: "MAR", MM: "MMR", NP: "NPL", NI: "NIC",
+  OM: "OMN", PY: "PRY", QA: "QAT", RW: "RWA", SN: "SEN",
+  RS: "SRB", SK: "SVK", SI: "SVN", LK: "LKA", SD: "SDN",
+  SY: "SYR", TJ: "TJK", TZ: "TZA", TN: "TUN", UG: "UGA",
+  UY: "URY", UZ: "UZB", YE: "YEM", ZM: "ZMB", ZW: "ZWE",
+};
+
+/** Convert an alpha-2 country code to alpha-3 for Sumsub. Returns undefined for
+ *  unmapped codes (including "OTHER") so callers can omit the field. */
+export function toAlpha3(alpha2: string | undefined): string | undefined {
+  if (!alpha2) return undefined;
+  return ALPHA2_TO_ALPHA3[alpha2.toUpperCase()];
+}
+
+/** Default country selection in the KYC picker — matches HashKey's home market. */
+export const DEFAULT_COUNTRY = "HK";

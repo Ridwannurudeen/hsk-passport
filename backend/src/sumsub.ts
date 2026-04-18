@@ -83,12 +83,22 @@ export interface SumsubApplicant {
   };
 }
 
-/** Create or fetch an applicant for a given externalUserId (use Semaphore commitment as externalUserId). */
-export async function createApplicant(externalUserId: string): Promise<SumsubApplicant> {
+/** Create or fetch an applicant for a given externalUserId (use Semaphore commitment as externalUserId).
+ *  Optionally seeds `fixedInfo.country` so Sumsub's WebSDK surfaces the right document list
+ *  regardless of the requester's IP geolocation.
+ */
+export async function createApplicant(
+  externalUserId: string,
+  country?: string
+): Promise<SumsubApplicant> {
+  const body: { externalUserId: string; fixedInfo?: { country: string } } = { externalUserId };
+  if (country && /^[A-Z]{3}$/.test(country)) {
+    body.fixedInfo = { country };
+  }
   return callSumsub<SumsubApplicant>({
     method: "POST",
     uri: `/resources/applicants?levelName=${encodeURIComponent(SUMSUB_LEVEL_NAME)}`,
-    body: { externalUserId },
+    body,
   });
 }
 

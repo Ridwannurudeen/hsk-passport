@@ -10,6 +10,7 @@ import {
 } from "@/lib/semaphore";
 import { apiSubmitKYC, apiGetKYCStatus, apiGetSumsubConfig, apiSumsubInit, apiSumsubStatus, type KYCRequest } from "@/lib/api";
 import { SumsubVerification } from "@/components/SumsubVerification";
+import { DEFAULT_COUNTRY, toAlpha3 } from "@/lib/countries";
 import {
   loadFaceApiModels,
   extractDocumentText,
@@ -34,6 +35,9 @@ import {
 } from "@/lib/kyc-local";
 import { COUNTRIES } from "@/lib/countries";
 import { useToast } from "@/components/Toast";
+// COUNTRIES (alpha-2) reused for both the OCR jurisdiction selector and the
+// Sumsub-country picker on the identity stage. toAlpha3() maps to the format
+// Sumsub's fixedInfo.country expects.
 
 const CREDENTIAL_TYPES = [
   { id: "KYCVerified", name: "Standard KYC", desc: "Basic identity verification" },
@@ -52,6 +56,9 @@ export default function KYCPage() {
   const [sumsubAccessToken, setSumsubAccessToken] = useState<string>("");
   const [notifyEmail, setNotifyEmail] = useState<string>("");
   const [sumsubLevelName, setSumsubLevelName] = useState<string>("");
+  // Country of issuance for the ID document. Seeds Sumsub's fixedInfo.country so
+  // the WebSDK surfaces the correct document list regardless of the user's IP.
+  const [sumsubCountry, setSumsubCountry] = useState<string>(DEFAULT_COUNTRY);
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [credentialType, setCredentialType] = useState("KYCVerified");
 
@@ -238,7 +245,7 @@ export default function KYCPage() {
 
   async function startSumsubFlowFor(id: Identity) {
     try {
-      const init = await apiSumsubInit(getCommitment(id).toString(), notifyEmail || undefined);
+      const init = await apiSumsubInit(getCommitment(id).toString(), notifyEmail || undefined, toAlpha3(sumsubCountry));
       setSumsubAccessToken(init.accessToken);
       setSumsubLevelName(init.levelName);
       setMethod("sumsub");
@@ -251,7 +258,7 @@ export default function KYCPage() {
   async function startSumsubFlow() {
     if (!identity) return;
     try {
-      const init = await apiSumsubInit(getCommitment(identity).toString(), notifyEmail || undefined);
+      const init = await apiSumsubInit(getCommitment(identity).toString(), notifyEmail || undefined, toAlpha3(sumsubCountry));
       setSumsubAccessToken(init.accessToken);
       setSumsubLevelName(init.levelName);
       setMethod("sumsub");
@@ -621,6 +628,27 @@ export default function KYCPage() {
           </p>
 
           <div className="mb-5">
+            <label htmlFor="sumsub-country" className="block text-xs font-medium text-gray-300 mb-1.5">
+              Country of ID issuance
+            </label>
+            <select
+              id="sumsub-country"
+              value={sumsubCountry}
+              onChange={(e) => setSumsubCountry(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:border-purple-500 focus:outline-none"
+            >
+              {COUNTRIES.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.name} ({c.code})
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-gray-500 mt-1.5">
+              Sumsub will show the identity document types (passport, ID card, driver&apos;s license, residence permit) available for the selected country. Pick the country that issued your ID — not your current location.
+            </p>
+          </div>
+
+          <div className="mb-5">
             <label htmlFor="notify-email" className="block text-xs font-medium text-gray-300 mb-1.5">
               Email me when verification is complete <span className="text-gray-500 font-normal">(optional)</span>
             </label>
@@ -742,7 +770,7 @@ export default function KYCPage() {
             onError={(e) => toast(`Sumsub error: ${e.message.slice(0, 120)}`, "error")}
             onTokenExpired={async () => {
               if (!identity) throw new Error("No identity");
-              const fresh = await apiSumsubInit(getCommitment(identity).toString());
+              const fresh = await apiSumsubInit(getCommitment(identity).toString(), undefined, toAlpha3(sumsubCountry));
               setSumsubAccessToken(fresh.accessToken);
               return fresh.accessToken;
             }}

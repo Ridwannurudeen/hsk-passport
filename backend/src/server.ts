@@ -388,7 +388,7 @@ app.post("/api/kyc/sumsub/init", async (request, reply) => {
     return { error: "Sumsub not configured on this server" };
   }
 
-  const body = request.body as { commitment?: string; notifyEmail?: string };
+  const body = request.body as { commitment?: string; notifyEmail?: string; country?: string };
   if (!body.commitment || !/^\d+$/.test(body.commitment)) {
     reply.code(400);
     return { error: "missing or invalid commitment (must be numeric string)" };
@@ -397,12 +397,18 @@ app.post("/api/kyc/sumsub/init", async (request, reply) => {
     reply.code(400);
     return { error: "notifyEmail is not a valid email address" };
   }
+  if (body.country && !/^[A-Z]{3}$/.test(body.country)) {
+    reply.code(400);
+    return { error: "country must be a 3-letter uppercase ISO 3166-1 alpha-3 code" };
+  }
 
   try {
-    // Create or fetch applicant for this commitment
+    // Create or fetch applicant for this commitment. Country, if provided, seeds
+    // Sumsub's fixedInfo so the WebSDK shows docs for the right jurisdiction
+    // regardless of the applicant's IP geolocation.
     let applicant = await getApplicantByExternalId(body.commitment);
     if (!applicant) {
-      applicant = await createApplicant(body.commitment);
+      applicant = await createApplicant(body.commitment, body.country);
     }
 
     // If user provided an email and we haven't stored a request for this commitment yet,
