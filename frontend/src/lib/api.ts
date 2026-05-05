@@ -137,7 +137,8 @@ export async function apiGetSumsubConfig(): Promise<{ enabled: boolean; levelNam
 export async function apiSumsubInit(
   commitment: string,
   notifyEmail?: string,
-  country?: string
+  country?: string,
+  signal?: AbortSignal
 ): Promise<{
   applicantId: string;
   accessToken: string;
@@ -145,20 +146,37 @@ export async function apiSumsubInit(
   reviewStatus: string;
   reviewAnswer: string | null;
 }> {
-  const res = await fetch(`${apiBase()}/api/kyc/sumsub/init`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      commitment,
-      notifyEmail: notifyEmail || undefined,
-      country: country || undefined,
-    }),
+  const body = JSON.stringify({
+    commitment,
+    notifyEmail: notifyEmail || undefined,
+    country: country || undefined,
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-    throw new Error((err as { error?: string }).error || `Sumsub init failed: ${res.status}`);
+  // Retry once on network-level failure (TypeError from fetch). Sumsub's create-applicant
+  // is idempotent on externalUserId (= commitment), so a retry is safe. Skip retry on
+  // AbortError (we intentionally cancelled) or HTTP errors (real backend issue).
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(`${apiBase()}/api/kyc/sumsub/init`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+        signal,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        throw new Error((err as { error?: string }).error || `Sumsub init failed: ${res.status}`);
+      }
+      return res.json();
+    } catch (e) {
+      lastErr = e;
+      const err = e as Error;
+      if (err.name === "AbortError" || signal?.aborted) throw e;
+      if (!(err instanceof TypeError) || attempt === 1) throw e;
+      await new Promise((r) => setTimeout(r, 500));
+    }
   }
-  return res.json();
+  throw lastErr;
 }
 
 export interface SumsubIdDoc {
@@ -196,3 +214,4 @@ export async function apiSumsubStatus(commitment: string): Promise<{
   if (!res.ok) return {};
   return res.json();
 }
+

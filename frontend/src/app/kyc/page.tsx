@@ -90,6 +90,11 @@ export default function KYCPage() {
   // loads that wallet's identity (if it exists) or prompts a signature to create one.
   const [currentWallet, setCurrentWallet] = useState<string | null>(null);
 
+  // Dedupes concurrent Sumsub init calls. Without this, clicking "Connect & Create Identity"
+  // fires startSumsubFlowFor from the button handler AND from the [currentWallet] effect,
+  // and the browser cancels the losing in-flight fetch with TypeError: Failed to fetch.
+  const sumsubInitRef = useRef<{ controller: AbortController; commitment: string } | null>(null);
+
   function resetPerWalletState() {
     setExtractedData(null);
     setDocumentPreview("");
@@ -244,29 +249,34 @@ export default function KYCPage() {
   }
 
   async function startSumsubFlowFor(id: Identity) {
+    const commitment = getCommitment(id).toString();
+    // If a request for this same commitment is already in flight, don't fire another.
+    if (sumsubInitRef.current?.commitment === commitment) return;
+    // Cancel any prior in-flight init (different commitment, e.g. wallet switch).
+    sumsubInitRef.current?.controller.abort();
+    const controller = new AbortController();
+    sumsubInitRef.current = { controller, commitment };
     try {
-      const init = await apiSumsubInit(getCommitment(id).toString(), notifyEmail || undefined, toAlpha3(sumsubCountry));
+      const init = await apiSumsubInit(commitment, notifyEmail || undefined, toAlpha3(sumsubCountry), controller.signal);
+      if (controller.signal.aborted) return;
       setSumsubAccessToken(init.accessToken);
       setSumsubLevelName(init.levelName);
       setMethod("sumsub");
       setStage("sumsub");
     } catch (e) {
+      if (controller.signal.aborted || (e as Error).name === "AbortError") return;
       toast(`Sumsub init failed: ${(e as Error).message.slice(0, 150)}`, "error");
+    } finally {
+      if (sumsubInitRef.current?.controller === controller) {
+        sumsubInitRef.current = null;
+      }
     }
   }
 
   async function startSumsubFlow() {
     if (!identity) return;
-    try {
-      const init = await apiSumsubInit(getCommitment(identity).toString(), notifyEmail || undefined, toAlpha3(sumsubCountry));
-      setSumsubAccessToken(init.accessToken);
-      setSumsubLevelName(init.levelName);
-      setMethod("sumsub");
-      setStage("sumsub");
-      toast("Sumsub verification loading...", "info");
-    } catch (e) {
-      toast(`Sumsub init failed: ${(e as Error).message.slice(0, 150)}`, "error");
-    }
+    await startSumsubFlowFor(identity);
+    if (sumsubAccessToken) toast("Sumsub verification loading...", "info");
   }
 
   function startLocalFlow() {
