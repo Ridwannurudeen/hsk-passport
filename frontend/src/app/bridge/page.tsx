@@ -57,7 +57,7 @@ export default function BridgePage() {
 
   async function ensureIdentity() {
     if (identity) return identity;
-    const { address: walletAddr } = await connectWallet();
+    const { address: walletAddr } = await connectWallet("testnet");
     const sig = await signMessage("HSK Passport: Generate my Semaphore identity");
     const id = createIdentityFromSignature(sig, walletAddr);
     setIdentity(id);
@@ -67,7 +67,7 @@ export default function BridgePage() {
   async function mintMockDID() {
     setLoading(true);
     try {
-      const { signer, address: addr } = await connectWallet();
+      const { signer, address: addr } = await connectWallet("testnet");
       setAddress(addr);
       const mockDid = new Contract(ADDRESSES.mockHashKeyDID, MOCK_DID_ABI, signer);
       const tx = await mockDid.mint(addr, didName);
@@ -91,7 +91,7 @@ export default function BridgePage() {
     setLoading(true);
     try {
       const id = await ensureIdentity();
-      const { signer } = await connectWallet();
+      const { signer } = await connectWallet("testnet");
       const bridge = new Contract(ADDRESSES.hashKeyDIDBridge, BRIDGE_ABI, signer);
       const tx = await bridge.bridgeDID(didId, getCommitment(id));
       toast("Bridging DID → HSK Passport credential...", "info");
@@ -107,7 +107,7 @@ export default function BridgePage() {
   async function setMockKYC() {
     setLoading(true);
     try {
-      const { signer, address: addr } = await connectWallet();
+      const { signer, address: addr } = await connectWallet("testnet");
       setAddress(addr);
       const kyc = new Contract(ADDRESSES.mockKYCSoulbound, MOCK_KYC_SBT_ABI, signer);
       const tx = await kyc.setKYCLevel(addr, Number(kycLevel));
@@ -123,7 +123,7 @@ export default function BridgePage() {
     setLoading(true);
     try {
       const id = await ensureIdentity();
-      const { signer } = await connectWallet();
+      const { signer } = await connectWallet("testnet");
       const importer = new Contract(ADDRESSES.hashKeyKYCImporter, IMPORTER_ABI, signer);
       const tx = await importer.importKYC(getCommitment(id));
       toast("Importing HashKey KYC → HSK Passport credentials...", "info");

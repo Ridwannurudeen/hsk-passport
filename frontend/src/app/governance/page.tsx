@@ -1,4 +1,4 @@
-import { ADDRESSES, EXPLORER_URL } from "@/lib/contracts";
+import { ADDRESSES, EXPLORER_URL, MAINNET_ADDRESSES, MAINNET_EXPLORER_URL } from "@/lib/contracts";
 
 export default function GovernancePage() {
   return (
@@ -54,16 +54,19 @@ export default function GovernancePage() {
           </div>
           <div className="flex items-center justify-between pb-3 border-b border-gray-800">
             <div>
-              <div className="font-medium">IssuerRegistry</div>
-              <div className="text-xs text-gray-500">Staking + slashing (governance-gated)</div>
+              <div className="font-medium">
+                IssuerRegistry
+                <span className="ml-2 px-1.5 py-0.5 text-[10px] font-mono rounded bg-emerald-950/40 border border-emerald-800/60 text-emerald-300">mainnet</span>
+              </div>
+              <div className="text-xs text-gray-500">Staking + slashing (mainnet, chain 177)</div>
             </div>
             <a
-              href={`${EXPLORER_URL}/address/${ADDRESSES.issuerRegistry}`}
+              href={`${MAINNET_EXPLORER_URL}/address/${MAINNET_ADDRESSES.issuerRegistry}`}
               target="_blank"
               rel="noopener noreferrer"
               className="font-mono text-xs text-purple-300 hover:text-purple-200"
             >
-              {ADDRESSES.issuerRegistry.slice(0, 10)}...{ADDRESSES.issuerRegistry.slice(-6)}
+              {MAINNET_ADDRESSES.issuerRegistry.slice(0, 10)}...{MAINNET_ADDRESSES.issuerRegistry.slice(-6)}
             </a>
           </div>
           <div className="flex items-center justify-between">

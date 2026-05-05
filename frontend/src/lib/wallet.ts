@@ -26,9 +26,7 @@ const HASHKEY_MAINNET = {
 
 export type ChainTarget = "testnet" | "mainnet";
 
-export async function connectWallet(
-  target: ChainTarget = "testnet",
-): Promise<{
+export async function connectWallet(target: ChainTarget): Promise<{
   provider: BrowserProvider;
   signer: JsonRpcSigner;
   address: string;
@@ -59,7 +57,17 @@ export async function connectWallet(
         throw switchError;
       }
     }
+    // Re-validate chain after switch — MetaMask may resolve `wallet_switchEthereumChain`
+    // against a *different* RPC entry the user already has saved for this chainId.
+    // We can't guarantee the RPC matches our canonical mainnet.hsk.xyz, but we can
+    // at least confirm the chainId itself is what we asked for.
     const freshProvider = new BrowserProvider(window.ethereum);
+    const freshNet = await freshProvider.getNetwork();
+    if (Number(freshNet.chainId) !== desiredChainId) {
+      throw new Error(
+        `Chain switch failed: expected ${desiredChainId}, got ${freshNet.chainId}`,
+      );
+    }
     const signer = await freshProvider.getSigner();
     const address = await signer.getAddress();
     return { provider: freshProvider, signer, address };

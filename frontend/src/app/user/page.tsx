@@ -95,7 +95,7 @@ export default function UserPage() {
     setLoading(true);
     setStatus("Sign the message in MetaMask to create your identity...");
     try {
-      const { address: walletAddr } = await connectWallet();
+      const { address: walletAddr } = await connectWallet("testnet");
       const sig = await signMessage("HSK Passport: Generate my Semaphore identity");
       const id = createIdentityFromSignature(sig, walletAddr);
       setIdentity(id);

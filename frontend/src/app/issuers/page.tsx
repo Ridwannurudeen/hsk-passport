@@ -139,6 +139,17 @@ export default function IssuersPage() {
         </div>
       </div>
 
+      <div className="mb-8 rounded-xl border border-amber-700/60 bg-amber-950/30 p-4 text-sm">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 inline-block w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
+          <div className="text-amber-100/80 leading-relaxed">
+            <span className="font-semibold text-amber-200">Soft-mainnet:</span> registry owner is a deployer EOA
+            (<code className="px-1 py-0.5 rounded bg-black/30 text-xs">0x0b17…50DF</code>), not yet a Safe + 48h Timelock.
+            Slashing can be called without governance delay until migration in Q3 2026.
+          </div>
+        </div>
+      </div>
+
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-10">
           <Stat label="Total issuers" value={stats.totalIssuers.toString()} />

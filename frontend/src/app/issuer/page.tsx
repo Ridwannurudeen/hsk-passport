@@ -32,7 +32,7 @@ export default function IssuerPage() {
 
   async function handleConnect() {
     try {
-      const { signer, address: addr } = await connectWallet();
+      const { signer, address: addr } = await connectWallet("testnet");
       setAddress(addr);
       setConnected(true);
       const passport = new Contract(ADDRESSES.hskPassport, HSK_PASSPORT_ABI, signer);
@@ -59,7 +59,7 @@ export default function IssuerPage() {
       let auth = issuerAuth;
       if (auth && Date.now() - auth.nonce > 4 * 60_000) {
         try {
-          const { signer, address: addr } = await connectWallet();
+          const { signer, address: addr } = await connectWallet("testnet");
           const nonce = Date.now();
           const sig = await signer.signMessage(buildIssuerReadMessage(nonce));
           auth = { address: addr, signature: sig, nonce };
@@ -97,7 +97,7 @@ export default function IssuerPage() {
     }
     setReviewingId(req.id);
     try {
-      const { signer } = await connectWallet();
+      const { signer } = await connectWallet("testnet");
       const passport = new Contract(ADDRESSES.hskPassport, HSK_PASSPORT_ABI, signer);
 
       const groupId = CREDENTIAL_TYPE_TO_GROUP[req.credential_type];
@@ -131,7 +131,7 @@ export default function IssuerPage() {
       const msg = (e as Error).message;
       if (msg.includes("CredentialAlreadyIssued")) {
         try {
-          const { signer: s2 } = await connectWallet();
+          const { signer: s2 } = await connectWallet("testnet");
           const nonce2 = Date.now();
           const sig2 = await s2.signMessage(buildReviewMessage(req.id, "approve", nonce2));
           await apiReviewKYC({ id: req.id, reviewer: address, action: "approve", signature: sig2, nonce: nonce2 });
@@ -153,7 +153,7 @@ export default function IssuerPage() {
     const reason = prompt("Rejection reason (optional):") || "Did not meet verification requirements";
     setReviewingId(req.id);
     try {
-      const { signer } = await connectWallet();
+      const { signer } = await connectWallet("testnet");
       const nonce = Date.now();
       const signature = await signer.signMessage(buildReviewMessage(req.id, "reject", nonce));
 

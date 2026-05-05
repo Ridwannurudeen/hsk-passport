@@ -142,6 +142,36 @@ export default function IssuerProgramPage() {
       toast("Connect your wallet first.", "error");
       return;
     }
+
+    // Second-confirmation gate for non-trivial stakes. KYC Provider tier is
+    // 1000 HSK; Institutional is 10000 HSK. Below that (Community) is allowed
+    // through without the modal. Above the upper threshold we require typing
+    // the amount a second time.
+    const tier = stakeNum >= 10_000 ? "Institutional" : stakeNum >= 1_000 ? "KYC Provider" : "Community";
+    if (stakeNum >= 1_000) {
+      const ok = window.confirm(
+        `You are about to stake ${stakeNum} HSK on HashKey Chain mainnet (chain 177).\n\n` +
+          `Tier: ${tier}\n` +
+          `Destination: ${MAINNET_ADDRESSES.issuerRegistry}\n` +
+          `Stake is locked for 7 days after requestUnstake().\n` +
+          `Partial withdrawal is not supported.\n\n` +
+          `Continue?`,
+      );
+      if (!ok) {
+        toast("Stake cancelled.", "info");
+        return;
+      }
+    }
+    if (stakeNum >= 10_000) {
+      const typed = window.prompt(
+        `Type the exact stake amount again to confirm:\n${stakeNum} HSK`,
+      );
+      if (typed?.trim() !== String(stakeNum)) {
+        toast("Stake amount confirmation failed — cancelled.", "error");
+        return;
+      }
+    }
+
     setSubmitting(true);
     setTx(null);
     try {
@@ -153,8 +183,19 @@ export default function IssuerProgramPage() {
         );
         return;
       }
-      const reg = new Contract(MAINNET_ADDRESSES.issuerRegistry, ISSUER_REGISTRY_ABI, signer);
+      // Refuse to spend more than wallet balance minus a generous gas reserve.
+      // Prevents "stake amount exceeds balance" reverts that still cost gas.
       const value = parseEther(form.stakeAmount);
+      const balance = await signer.provider.getBalance(current);
+      const gasReserve = parseEther("0.01");
+      if (value + gasReserve > balance) {
+        toast(
+          `Insufficient balance. You have ${(Number(balance) / 1e18).toFixed(4)} HSK; need ${form.stakeAmount} + ~0.01 HSK gas.`,
+          "error",
+        );
+        return;
+      }
+      const reg = new Contract(MAINNET_ADDRESSES.issuerRegistry, ISSUER_REGISTRY_ABI, signer);
       const txn = await reg.stakeAndRegister(uri, { value });
       toast("Transaction submitted, waiting for confirmation…", "info");
       setTx(txn.hash);
@@ -197,6 +238,26 @@ export default function IssuerProgramPage() {
           </a>
           , publish your metadata, and start issuing credentials. Your tier (Community / KYC Provider / Institutional) is determined automatically by stake size. Misissuance is slashable via 48-hour governance Timelock. Credentials and KYC continue to issue on testnet pending third-party audit.
         </p>
+      </div>
+
+      {/* Honest disclosure: registry owner is still an EOA today, not the
+          Timelock the marketing copy implies. Slashing+ownership transfer to
+          a Safe + 48h Timelock is roadmap Q3 — until then, stake at your own
+          risk. Don't bury this. */}
+      <div className="mb-8 rounded-xl border border-amber-700/60 bg-amber-950/30 p-4 text-sm">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 inline-block w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
+          <div>
+            <div className="font-semibold text-amber-200 mb-1">Soft-mainnet — owner is an EOA today</div>
+            <div className="text-amber-100/80 leading-relaxed">
+              The IssuerRegistry on mainnet is owned by a deployer EOA{" "}
+              <code className="px-1 py-0.5 rounded bg-black/30 text-xs">0x0b17…50DF</code>, not yet a Safe + 48h Timelock.
+              Migration to multi-sig governance is planned for Q3 2026. If the deployer key is compromised before then,
+              <code className="px-1 py-0.5 mx-0.5 rounded bg-black/30 text-xs">slash()</code> can be called without delay.
+              Stake at your own risk — the Timelock copy below describes the post-migration end state.
+            </div>
+          </div>
+        </div>
       </div>
 
       <section className="mb-10 grid gap-4 md:grid-cols-3">

@@ -70,6 +70,21 @@ export interface IssuerRegistryStats {
 const provider = new JsonRpcProvider(CONFIG.mainnetRpcUrl);
 const registry = new Contract(CONFIG.mainnetIssuerRegistry, ISSUER_REGISTRY_ABI, provider);
 
+// Lazy chain-id assertion on first registry read. Fail fast if MAINNET_RPC_URL
+// has been overridden to a different chain — without this guard, a misconfig
+// or hostile env override silently indexes the wrong contract.
+let chainIdChecked = false;
+async function assertMainnetChain(): Promise<void> {
+  if (chainIdChecked) return;
+  const net = await provider.getNetwork();
+  if (Number(net.chainId) !== CONFIG.mainnetChainId) {
+    throw new Error(
+      `mainnet RPC chain mismatch: expected ${CONFIG.mainnetChainId}, got ${net.chainId}`,
+    );
+  }
+  chainIdChecked = true;
+}
+
 const METADATA_FETCH_TIMEOUT_MS = 5_000;
 const METADATA_MAX_BYTES = 32 * 1024;
 const METADATA_TTL_MS = 10 * 60_000;
@@ -510,6 +525,7 @@ async function mapWithConcurrency<T, R>(
 // ── On-chain registry read ───────────────────────────────────────
 
 async function loadIssuersFresh(): Promise<{ stats: IssuerRegistryStats; issuers: IssuerView[] }> {
+  await assertMainnetChain();
   const [communityMin, kycMin, institutionalMin, cooldown, addresses] = await Promise.all([
     registry.communityMinStake() as Promise<bigint>,
     registry.kycProviderMinStake() as Promise<bigint>,

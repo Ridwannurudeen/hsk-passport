@@ -158,7 +158,6 @@ const valid = await passport.verifyProof(15, proof);`}</pre>
               { label: "HSKPassport", address: "0x7d2E692A08f2fb0724238396e0436106b4FbD792" },
               { label: "CredentialRegistry", address: "0x20265dAe4711B3CeF88D7078bf1290f815279De1" },
               { label: "Semaphore", address: "0xd09e8Aec6B6A36588E7A105f606A9fe9a134CFE9" },
-              { label: "IssuerRegistry", address: "0x5BbAe6e90b82c7c51EbA9cA6D844D698dE2eb504" },
               { label: "Timelock (48h)", address: "0xb07Bc78559CbDe44c047b1dC3028d13c4f863D8A" },
               { label: "DemoIssuer", address: "0xBf7d566B8077A098F6844fb6b827D2A4118C88C3" },
               { label: "HashKeyDIDBridge", address: "0xF072D06adcA2B6d5941bde6cc87f41feC5F5Ea7a" },
@@ -183,6 +182,27 @@ const valid = await passport.verifyProof(15, proof);`}</pre>
               </div>
             ))}
           </dl>
+          <div className="mt-6 pt-5 border-t border-gray-800">
+            <div className="text-xs text-gray-500 mb-3 font-mono">
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-950/40 border border-emerald-800/60 text-emerald-300 mr-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                mainnet
+              </span>
+              HashKey Chain (chain ID 177)
+            </div>
+            <dl className="space-y-2 text-sm">
+              <div className="flex items-center justify-between py-1">
+                <dt className="text-gray-400">IssuerRegistry</dt>
+                <dd>
+                  <a href="https://explorer.hsk.xyz/address/0xf109cBe3D8d54D77C85ECF1367Cfcd6f075868e9"
+                    target="_blank" rel="noopener noreferrer"
+                    className="font-mono text-xs text-emerald-300 hover:text-emerald-200">
+                    0xf109cBe3D8d54D77C85ECF1367Cfcd6f075868e9
+                  </a>
+                </dd>
+              </div>
+            </dl>
+          </div>
         </div>
 
         <div className="grid grid-cols-3 sm:grid-cols-5 gap-3 mt-4 text-sm">

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { apiGetGlobalStats, type GlobalStats } from "@/lib/api";
-import { GROUPS, GROUP_NAMES, EXPLORER_URL, ADDRESSES } from "@/lib/contracts";
+import { GROUPS, GROUP_NAMES, EXPLORER_URL, ADDRESSES, MAINNET_ADDRESSES, MAINNET_EXPLORER_URL } from "@/lib/contracts";
 
 interface GroupStat {
   groupId: number;
@@ -136,7 +136,6 @@ export default function StatsPage() {
                   ["DemoIssuer", ADDRESSES.demoIssuer],
                   ["HashKeyDIDBridge", ADDRESSES.hashKeyDIDBridge],
                   ["HashKeyKYCImporter", ADDRESSES.hashKeyKYCImporter],
-                  ["IssuerRegistry", ADDRESSES.issuerRegistry],
                   ["Timelock", ADDRESSES.timelock],
                   ["GatedRWA (hSILVER)", ADDRESSES.gatedRWA],
                   ["KYCGatedAirdrop (hPILOT)", ADDRESSES.kycGatedAirdrop],
@@ -155,6 +154,30 @@ export default function StatsPage() {
                     </a>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            {/* Mainnet contracts (soft-mainnet: just IssuerRegistry today) */}
+            <div className="bg-gray-900 border border-emerald-900/50 rounded-xl p-5 mt-4">
+              <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-mono rounded bg-emerald-950/40 border border-emerald-800/60 text-emerald-300">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  mainnet
+                </span>
+                HashKey Chain (chain 177)
+              </h3>
+              <div className="space-y-1.5 text-xs">
+                <div className="flex justify-between py-1">
+                  <span className="text-gray-400">IssuerRegistry</span>
+                  <a
+                    href={`${MAINNET_EXPLORER_URL}/address/${MAINNET_ADDRESSES.issuerRegistry}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-mono text-xs text-emerald-300 hover:text-emerald-200"
+                  >
+                    {MAINNET_ADDRESSES.issuerRegistry.slice(0, 10)}...{MAINNET_ADDRESSES.issuerRegistry.slice(-6)}
+                  </a>
+                </div>
               </div>
             </div>
           </section>

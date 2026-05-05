@@ -50,7 +50,7 @@ export function WalletButton() {
     }
     setConnecting(true);
     try {
-      const { address: addr } = await connectWallet();
+      const { address: addr } = await connectWallet("testnet");
       setAddress(addr);
     } catch {
       // user rejected

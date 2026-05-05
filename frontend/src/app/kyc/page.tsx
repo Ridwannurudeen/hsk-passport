@@ -224,7 +224,7 @@ export default function KYCPage() {
 
   async function handleCreateIdentity() {
     try {
-      const { address: walletAddr } = await connectWallet();
+      const { address: walletAddr } = await connectWallet("testnet");
       setCurrentWallet(walletAddr.toLowerCase());
       const existing = loadIdentityForWallet(walletAddr);
       let id = existing;
@@ -289,7 +289,7 @@ export default function KYCPage() {
     if (reviewAnswer === "GREEN") {
       // Submit to our backend KYC queue for credential issuance
       try {
-        const { address } = await connectWallet();
+        const { address } = await connectWallet("testnet");
         await apiSubmitKYC({
           commitment: getCommitment(identity).toString(),
           wallet: address,
@@ -488,7 +488,7 @@ export default function KYCPage() {
     if (!identity || !extractedData) return;
     setSubmitting(true);
     try {
-      const { address } = await connectWallet();
+      const { address } = await connectWallet("testnet");
       const dataHash = await hashExtractedData(extractedData);
 
       const result = await apiSubmitKYC({

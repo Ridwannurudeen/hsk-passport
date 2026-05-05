@@ -63,7 +63,7 @@ export default function DemoPage() {
     (async () => {
       try {
         if (typeof window === "undefined" || !window.ethereum) return;
-        const { signer, address } = await connectWallet();
+        const { signer, address } = await connectWallet("testnet");
         const rwa = new Contract(ADDRESSES.gatedRWA, GATED_RWA_ABI, signer);
         const bal = await rwa.balanceOf(address);
         const balFloat = Number(bal) / 1e18;
@@ -86,7 +86,7 @@ export default function DemoPage() {
     setLoading(true);
     setLoadingText("Connecting wallet...");
     try {
-      const { address: walletAddr } = await connectWallet();
+      const { address: walletAddr } = await connectWallet("testnet");
       setLoadingText("Sign the message in MetaMask to create your identity...");
       const sig = await signMessage("HSK Passport: Generate my Semaphore identity");
       const id = createIdentityFromSignature(sig, walletAddr);
@@ -113,7 +113,7 @@ export default function DemoPage() {
     setLoading(true);
     setLoadingText("Issuing KYC credential on-chain...");
     try {
-      const { signer, address } = await connectWallet();
+      const { signer, address } = await connectWallet("testnet");
       const commitment = getCommitment(identity);
 
       // Two-layer pre-check. The DemoIssuer tracks claims per wallet address,
@@ -227,7 +227,7 @@ export default function DemoPage() {
       }
 
       // Bind proof to caller's address to prevent front-running
-      const { address: callerAddress } = await connectWallet();
+      const { address: callerAddress } = await connectWallet("testnet");
       const callerAsMessage = BigInt(callerAddress);
 
       setLoadingText("Generating Groth16 zero-knowledge proof (20-60 seconds)...");
@@ -264,7 +264,7 @@ export default function DemoPage() {
     setLoading(true);
     setLoadingText("Checking if you've already minted...");
     try {
-      const { signer, address } = await connectWallet();
+      const { signer, address } = await connectWallet("testnet");
       const rwa = new Contract(ADDRESSES.gatedRWA, GATED_RWA_ABI, signer);
 
       // Pre-flight check: has this nullifier already been used?
