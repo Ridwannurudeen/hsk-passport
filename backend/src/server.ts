@@ -27,6 +27,7 @@ import {
 } from "./sumsub.js";
 import { emailConfig, notifyCredentialApproved, notifyCredentialRejected } from "./notify.js";
 import { markKYCNotified } from "./db.js";
+import { getIssuersList } from "./issuers.js";
 
 const app = Fastify({ logger: { level: "info" } });
 
@@ -582,6 +583,20 @@ app.post("/api/kyc/sumsub/webhook", async (request, reply) => {
 });
 
 app.get("/api/notify/status", async () => ({ enabled: emailConfig.enabled, from: emailConfig.from }));
+
+// ================================================================
+// Third-party issuers (public directory + onboarding)
+// ================================================================
+
+app.get("/api/issuers", async (_request, reply) => {
+  try {
+    const data = await getIssuersList();
+    return data;
+  } catch (e) {
+    reply.code(502);
+    return { error: "issuer registry unavailable", detail: (e as Error).message?.slice(0, 200) };
+  }
+});
 
 // ================================================================
 // Start

@@ -5,6 +5,7 @@ export const CONFIG = {
   credentialRegistry: "0x20265dAe4711B3CeF88D7078bf1290f815279De1",
   demoIssuer: "0xBf7d566B8077A098F6844fb6b827D2A4118C88C3",
   gatedRWA: "0xb6955cb3e442c4222fFc3b92c322851109d0b9c9",
+  issuerRegistry: "0x5BbAe6e90b82c7c51EbA9cA6D844D698dE2eb504",
   deployBlock: Number(process.env.DEPLOY_BLOCK ?? 26400000),
   groups: {
     KYC_VERIFIED: 25,

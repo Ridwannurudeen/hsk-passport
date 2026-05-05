@@ -215,3 +215,61 @@ export async function apiSumsubStatus(commitment: string): Promise<{
   return res.json();
 }
 
+// ── IssuerRegistry directory ──────────────────────────────
+
+export interface IssuerMetadata {
+  name: string;
+  website?: string;
+  contact: { email: string; abuseEmail?: string; securityEmail?: string };
+  kycMethod: string;
+  kycMethodNotes?: string;
+  jurisdictions: string[];
+  regulatoryLicenses?: Array<{
+    regulator: string;
+    licenseNumber: string;
+    licenseType?: string;
+    validUntil?: string;
+    publicRegistryURL?: string;
+  }>;
+  supportedCredentials?: string[];
+  operationalSecurity?: {
+    keyCustody?: string;
+    incidentResponseURL?: string;
+    soc2Type2?: boolean;
+    iso27001?: boolean;
+  };
+  publishedAt: string;
+  logoURL?: string;
+}
+
+export interface IssuerView {
+  address: string;
+  active: boolean;
+  tier: number;
+  tierName: string;
+  stakeWei: string;
+  stakeHSK: string;
+  stakedAt: number;
+  totalIssued: number;
+  totalRevoked: number;
+  slashedAmountWei: string;
+  reputation: number;
+  metadataURI: string;
+  metadata: IssuerMetadata | null;
+  metadataError: string | null;
+}
+
+export interface IssuerRegistryStats {
+  communityMinStakeWei: string;
+  kycProviderMinStakeWei: string;
+  institutionalMinStakeWei: string;
+  unstakeCooldownSec: number;
+  totalIssuers: number;
+  activeIssuers: number;
+}
+
+export async function apiGetIssuers(): Promise<{ stats: IssuerRegistryStats; issuers: IssuerView[] }> {
+  const res = await fetch(`${apiBase()}/api/issuers`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`API ${res.status}`);
+  return res.json();
+}

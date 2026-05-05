@@ -157,3 +157,38 @@ export const SEMAPHORE_ABI = [
   "function getMerkleTreeSize(uint256 groupId) view returns (uint256)",
   "function verifyProof(uint256 groupId, tuple(uint256 merkleTreeDepth, uint256 merkleTreeRoot, uint256 nullifier, uint256 message, uint256 scope, uint256[8] points) proof) view returns (bool)",
 ] as const;
+
+// ---------------------------------------------------------------------------
+// IssuerRegistry — third-party issuer staking + reputation.
+// Tier mapping mirrors contracts/IssuerRegistry.sol::Tier.
+// ---------------------------------------------------------------------------
+export const ISSUER_TIER_NAMES: Record<number, string> = {
+  0: "None",
+  1: "Community",
+  2: "KYC Provider",
+  3: "Institutional",
+};
+
+export const ISSUER_REGISTRY_ABI = [
+  "function communityMinStake() view returns (uint256)",
+  "function kycProviderMinStake() view returns (uint256)",
+  "function institutionalMinStake() view returns (uint256)",
+  "function unstakeCooldown() view returns (uint256)",
+  "function issuers(address) view returns (uint256 stake, uint8 tier, uint256 stakedAt, uint256 totalIssued, uint256 totalRevoked, uint256 slashedAmount, bool active, string metadataURI)",
+  "function isActiveIssuer(address) view returns (bool)",
+  "function getTier(address) view returns (uint8)",
+  "function issuerCount() view returns (uint256)",
+  "function getAllIssuers() view returns (address[])",
+  "function reputationOf(address) view returns (int256)",
+  "function unstakeRequestedAt(address) view returns (uint256)",
+  "function stakeAndRegister(string metadataURI) payable",
+  "function setMetadataURI(string uri)",
+  "function requestUnstake()",
+  "function withdrawStake()",
+  "event IssuerStaked(address indexed issuer, uint256 amount, uint8 tier)",
+  "event IssuerUpgraded(address indexed issuer, uint8 from, uint8 to)",
+  "event UnstakeRequested(address indexed issuer, uint256 availableAt)",
+  "event Unstaked(address indexed issuer, uint256 amount)",
+  "event IssuerSlashed(address indexed issuer, uint256 amount, string reason)",
+  "event MetadataUpdated(address indexed issuer, string uri)",
+] as const;
