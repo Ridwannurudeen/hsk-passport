@@ -471,8 +471,12 @@ async function fetchMetadata(
       return cacheMetadata(uri, null, `HTTP ${res.status}`);
     }
     const ct = (res.headers.get("content-type") ?? "").toLowerCase();
-    if (!ct.includes("application/json") && !ct.includes("text/json")) {
-      return cacheMetadata(uri, null, "expected application/json content-type");
+    // GitHub gists, raw IPFS gateways, and many developer-friendly hosts serve
+    // JSON with "text/plain" or "application/octet-stream". JSON.parse +
+    // validateMetadata are the real gate — content-type is a hint only. Reject
+    // text/html outright (defense-in-depth against accidental HTML responses).
+    if (ct.includes("text/html")) {
+      return cacheMetadata(uri, null, "html responses not allowed");
     }
     const declaredLen = Number(res.headers.get("content-length") ?? -1);
     if (Number.isFinite(declaredLen) && declaredLen > METADATA_MAX_BYTES) {
