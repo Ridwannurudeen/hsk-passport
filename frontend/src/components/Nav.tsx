@@ -99,12 +99,13 @@ export default function Nav() {
             <span
               className="hidden md:inline-flex items-center gap-1.5 eyebrow mr-2"
               style={{ color: "var(--text-muted)" }}
+              title="Credentials and KYC issue on testnet pending third-party audit. Issuer staking is live on mainnet."
             >
               <span
                 className="w-1.5 h-1.5 rounded-full animate-pulse"
                 style={{ background: "var(--success)" }}
               />
-              testnet
+              testnet KYC · mainnet staking
             </span>
             <ThemeToggle />
             <WalletButton />
@@ -154,7 +155,7 @@ export default function Nav() {
                 className="w-1.5 h-1.5 rounded-full animate-pulse"
                 style={{ background: "var(--success)" }}
               />
-              HashKey testnet · v6 live
+              testnet KYC · mainnet staking · v6 live
             </div>
           </div>
         </div>
