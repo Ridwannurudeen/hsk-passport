@@ -17,6 +17,8 @@ const KYC_METHODS = [
   "other",
 ] as const;
 
+const KYC_METHODS_REQUIRING_NOTES = new Set<(typeof KYC_METHODS)[number]>(["in-house", "other"]);
+
 const SUPPORTED_CREDENTIAL_TYPES = [
   "KYCVerified",
   "AccreditedInvestor",
@@ -99,25 +101,56 @@ export default function IssuerProgramPage() {
   }
 
   async function handleStake() {
-    if (!form.metadataURI.trim()) {
+    const uri = form.metadataURI.trim();
+    if (!uri) {
       toast("Paste your metadata URI before staking.", "error");
       return;
     }
-    if (!/^https?:\/\/|^ipfs:\/\//.test(form.metadataURI)) {
+    // Mirror backend: only https:// or ipfs:// are accepted; the backend
+    // additionally rejects private IPs and non-CID ipfs paths.
+    if (!/^(https:\/\/|ipfs:\/\/)/i.test(uri)) {
       toast("metadataURI must start with https:// or ipfs://", "error");
       return;
     }
-    if (!form.stakeAmount || Number(form.stakeAmount) < 0) {
-      toast("Enter a stake amount in HSK.", "error");
+    // Up-to-18-decimal positive number, no scientific notation.
+    if (!/^\d+(\.\d{1,18})?$/.test(form.stakeAmount)) {
+      toast(
+        "Enter a stake amount in HSK as a plain decimal (e.g. 1000 or 1500.5). No scientific notation.",
+        "error",
+      );
+      return;
+    }
+    const stakeNum = Number(form.stakeAmount);
+    if (!Number.isFinite(stakeNum) || stakeNum < 0) {
+      toast("Stake amount must be a non-negative number.", "error");
+      return;
+    }
+    if (stakeNum > 10_000_000) {
+      toast("Stake amount looks unreasonably large — double-check the value.", "error");
+      return;
+    }
+    if (KYC_METHODS_REQUIRING_NOTES.has(form.kycMethod) && form.kycMethodNotes.trim().length < 10) {
+      toast(`kycMethod "${form.kycMethod}" requires a notes field of at least 10 characters.`, "error");
+      return;
+    }
+    if (!connected || !address) {
+      toast("Connect your wallet first.", "error");
       return;
     }
     setSubmitting(true);
     setTx(null);
     try {
-      const { signer } = await connectWallet();
+      const { signer, address: current } = await connectWallet();
+      if (current.toLowerCase() !== address.toLowerCase()) {
+        toast(
+          `Wallet account changed during the flow. Was ${address.slice(0, 6)}…, now ${current.slice(0, 6)}…. Reconnect and try again.`,
+          "error",
+        );
+        return;
+      }
       const reg = new Contract(ADDRESSES.issuerRegistry, ISSUER_REGISTRY_ABI, signer);
       const value = parseEther(form.stakeAmount);
-      const txn = await reg.stakeAndRegister(form.metadataURI.trim(), { value });
+      const txn = await reg.stakeAndRegister(uri, { value });
       toast("Transaction submitted, waiting for confirmation…", "info");
       setTx(txn.hash);
       const receipt = await txn.wait();

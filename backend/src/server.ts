@@ -588,13 +588,46 @@ app.get("/api/notify/status", async () => ({ enabled: emailConfig.enabled, from:
 // Third-party issuers (public directory + onboarding)
 // ================================================================
 
-app.get("/api/issuers", async (_request, reply) => {
+// Per-IP sliding-window limiter for /api/issuers. Bounded map to prevent
+// unbounded growth from a flood of distinct IPs.
+const ISSUERS_RATE_WINDOW_MS = 60_000;
+const ISSUERS_RATE_LIMIT = 30;
+const ISSUERS_RATE_MAX_KEYS = 5_000;
+const issuersRateBuckets = new Map<string, number[]>();
+
+function rateAllow(key: string): boolean {
+  const now = Date.now();
+  const cutoff = now - ISSUERS_RATE_WINDOW_MS;
+  let bucket = issuersRateBuckets.get(key);
+  if (!bucket) {
+    bucket = [];
+    if (issuersRateBuckets.size >= ISSUERS_RATE_MAX_KEYS) {
+      const oldest = issuersRateBuckets.keys().next().value;
+      if (oldest !== undefined) issuersRateBuckets.delete(oldest);
+    }
+    issuersRateBuckets.set(key, bucket);
+  }
+  while (bucket.length && bucket[0] < cutoff) bucket.shift();
+  if (bucket.length >= ISSUERS_RATE_LIMIT) return false;
+  bucket.push(now);
+  return true;
+}
+
+app.get("/api/issuers", async (request, reply) => {
+  const key = request.ip || "unknown";
+  if (!rateAllow(key)) {
+    reply.code(429);
+    reply.header("retry-after", "60");
+    return { error: "rate limited" };
+  }
   try {
     const data = await getIssuersList();
+    reply.header("Cache-Control", "public, max-age=60");
     return data;
   } catch (e) {
+    request.log.error({ err: e }, "/api/issuers failed");
     reply.code(502);
-    return { error: "issuer registry unavailable", detail: (e as Error).message?.slice(0, 200) };
+    return { error: "issuer registry unavailable" };
   }
 });
 

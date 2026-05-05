@@ -1,4 +1,5 @@
 import { JsonRpcProvider, Contract, formatEther } from "ethers";
+import { promises as dns } from "node:dns";
 import { CONFIG } from "./config.js";
 
 const ISSUER_REGISTRY_ABI = [
@@ -71,6 +72,50 @@ const METADATA_FETCH_TIMEOUT_MS = 5_000;
 const METADATA_MAX_BYTES = 32 * 1024;
 const METADATA_TTL_MS = 10 * 60_000;
 const LIST_TTL_MS = 60_000;
+const METADATA_CACHE_MAX = 500;
+const FETCH_CONCURRENCY = 6;
+
+const ALLOWED_KYC_METHODS = new Set([
+  "sumsub", "onfido", "jumio", "veriff", "persona", "in-house", "other",
+]);
+const KYC_METHODS_REQUIRING_NOTES = new Set(["in-house", "other"]);
+const ALLOWED_KEY_CUSTODY = new Set(["hsm", "mpc", "multisig", "hot-wallet"]);
+const ALLOWED_CREDENTIAL_TYPES = new Set([
+  "KYCVerified", "AccreditedInvestor", "HKResident", "SGResident", "AEResident",
+]);
+const COUNTRY_CODE_RE = /^[A-Z]{2}$/;
+// RFC-5322-light: rejects whitespace, control chars, mailto-smuggle chars.
+const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+const HTTPS_RE = /^https:\/\//i;
+const HTTPS_OR_IPFS_RE = /^(https:\/\/|ipfs:\/\/)/i;
+// Strict CID: base58btc CIDv0 (Qm…) or base32 CIDv1 (baf…). Length-bounded
+// so a malformed value can't smuggle subdomain or path tricks.
+const IPFS_CID_RE = /^(baf[0-9a-z]{55,150}|Qm[1-9A-HJ-NP-Za-km-z]{44})$/;
+const IPFS_PATH_RE = /^[A-Za-z0-9._\-/]{0,200}$/;
+
+// ── Bounded LRU cache ────────────────────────────────────────────
+
+class LRUCache<K, V> {
+  private map = new Map<K, V>();
+  constructor(private max: number) {}
+  get(k: K): V | undefined {
+    const v = this.map.get(k);
+    if (v !== undefined) {
+      this.map.delete(k);
+      this.map.set(k, v);
+    }
+    return v;
+  }
+  set(k: K, v: V): void {
+    if (this.map.has(k)) this.map.delete(k);
+    this.map.set(k, v);
+    while (this.map.size > this.max) {
+      const oldest = this.map.keys().next().value;
+      if (oldest === undefined) break;
+      this.map.delete(oldest);
+    }
+  }
+}
 
 interface MetadataCacheEntry {
   fetchedAt: number;
@@ -78,7 +123,7 @@ interface MetadataCacheEntry {
   error: string | null;
 }
 
-const metadataCache = new Map<string, MetadataCacheEntry>();
+const metadataCache = new LRUCache<string, MetadataCacheEntry>(METADATA_CACHE_MAX);
 
 interface ListCache {
   fetchedAt: number;
@@ -87,16 +132,119 @@ interface ListCache {
 
 let listCache: ListCache | null = null;
 
-const ALLOWED_KYC_METHODS = new Set([
-  "sumsub", "onfido", "jumio", "veriff", "persona", "in-house", "other",
-]);
-const ALLOWED_KEY_CUSTODY = new Set(["hsm", "mpc", "multisig", "hot-wallet"]);
-const ALLOWED_CREDENTIAL_TYPES = new Set([
-  "KYCVerified", "AccreditedInvestor", "HKResident", "SGResident", "AEResident",
-]);
-const COUNTRY_CODE_RE = /^[A-Z]{2}$/;
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const HTTPS_OR_IPFS_RE = /^(https?:\/\/|ipfs:\/\/)/i;
+// ── SSRF defenses ────────────────────────────────────────────────
+
+function isPrivateIPv4(ip: string): boolean {
+  const parts = ip.split(".").map(Number);
+  if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) {
+    return true; // malformed treated as unsafe
+  }
+  const [a, b] = parts;
+  if (a === 0) return true;                                   // 0.0.0.0/8
+  if (a === 10) return true;                                  // 10.0.0.0/8
+  if (a === 127) return true;                                 // loopback
+  if (a === 100 && b >= 64 && b <= 127) return true;          // CGNAT 100.64.0.0/10
+  if (a === 169 && b === 254) return true;                    // link-local
+  if (a === 172 && b >= 16 && b <= 31) return true;           // 172.16.0.0/12
+  if (a === 192 && b === 168) return true;                    // 192.168.0.0/16
+  if (a === 192 && b === 0) return true;                      // 192.0.0.0/24 IETF
+  if (a >= 224) return true;                                  // multicast + reserved
+  return false;
+}
+
+function isPrivateIPv6(ip: string): boolean {
+  const lower = ip.toLowerCase().replace(/^\[|\]$/g, "");
+  if (lower === "::1" || lower === "::") return true;
+  if (lower.startsWith("fe80:") || lower.startsWith("fe9") || lower.startsWith("fea") || lower.startsWith("feb")) return true; // link-local
+  if (/^f[cd][0-9a-f]?:/.test(lower)) return true;            // ULA fc00::/7
+  if (lower.startsWith("ff")) return true;                    // multicast
+  const v4mapped = lower.match(/^::ffff:([\d.]+)$/);
+  if (v4mapped) return isPrivateIPv4(v4mapped[1]);
+  return false;
+}
+
+async function isHostSafe(host: string): Promise<{ ok: boolean; reason?: string }> {
+  // Reject literal IP addresses outright if private.
+  if (/^[\d.]+$/.test(host)) {
+    if (isPrivateIPv4(host)) return { ok: false, reason: "private IPv4 literal" };
+    return { ok: true };
+  }
+  // Bracketed IPv6 or bare IPv6
+  if (host.includes(":") || /^\[.+\]$/.test(host)) {
+    if (isPrivateIPv6(host)) return { ok: false, reason: "private IPv6 literal" };
+    return { ok: true };
+  }
+  const lc = host.toLowerCase();
+  if (
+    lc === "localhost" ||
+    lc.endsWith(".localhost") ||
+    lc.endsWith(".local") ||
+    lc.endsWith(".internal") ||
+    lc.endsWith(".lan") ||
+    lc.endsWith(".intranet") ||
+    lc.endsWith(".corp") ||
+    lc.endsWith(".home")
+  ) {
+    return { ok: false, reason: "non-public hostname" };
+  }
+  try {
+    const records = await dns.lookup(host, { all: true, verbatim: true });
+    if (records.length === 0) return { ok: false, reason: "DNS no records" };
+    for (const r of records) {
+      if (r.family === 4 && isPrivateIPv4(r.address)) {
+        return { ok: false, reason: `resolves to private IPv4 ${r.address}` };
+      }
+      if (r.family === 6 && isPrivateIPv6(r.address)) {
+        return { ok: false, reason: `resolves to private IPv6 ${r.address}` };
+      }
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, reason: `DNS lookup failed: ${(e as Error).message?.slice(0, 60) ?? "unknown"}` };
+  }
+}
+
+function resolveIPFS(uri: string): { ok: true; url: string } | { ok: false; reason: string } {
+  if (!uri.startsWith("ipfs://")) return { ok: false, reason: "not an ipfs URI" };
+  const tail = uri.slice(7);
+  // Strip any auth / query / fragment that might smuggle hosts past the gateway.
+  if (/[@?#]/.test(tail)) return { ok: false, reason: "ipfs URI contains @, ? or #" };
+  const slashIdx = tail.indexOf("/");
+  const cid = slashIdx === -1 ? tail : tail.slice(0, slashIdx);
+  const path = slashIdx === -1 ? "" : tail.slice(slashIdx + 1);
+  if (!IPFS_CID_RE.test(cid)) return { ok: false, reason: "invalid IPFS CID" };
+  if (path && !IPFS_PATH_RE.test(path)) return { ok: false, reason: "invalid IPFS path" };
+  return { ok: true, url: `https://ipfs.io/ipfs/${cid}${path ? `/${path}` : ""}` };
+}
+
+async function readBoundedText(
+  res: Response,
+  maxBytes: number,
+): Promise<{ ok: true; text: string } | { ok: false; reason: string }> {
+  if (!res.body) return { ok: false, reason: "no response body" };
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let total = 0;
+  let text = "";
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel().catch(() => {});
+        return { ok: false, reason: `metadata exceeds ${maxBytes} bytes` };
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    text += decoder.decode();
+    return { ok: true, text };
+  } catch (e) {
+    return { ok: false, reason: `read failed: ${(e as Error).message?.slice(0, 60) ?? "unknown"}` };
+  }
+}
+
+// ── Metadata validation ──────────────────────────────────────────
 
 function clampString(v: unknown, max: number): string | undefined {
   if (typeof v !== "string") return undefined;
@@ -105,7 +253,25 @@ function clampString(v: unknown, max: number): string | undefined {
   return trimmed.slice(0, max);
 }
 
-function validateMetadata(raw: unknown): { ok: true; value: IssuerMetadata } | { ok: false; error: string } {
+function isSafeUrl(v: unknown): string | undefined {
+  if (typeof v !== "string") return undefined;
+  if (!HTTPS_OR_IPFS_RE.test(v)) return undefined;
+  // Reject URLs containing control chars / whitespace.
+  if (/[\s<>"\\ -]/.test(v)) return undefined;
+  return v.slice(0, 300);
+}
+
+function isCleanEmail(v: unknown): string | undefined {
+  if (typeof v !== "string") return undefined;
+  const trimmed = v.trim();
+  if (trimmed.length > 200) return undefined;
+  if (!EMAIL_RE.test(trimmed)) return undefined;
+  return trimmed;
+}
+
+function validateMetadata(
+  raw: unknown,
+): { ok: true; value: IssuerMetadata } | { ok: false; error: string } {
   if (!raw || typeof raw !== "object") return { ok: false, error: "metadata is not an object" };
   const m = raw as Record<string, unknown>;
 
@@ -114,12 +280,22 @@ function validateMetadata(raw: unknown): { ok: true; value: IssuerMetadata } | {
 
   const contactRaw = m.contact as Record<string, unknown> | undefined;
   if (!contactRaw || typeof contactRaw !== "object") return { ok: false, error: "contact missing" };
-  const email = clampString(contactRaw.email, 200);
-  if (!email || !EMAIL_RE.test(email)) return { ok: false, error: "contact.email invalid" };
+  const email = isCleanEmail(contactRaw.email);
+  if (!email) return { ok: false, error: "contact.email invalid" };
 
   const kycMethod = clampString(m.kycMethod, 32);
   if (!kycMethod || !ALLOWED_KYC_METHODS.has(kycMethod)) {
     return { ok: false, error: "kycMethod not in allowlist" };
+  }
+
+  let kycMethodNotes: string | undefined;
+  if (KYC_METHODS_REQUIRING_NOTES.has(kycMethod)) {
+    kycMethodNotes = clampString(m.kycMethodNotes, 500);
+    if (!kycMethodNotes || kycMethodNotes.length < 10) {
+      return { ok: false, error: `kycMethodNotes required (min 10 chars) when kycMethod is "${kycMethod}"` };
+    }
+  } else {
+    kycMethodNotes = clampString(m.kycMethodNotes, 500);
   }
 
   const jurisdictionsRaw = m.jurisdictions;
@@ -144,26 +320,20 @@ function validateMetadata(raw: unknown): { ok: true; value: IssuerMetadata } | {
     name,
     contact: {
       email,
-      abuseEmail: contactRaw.abuseEmail && EMAIL_RE.test(String(contactRaw.abuseEmail))
-        ? clampString(contactRaw.abuseEmail, 200)
-        : undefined,
-      securityEmail: contactRaw.securityEmail && EMAIL_RE.test(String(contactRaw.securityEmail))
-        ? clampString(contactRaw.securityEmail, 200)
-        : undefined,
+      abuseEmail: isCleanEmail(contactRaw.abuseEmail),
+      securityEmail: isCleanEmail(contactRaw.securityEmail),
     },
     kycMethod,
     jurisdictions,
     publishedAt,
   };
+  if (kycMethodNotes) sanitized.kycMethodNotes = kycMethodNotes;
 
-  const website = clampString(m.website, 300);
-  if (website && HTTPS_OR_IPFS_RE.test(website)) sanitized.website = website;
+  const website = isSafeUrl(m.website);
+  if (website) sanitized.website = website;
 
-  const notes = clampString(m.kycMethodNotes, 500);
-  if (notes) sanitized.kycMethodNotes = notes;
-
-  const logo = clampString(m.logoURL, 300);
-  if (logo && HTTPS_OR_IPFS_RE.test(logo)) sanitized.logoURL = logo;
+  const logo = isSafeUrl(m.logoURL);
+  if (logo) sanitized.logoURL = logo;
 
   const supported = m.supportedCredentials;
   if (Array.isArray(supported)) {
@@ -187,16 +357,19 @@ function validateMetadata(raw: unknown): { ok: true; value: IssuerMetadata } | {
         const regulator = clampString(l.regulator, 100);
         const licenseNumber = clampString(l.licenseNumber, 100);
         if (!regulator || !licenseNumber) return null;
-        const out: { regulator: string; licenseNumber: string; licenseType?: string; validUntil?: string; publicRegistryURL?: string } = {
-          regulator,
-          licenseNumber,
-        };
+        const out: {
+          regulator: string;
+          licenseNumber: string;
+          licenseType?: string;
+          validUntil?: string;
+          publicRegistryURL?: string;
+        } = { regulator, licenseNumber };
         const t = clampString(l.licenseType, 80);
         if (t) out.licenseType = t;
         const v = clampString(l.validUntil, 40);
         if (v && !Number.isNaN(Date.parse(v))) out.validUntil = v;
-        const u = clampString(l.publicRegistryURL, 300);
-        if (u && HTTPS_OR_IPFS_RE.test(u)) out.publicRegistryURL = u;
+        const u = isSafeUrl(l.publicRegistryURL);
+        if (u) out.publicRegistryURL = u;
         return out;
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);
@@ -208,8 +381,8 @@ function validateMetadata(raw: unknown): { ok: true; value: IssuerMetadata } | {
     const out: NonNullable<IssuerMetadata["operationalSecurity"]> = {};
     const custody = clampString(opsec.keyCustody, 32);
     if (custody && ALLOWED_KEY_CUSTODY.has(custody)) out.keyCustody = custody;
-    const incident = clampString(opsec.incidentResponseURL, 300);
-    if (incident && HTTPS_OR_IPFS_RE.test(incident)) out.incidentResponseURL = incident;
+    const incident = isSafeUrl(opsec.incidentResponseURL);
+    if (incident) out.incidentResponseURL = incident;
     if (typeof opsec.soc2Type2 === "boolean") out.soc2Type2 = opsec.soc2Type2;
     if (typeof opsec.iso27001 === "boolean") out.iso27001 = opsec.iso27001;
     if (Object.keys(out).length) sanitized.operationalSecurity = out;
@@ -218,74 +391,121 @@ function validateMetadata(raw: unknown): { ok: true; value: IssuerMetadata } | {
   return { ok: true, value: sanitized };
 }
 
-function resolveIPFS(uri: string): string {
-  if (uri.startsWith("ipfs://")) {
-    return `https://ipfs.io/ipfs/${uri.slice(7)}`;
-  }
-  return uri;
+// ── Metadata fetch ───────────────────────────────────────────────
+
+function cacheMetadata(uri: string, metadata: IssuerMetadata | null, error: string | null): {
+  metadata: IssuerMetadata | null;
+  error: string | null;
+} {
+  metadataCache.set(uri, { fetchedAt: Date.now(), metadata, error });
+  return { metadata, error };
 }
 
-async function fetchMetadata(uri: string): Promise<{ metadata: IssuerMetadata | null; error: string | null }> {
+async function fetchMetadata(
+  uri: string,
+): Promise<{ metadata: IssuerMetadata | null; error: string | null }> {
   const cached = metadataCache.get(uri);
   if (cached && Date.now() - cached.fetchedAt < METADATA_TTL_MS) {
     return { metadata: cached.metadata, error: cached.error };
   }
 
-  if (!HTTPS_OR_IPFS_RE.test(uri)) {
-    const result = { metadata: null, error: "metadataURI scheme not allowed (must be https or ipfs)" };
-    metadataCache.set(uri, { fetchedAt: Date.now(), ...result });
-    return result;
+  // Resolve to a concrete https URL.
+  let url: string;
+  if (uri.startsWith("ipfs://")) {
+    const r = resolveIPFS(uri);
+    if (!r.ok) return cacheMetadata(uri, null, r.reason);
+    url = r.url;
+  } else if (HTTPS_RE.test(uri)) {
+    url = uri;
+  } else {
+    return cacheMetadata(uri, null, "metadataURI must be https:// or ipfs://");
   }
 
-  const url = resolveIPFS(uri);
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return cacheMetadata(uri, null, "invalid URL");
+  }
+  if (parsed.protocol !== "https:") {
+    return cacheMetadata(uri, null, "non-https URL after resolution");
+  }
+
+  const hostCheck = await isHostSafe(parsed.hostname);
+  if (!hostCheck.ok) {
+    return cacheMetadata(uri, null, `host rejected: ${hostCheck.reason ?? "unsafe"}`);
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), METADATA_FETCH_TIMEOUT_MS);
-
   try {
-    const res = await fetch(url, { signal: controller.signal, redirect: "follow" });
+    const res = await fetch(parsed.toString(), {
+      signal: controller.signal,
+      redirect: "manual",
+      headers: { accept: "application/json" },
+    });
+    if (res.status >= 300 && res.status < 400) {
+      return cacheMetadata(uri, null, "redirects not allowed");
+    }
+    if (res.type === "opaqueredirect") {
+      return cacheMetadata(uri, null, "redirects not allowed");
+    }
     if (!res.ok) {
-      const result = { metadata: null, error: `HTTP ${res.status}` };
-      metadataCache.set(uri, { fetchedAt: Date.now(), ...result });
-      return result;
+      return cacheMetadata(uri, null, `HTTP ${res.status}`);
     }
-    const len = Number(res.headers.get("content-length") ?? 0);
-    if (len > METADATA_MAX_BYTES) {
-      const result = { metadata: null, error: "metadata exceeds 32KB" };
-      metadataCache.set(uri, { fetchedAt: Date.now(), ...result });
-      return result;
+    const ct = (res.headers.get("content-type") ?? "").toLowerCase();
+    if (!ct.includes("application/json") && !ct.includes("text/json")) {
+      return cacheMetadata(uri, null, "expected application/json content-type");
     }
-    const text = await res.text();
-    if (text.length > METADATA_MAX_BYTES) {
-      const result = { metadata: null, error: "metadata exceeds 32KB" };
-      metadataCache.set(uri, { fetchedAt: Date.now(), ...result });
-      return result;
+    const declaredLen = Number(res.headers.get("content-length") ?? -1);
+    if (Number.isFinite(declaredLen) && declaredLen > METADATA_MAX_BYTES) {
+      return cacheMetadata(uri, null, "metadata exceeds 32KB");
     }
-    let parsed: unknown;
+
+    const body = await readBoundedText(res, METADATA_MAX_BYTES);
+    if (!body.ok) return cacheMetadata(uri, null, body.reason);
+
+    let parsedJson: unknown;
     try {
-      parsed = JSON.parse(text);
+      parsedJson = JSON.parse(body.text);
     } catch {
-      const result = { metadata: null, error: "metadata is not valid JSON" };
-      metadataCache.set(uri, { fetchedAt: Date.now(), ...result });
-      return result;
+      return cacheMetadata(uri, null, "metadata is not valid JSON");
     }
-    const validated = validateMetadata(parsed);
-    if (!validated.ok) {
-      const result = { metadata: null, error: validated.error };
-      metadataCache.set(uri, { fetchedAt: Date.now(), ...result });
-      return result;
-    }
-    const result = { metadata: validated.value, error: null };
-    metadataCache.set(uri, { fetchedAt: Date.now(), ...result });
-    return result;
+    const validated = validateMetadata(parsedJson);
+    if (!validated.ok) return cacheMetadata(uri, null, validated.error);
+    return cacheMetadata(uri, validated.value, null);
   } catch (e) {
-    const error = e instanceof Error && e.name === "AbortError" ? "timeout" : (e as Error).message?.slice(0, 100) || "fetch failed";
-    const result = { metadata: null, error };
-    metadataCache.set(uri, { fetchedAt: Date.now(), ...result });
-    return result;
+    const err = e as Error;
+    const reason =
+      err?.name === "AbortError" ? "timeout" : err?.message?.slice(0, 60) ?? "fetch failed";
+    return cacheMetadata(uri, null, reason);
   } finally {
     clearTimeout(timer);
   }
 }
+
+// ── Concurrency-bounded mapping ──────────────────────────────────
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let cursor = 0;
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      const idx = cursor++;
+      if (idx >= items.length) return;
+      results[idx] = await fn(items[idx], idx);
+    }
+  };
+  const workerCount = Math.max(1, Math.min(concurrency, items.length));
+  await Promise.all(Array.from({ length: workerCount }, worker));
+  return results;
+}
+
+// ── On-chain registry read ───────────────────────────────────────
 
 async function loadIssuersFresh(): Promise<{ stats: IssuerRegistryStats; issuers: IssuerView[] }> {
   const [communityMin, kycMin, institutionalMin, cooldown, addresses] = await Promise.all([
@@ -296,32 +516,35 @@ async function loadIssuersFresh(): Promise<{ stats: IssuerRegistryStats; issuers
     registry.getAllIssuers() as Promise<string[]>,
   ]);
 
-  const issuers: IssuerView[] = [];
-  for (const addr of addresses) {
+  const issuers: IssuerView[] = await mapWithConcurrency(addresses, FETCH_CONCURRENCY, async (addr) => {
     const [data, reputation] = await Promise.all([
-      registry.issuers(addr) as Promise<[bigint, bigint, bigint, bigint, bigint, bigint, boolean, string]>,
+      registry.issuers(addr) as Promise<
+        [bigint, bigint, bigint, bigint, bigint, bigint, boolean, string]
+      >,
       registry.reputationOf(addr) as Promise<bigint>,
     ]);
     const [stake, tier, stakedAt, totalIssued, totalRevoked, slashedAmount, active, metadataURI] = data;
     const tierNum = Number(tier);
-    const meta = metadataURI ? await fetchMetadata(metadataURI) : { metadata: null, error: "no metadataURI" };
-    issuers.push({
+    const meta = metadataURI
+      ? await fetchMetadata(metadataURI)
+      : { metadata: null, error: "no metadataURI" };
+    return {
       address: addr.toLowerCase(),
       active,
       tier: tierNum,
       tierName: TIER_NAMES[tierNum] ?? "None",
       stakeWei: stake.toString(),
       stakeHSK: formatEther(stake),
-      stakedAt: Number(stakedAt),
-      totalIssued: Number(totalIssued),
-      totalRevoked: Number(totalRevoked),
+      stakedAt: stakedAt > BigInt(Number.MAX_SAFE_INTEGER) ? 0 : Number(stakedAt),
+      totalIssued: totalIssued > BigInt(Number.MAX_SAFE_INTEGER) ? 0 : Number(totalIssued),
+      totalRevoked: totalRevoked > BigInt(Number.MAX_SAFE_INTEGER) ? 0 : Number(totalRevoked),
       slashedAmountWei: slashedAmount.toString(),
-      reputation: Number(reputation),
+      reputation: reputation > BigInt(Number.MAX_SAFE_INTEGER) || reputation < BigInt(Number.MIN_SAFE_INTEGER) ? 0 : Number(reputation),
       metadataURI,
       metadata: meta.metadata,
       metadataError: meta.error,
-    });
-  }
+    };
+  });
 
   const activeCount = issuers.filter((i) => i.active).length;
 
@@ -338,7 +561,10 @@ async function loadIssuersFresh(): Promise<{ stats: IssuerRegistryStats; issuers
   };
 }
 
-export async function getIssuersList(): Promise<{ stats: IssuerRegistryStats; issuers: IssuerView[] }> {
+export async function getIssuersList(): Promise<{
+  stats: IssuerRegistryStats;
+  issuers: IssuerView[];
+}> {
   if (listCache && Date.now() - listCache.fetchedAt < LIST_TTL_MS) {
     return listCache.payload;
   }

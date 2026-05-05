@@ -15,7 +15,8 @@
     "website": {
       "type": "string",
       "format": "uri",
-      "description": "Public homepage."
+      "pattern": "^(https://|ipfs://)",
+      "description": "Public homepage. Must use https:// or ipfs:// scheme."
     },
     "contact": {
       "type": "object",
@@ -37,8 +38,9 @@
     },
     "kycMethodNotes": {
       "type": "string",
+      "minLength": 10,
       "maxLength": 500,
-      "description": "Required if kycMethod is 'other' or 'in-house'. Brief description of the verification process."
+      "description": "Brief description of the verification process. Required if kycMethod is 'other' or 'in-house'."
     },
     "jurisdictions": {
       "type": "array",
@@ -65,7 +67,7 @@
           "licenseNumber": { "type": "string" },
           "licenseType": { "type": "string" },
           "validUntil": { "type": "string", "format": "date" },
-          "publicRegistryURL": { "type": "string", "format": "uri" }
+          "publicRegistryURL": { "type": "string", "format": "uri", "pattern": "^(https://|ipfs://)" }
         }
       },
       "description": "Optional. Public regulatory licenses backing this issuer's operating mandate."
@@ -87,7 +89,7 @@
           "enum": ["hsm", "mpc", "multisig", "hot-wallet"],
           "description": "How the issuer key is held. 'hot-wallet' is acceptable for Tier 1 only."
         },
-        "incidentResponseURL": { "type": "string", "format": "uri" },
+        "incidentResponseURL": { "type": "string", "format": "uri", "pattern": "^(https://|ipfs://)" },
         "soc2Type2": { "type": "boolean" },
         "iso27001": { "type": "boolean" }
       }
@@ -100,8 +102,11 @@
     "logoURL": {
       "type": "string",
       "format": "uri",
+      "pattern": "^(https://|ipfs://)",
       "description": "Optional public logo. Recommended 512x512 PNG or SVG."
     }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "if": { "properties": { "kycMethod": { "enum": ["in-house", "other"] } } },
+  "then": { "required": ["kycMethodNotes"] }
 }

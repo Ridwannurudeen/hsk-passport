@@ -5,6 +5,37 @@ import { useEffect, useState } from "react";
 import { EXPLORER_URL, ISSUER_TIER_NAMES } from "@/lib/contracts";
 import { apiGetIssuers, type IssuerView, type IssuerRegistryStats } from "@/lib/api";
 
+// Whitelist for hrefs derived from issuer-supplied strings or the on-chain
+// metadataURI. Backend strips javascript:/data:/file: from validated metadata,
+// but the raw metadataURI is rendered as a "raw URI" link too — re-validate
+// here. ipfs:// is rewritten to a public gateway so the link is clickable.
+function safeHref(raw: string | undefined): string | undefined {
+  if (!raw || typeof raw !== "string") return undefined;
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.startsWith("ipfs://")) {
+    const tail = trimmed.slice(7);
+    if (/[@?#]/.test(tail)) return undefined;
+    if (!/^[A-Za-z0-9._\-/]+$/.test(tail)) return undefined;
+    return `https://ipfs.io/ipfs/${tail}`;
+  }
+  try {
+    const u = new URL(trimmed);
+    if (u.protocol !== "https:" && u.protocol !== "http:") return undefined;
+    return u.toString();
+  } catch {
+    return undefined;
+  }
+}
+
+function safeImgSrc(raw: string | undefined): string | undefined {
+  const href = safeHref(raw);
+  if (!href) return undefined;
+  // Only allow https for images to avoid mixed-content + cleartext leaks.
+  if (!href.startsWith("https://")) return undefined;
+  return href;
+}
+
 const TIER_TONE: Record<number, string> = {
   0: "border-gray-700 bg-gray-900/40 text-gray-400",
   1: "border-blue-800/50 bg-blue-950/30 text-blue-300",
@@ -164,6 +195,12 @@ function IssuerCard({ issuer }: { issuer: IssuerView }) {
   const tone = TIER_TONE[issuer.tier] ?? TIER_TONE[0];
   const meta = issuer.metadata;
   const slashed = BigInt(issuer.slashedAmountWei || "0") > 0n;
+  const logoSrc = safeImgSrc(meta?.logoURL);
+  const websiteHref = safeHref(meta?.website);
+  const metadataHref = safeHref(issuer.metadataURI);
+  const cleanEmail = meta && /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(meta.contact.email)
+    ? meta.contact.email
+    : null;
 
   return (
     <div className={`border rounded-xl p-5 ${tone}`}>
@@ -178,11 +215,13 @@ function IssuerCard({ issuer }: { issuer: IssuerView }) {
             {meta?.name ?? <span className="text-gray-500 italic">unnamed (metadata unavailable)</span>}
           </h3>
         </div>
-        {meta?.logoURL && (
+        {logoSrc && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={meta.logoURL}
+            src={logoSrc}
             alt=""
+            loading="lazy"
+            referrerPolicy="no-referrer"
             className="w-12 h-12 rounded object-cover flex-shrink-0 bg-gray-900"
             onError={(e) => {
               (e.currentTarget as HTMLImageElement).style.display = "none";
@@ -227,38 +266,43 @@ function IssuerCard({ issuer }: { issuer: IssuerView }) {
             <div className="mb-3">
               <div className="text-xs uppercase tracking-wider opacity-70 mb-1">Licenses</div>
               <ul className="text-xs space-y-0.5">
-                {meta.regulatoryLicenses.slice(0, 3).map((l, i) => (
-                  <li key={i} className="opacity-90">
-                    {l.regulator} · {l.licenseNumber}
-                    {l.publicRegistryURL && (
-                      <>
-                        {" "}
-                        <a
-                          href={l.publicRegistryURL}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="underline opacity-70 hover:opacity-100"
-                        >
-                          verify
-                        </a>
-                      </>
-                    )}
-                  </li>
-                ))}
+                {meta.regulatoryLicenses.slice(0, 3).map((l, i) => {
+                  const licHref = safeHref(l.publicRegistryURL);
+                  return (
+                    <li key={i} className="opacity-90">
+                      {l.regulator} · {l.licenseNumber}
+                      {licHref && (
+                        <>
+                          {" "}
+                          <a
+                            href={licHref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline opacity-70 hover:opacity-100"
+                          >
+                            verify
+                          </a>
+                        </>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}
           <div className="flex flex-wrap gap-3 text-xs pt-2 border-t border-white/5">
-            {meta.website && (
-              <a href={meta.website} target="_blank" rel="noreferrer" className="hover:underline opacity-80">
+            {websiteHref && (
+              <a href={websiteHref} target="_blank" rel="noopener noreferrer" className="hover:underline opacity-80">
                 website ↗
               </a>
             )}
-            <a href={`mailto:${meta.contact.email}`} className="hover:underline opacity-80">
-              contact
-            </a>
-            {issuer.metadataURI && (
-              <a href={issuer.metadataURI} target="_blank" rel="noreferrer" className="hover:underline opacity-50 ml-auto">
+            {cleanEmail && (
+              <a href={`mailto:${cleanEmail}`} className="hover:underline opacity-80">
+                contact
+              </a>
+            )}
+            {metadataHref && (
+              <a href={metadataHref} target="_blank" rel="noopener noreferrer" className="hover:underline opacity-50 ml-auto">
                 metadata.json ↗
               </a>
             )}
@@ -267,15 +311,15 @@ function IssuerCard({ issuer }: { issuer: IssuerView }) {
       )}
 
       {!meta && issuer.metadataError && (
-        <div className="text-xs text-amber-400/70 italic">
+        <div className="text-xs text-amber-400/70 italic break-all">
           metadata error: {issuer.metadataError}
-          {issuer.metadataURI && (
+          {metadataHref && (
             <>
               {" "}
               <a
-                href={issuer.metadataURI}
+                href={metadataHref}
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 className="underline"
               >
                 raw URI
