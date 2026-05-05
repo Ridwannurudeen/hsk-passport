@@ -5,7 +5,14 @@ export const CONFIG = {
   credentialRegistry: "0x20265dAe4711B3CeF88D7078bf1290f815279De1",
   demoIssuer: "0xBf7d566B8077A098F6844fb6b827D2A4118C88C3",
   gatedRWA: "0xb6955cb3e442c4222fFc3b92c322851109d0b9c9",
+  // Testnet IssuerRegistry — kept as a fallback for legacy callers; the
+  // production directory reads from MAINNET below.
   issuerRegistry: "0x5BbAe6e90b82c7c51EbA9cA6D844D698dE2eb504",
+  // Soft-mainnet: real-money issuer staking lives on chain 177; credentials
+  // and KYC continue to issue on testnet pending audit.
+  mainnetRpcUrl: process.env.MAINNET_RPC_URL || "https://mainnet.hsk.xyz",
+  mainnetChainId: 177,
+  mainnetIssuerRegistry: "0xf109cBe3D8d54D77C85ECF1367Cfcd6f075868e9",
   deployBlock: Number(process.env.DEPLOY_BLOCK ?? 26400000),
   groups: {
     KYC_VERIFIED: 25,

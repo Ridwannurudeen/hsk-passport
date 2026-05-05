@@ -65,8 +65,10 @@ export interface IssuerRegistryStats {
   activeIssuers: number;
 }
 
-const provider = new JsonRpcProvider(CONFIG.rpcUrl);
-const registry = new Contract(CONFIG.issuerRegistry, ISSUER_REGISTRY_ABI, provider);
+// IssuerRegistry lives on mainnet (chain 177). Other backend modules continue
+// to use the testnet provider; this file is the only mainnet read.
+const provider = new JsonRpcProvider(CONFIG.mainnetRpcUrl);
+const registry = new Contract(CONFIG.mainnetIssuerRegistry, ISSUER_REGISTRY_ABI, provider);
 
 const METADATA_FETCH_TIMEOUT_MS = 5_000;
 const METADATA_MAX_BYTES = 32 * 1024;

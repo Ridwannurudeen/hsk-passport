@@ -2,6 +2,17 @@ export const CHAIN_ID = 133;
 export const RPC_URL = "https://testnet.hsk.xyz";
 export const EXPLORER_URL = "https://hashkey-testnet.blockscout.com";
 
+// Mainnet — soft-mainnet posture: the IssuerRegistry contract is live on
+// chain 177 so issuers stake real HSK against their identity. Credentials
+// and KYC continue to issue on testnet pending third-party audit.
+export const MAINNET_CHAIN_ID = 177;
+export const MAINNET_RPC_URL = "https://mainnet.hsk.xyz";
+export const MAINNET_EXPLORER_URL = "https://explorer.hsk.xyz";
+
+export const MAINNET_ADDRESSES = {
+  issuerRegistry: "0xf109cBe3D8d54D77C85ECF1367Cfcd6f075868e9",
+};
+
 // V5 addresses — expiry enforcement + issuer slashing via timelock
 export const ADDRESSES = {
   semaphoreVerifier: "0xe874E5DE61fa40dAf82e8916489d1B7071aC3b9A",

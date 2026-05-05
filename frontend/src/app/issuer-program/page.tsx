@@ -4,7 +4,12 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Contract, parseEther } from "ethers";
 import { connectWallet } from "@/lib/wallet";
-import { ADDRESSES, EXPLORER_URL, ISSUER_REGISTRY_ABI, ISSUER_TIER_NAMES } from "@/lib/contracts";
+import {
+  MAINNET_ADDRESSES,
+  MAINNET_EXPLORER_URL,
+  ISSUER_REGISTRY_ABI,
+  ISSUER_TIER_NAMES,
+} from "@/lib/contracts";
 import { useToast } from "@/components/Toast";
 
 const KYC_METHODS = [
@@ -91,7 +96,7 @@ export default function IssuerProgramPage() {
 
   async function handleConnect() {
     try {
-      const { address: addr } = await connectWallet();
+      const { address: addr } = await connectWallet("mainnet");
       setAddress(addr);
       setConnected(true);
       toast(`Connected ${addr.slice(0, 6)}…${addr.slice(-4)}`, "success");
@@ -140,7 +145,7 @@ export default function IssuerProgramPage() {
     setSubmitting(true);
     setTx(null);
     try {
-      const { signer, address: current } = await connectWallet();
+      const { signer, address: current } = await connectWallet("mainnet");
       if (current.toLowerCase() !== address.toLowerCase()) {
         toast(
           `Wallet account changed during the flow. Was ${address.slice(0, 6)}…, now ${current.slice(0, 6)}…. Reconnect and try again.`,
@@ -148,7 +153,7 @@ export default function IssuerProgramPage() {
         );
         return;
       }
-      const reg = new Contract(ADDRESSES.issuerRegistry, ISSUER_REGISTRY_ABI, signer);
+      const reg = new Contract(MAINNET_ADDRESSES.issuerRegistry, ISSUER_REGISTRY_ABI, signer);
       const value = parseEther(form.stakeAmount);
       const txn = await reg.stakeAndRegister(uri, { value });
       toast("Transaction submitted, waiting for confirmation…", "info");
@@ -170,21 +175,27 @@ export default function IssuerProgramPage() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-12">
       <div className="mb-10">
-        <div className="inline-block px-3 py-1 mb-3 text-xs font-mono text-purple-400 border border-purple-800 rounded-full bg-purple-950/30">
-          Issuer onboarding
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          <span className="inline-block px-3 py-1 text-xs font-mono text-purple-400 border border-purple-800 rounded-full bg-purple-950/30">
+            Issuer onboarding
+          </span>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-mono text-emerald-300 border border-emerald-700 rounded-full bg-emerald-950/30">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            mainnet
+          </span>
         </div>
         <h1 className="text-4xl font-bold mb-3">Become an HSK Passport issuer</h1>
         <p className="text-gray-400 text-lg max-w-3xl">
-          Stake native HSK to{" "}
+          Stake native HSK on{" "}
           <a
-            href={`${EXPLORER_URL}/address/${ADDRESSES.issuerRegistry}`}
+            href={`${MAINNET_EXPLORER_URL}/address/${MAINNET_ADDRESSES.issuerRegistry}`}
             target="_blank"
             rel="noreferrer"
             className="text-purple-400 hover:underline"
           >
-            IssuerRegistry
+            HashKey Chain mainnet IssuerRegistry
           </a>
-          , publish your metadata, and start issuing credentials. Your tier (Community / KYC Provider / Institutional) is determined automatically by stake size. Misissuance is slashable via 48-hour governance Timelock.
+          , publish your metadata, and start issuing credentials. Your tier (Community / KYC Provider / Institutional) is determined automatically by stake size. Misissuance is slashable via 48-hour governance Timelock. Credentials and KYC continue to issue on testnet pending third-party audit.
         </p>
       </div>
 
@@ -440,7 +451,7 @@ export default function IssuerProgramPage() {
             <div className="text-xs text-gray-400 pt-3 border-t border-gray-800">
               Transaction:{" "}
               <a
-                href={`${EXPLORER_URL}/tx/${tx}`}
+                href={`${MAINNET_EXPLORER_URL}/tx/${tx}`}
                 target="_blank"
                 rel="noreferrer"
                 className="text-purple-400 hover:underline font-mono"

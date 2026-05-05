@@ -2,7 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { EXPLORER_URL, ISSUER_TIER_NAMES } from "@/lib/contracts";
+import {
+  MAINNET_ADDRESSES,
+  MAINNET_EXPLORER_URL,
+  ISSUER_TIER_NAMES,
+} from "@/lib/contracts";
 import { apiGetIssuers, type IssuerView, type IssuerRegistryStats } from "@/lib/api";
 
 // Whitelist for hrefs derived from issuer-supplied strings or the on-chain
@@ -95,19 +99,25 @@ export default function IssuersPage() {
   return (
     <div className="max-w-6xl mx-auto px-4 py-12">
       <div className="mb-10">
-        <div className="inline-block px-3 py-1 mb-3 text-xs font-mono text-purple-400 border border-purple-800 rounded-full bg-purple-950/30">
-          Issuer directory
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          <span className="inline-block px-3 py-1 text-xs font-mono text-purple-400 border border-purple-800 rounded-full bg-purple-950/30">
+            Issuer directory
+          </span>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-mono text-emerald-300 border border-emerald-700 rounded-full bg-emerald-950/30">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            mainnet
+          </span>
         </div>
         <h1 className="text-4xl font-bold mb-3">Approved HSK Passport issuers</h1>
         <p className="text-gray-400 text-lg max-w-3xl mb-6">
-          Every issuer here has staked native HSK to{" "}
+          Every issuer here has staked native HSK on{" "}
           <a
-            href={`${EXPLORER_URL}/address/0x5BbAe6e90b82c7c51EbA9cA6D844D698dE2eb504`}
+            href={`${MAINNET_EXPLORER_URL}/address/${MAINNET_ADDRESSES.issuerRegistry}`}
             target="_blank"
             rel="noreferrer"
             className="text-purple-400 hover:underline"
           >
-            IssuerRegistry
+            HashKey Chain mainnet IssuerRegistry
           </a>
           . Reputation is tracked on-chain (issuances minus 10× revocations). Misissuance can be slashed via 48-hour governance Timelock.
         </p>
@@ -233,7 +243,7 @@ function IssuerCard({ issuer }: { issuer: IssuerView }) {
       <div className="grid grid-cols-2 gap-3 text-xs mb-3">
         <Field label="Address">
           <a
-            href={`${EXPLORER_URL}/address/${issuer.address}`}
+            href={`${MAINNET_EXPLORER_URL}/address/${issuer.address}`}
             target="_blank"
             rel="noreferrer"
             className="font-mono hover:underline"
