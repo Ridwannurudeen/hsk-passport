@@ -156,7 +156,7 @@ function isPrivateIPv6(ip: string): boolean {
   const lower = ip.toLowerCase().replace(/^\[|\]$/g, "");
   if (lower === "::1" || lower === "::") return true;
   if (lower.startsWith("fe80:") || lower.startsWith("fe9") || lower.startsWith("fea") || lower.startsWith("feb")) return true; // link-local
-  if (/^f[cd][0-9a-f]?:/.test(lower)) return true;            // ULA fc00::/7
+  if (/^f[cd][0-9a-f]{2}:/.test(lower)) return true;          // ULA fc00::/7
   if (lower.startsWith("ff")) return true;                    // multicast
   const v4mapped = lower.match(/^::ffff:([\d.]+)$/);
   if (v4mapped) return isPrivateIPv4(v4mapped[1]);
