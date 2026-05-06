@@ -16,6 +16,7 @@ import {
 } from "./db.js";
 import { startIndexer } from "./indexer.js";
 import { startAutoIssuer } from "./auto-issuer.js";
+import { buildHealthReport, buildPrometheusMetrics } from "./health.js";
 import {
   sumsubConfig,
   createApplicant,
@@ -66,6 +67,37 @@ app.get("/health", async () => ({
   chainId: CONFIG.chainId,
   contract: CONFIG.hskPassport,
 }));
+
+// Detailed health report - drives the frontend status indicator and external
+// monitors (status page, Grafana, alerting). Returns 200 even when degraded so
+// the JSON is parseable; clients should look at `status` and `ok` fields.
+// Returns 503 only when the underlying report itself fails to build.
+app.get("/api/healthz", async (_request, reply) => {
+  try {
+    const report = await buildHealthReport();
+    reply.header("Cache-Control", "no-store");
+    return report;
+  } catch (e) {
+    reply.code(503);
+    return { ok: false, status: "error", error: (e as Error).message };
+  }
+});
+
+// Prometheus scrape endpoint. Same data as /api/healthz, plus per-group active
+// credential counts. Plain-text content type is required by the Prometheus
+// text-format spec.
+app.get("/api/metrics", async (_request, reply) => {
+  try {
+    const report = await buildHealthReport();
+    reply.header("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
+    reply.header("Cache-Control", "no-store");
+    return buildPrometheusMetrics(report);
+  } catch (e) {
+    reply.code(503);
+    reply.header("Content-Type", "text/plain; charset=utf-8");
+    return `# scrape failed: ${(e as Error).message}\n`;
+  }
+});
 
 app.get("/api/groups/:groupId/members", async (request, reply) => {
   const { groupId } = request.params as { groupId: string };

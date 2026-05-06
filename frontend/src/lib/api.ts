@@ -273,3 +273,36 @@ export async function apiGetIssuers(): Promise<{ stats: IssuerRegistryStats; iss
   if (!res.ok) throw new Error(`API ${res.status}`);
   return res.json();
 }
+
+// Health / status
+
+export type HealthStatus = "ok" | "warn" | "error";
+
+export interface HealthReport {
+  ok: boolean;
+  status: HealthStatus;
+  ts: number;
+  uptimeSec: number;
+  indexer: {
+    status: HealthStatus;
+    lastIndexedBlock: number;
+    headBlock: number;
+    lagBlocks: number;
+    lastSyncedAt: number | null;
+    secondsSinceSync: number | null;
+    lastError: string | null;
+  };
+  rpc: {
+    testnet: { ok: boolean; headBlock: number; latencyMs: number; error: string | null };
+    mainnet: { ok: boolean; headBlock: number; latencyMs: number; error: string | null };
+  };
+  db: { ok: boolean; activeCredentials: number; kycPending: number };
+}
+
+export async function apiGetHealth(): Promise<HealthReport> {
+  const res = await fetch(`${apiBase()}/api/healthz`, { cache: "no-store" });
+  // /api/healthz always returns parseable JSON, even when degraded - only
+  // throw on transport failure or 5xx where the body is not a HealthReport.
+  if (!res.ok && res.status !== 503) throw new Error(`API ${res.status}`);
+  return res.json();
+}
