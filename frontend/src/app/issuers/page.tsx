@@ -7,7 +7,13 @@ import {
   MAINNET_EXPLORER_URL,
   ISSUER_TIER_NAMES,
 } from "@/lib/contracts";
-import { apiGetIssuers, type IssuerView, type IssuerRegistryStats } from "@/lib/api";
+import {
+  apiGetIssuers,
+  apiGetRegistryGovernance,
+  type IssuerView,
+  type IssuerRegistryStats,
+  type RegistryGovernanceState,
+} from "@/lib/api";
 
 // Whitelist for hrefs derived from issuer-supplied strings or the on-chain
 // metadataURI. Backend strips javascript:/data:/file: from validated metadata,
@@ -71,6 +77,7 @@ function formatStakedAt(ts: number): string {
 export default function IssuersPage() {
   const [issuers, setIssuers] = useState<IssuerView[]>([]);
   const [stats, setStats] = useState<IssuerRegistryStats | null>(null);
+  const [governance, setGovernance] = useState<RegistryGovernanceState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -88,6 +95,9 @@ export default function IssuersPage() {
         setError(e instanceof Error ? e.message : "failed to load issuers");
         setLoading(false);
       });
+    apiGetRegistryGovernance().then((g) => {
+      if (!cancelled) setGovernance(g);
+    });
     return () => {
       cancelled = true;
     };
@@ -139,16 +149,8 @@ export default function IssuersPage() {
         </div>
       </div>
 
-      <div className="mb-8 rounded-xl border border-amber-700/60 bg-amber-950/30 p-4 text-sm">
-        <div className="flex items-start gap-3">
-          <span className="mt-0.5 inline-block w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
-          <div className="text-amber-100/80 leading-relaxed">
-            <span className="font-semibold text-amber-200">Soft-mainnet:</span> registry owner is a deployer EOA
-            (<code className="px-1 py-0.5 rounded bg-black/30 text-xs">0x0b17…50DF</code>), not yet a Safe + 48h Timelock.
-            Slashing can be called without governance delay until migration in Q3 2026.
-          </div>
-        </div>
-      </div>
+      <GovernanceBanner governance={governance} />
+
 
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-10">
@@ -199,6 +201,67 @@ export default function IssuersPage() {
           </div>
         </section>
       )}
+    </div>
+  );
+}
+
+function shortAddr(a?: string): string {
+  if (!a) return "—";
+  return `${a.slice(0, 6)}…${a.slice(-4)}`;
+}
+
+function GovernanceBanner({ governance }: { governance: RegistryGovernanceState | null }) {
+  // Until /api/registry/governance returns, fall back to the conservative
+  // soft-mainnet copy — same as before. After it returns, the banner reflects
+  // the actual on-chain ownership state.
+  if (!governance) {
+    return (
+      <div className="mb-8 rounded-xl border border-gray-700/60 bg-gray-900/40 p-4 text-sm">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 inline-block w-2 h-2 rounded-full bg-gray-500 flex-shrink-0" />
+          <div className="text-gray-300 leading-relaxed">
+            Loading on-chain governance state…
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const ownerLabel = governance.ownerIsTimelock ? "48h timelock" : "deployer EOA";
+  const slashingLabel = governance.slashingIsTimelock ? "48h timelock" : "deployer EOA";
+  const fullyHandedOff = governance.ownerIsTimelock && governance.slashingIsTimelock;
+
+  if (fullyHandedOff) {
+    return (
+      <div className="mb-8 rounded-xl border border-emerald-700/60 bg-emerald-950/30 p-4 text-sm">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 inline-block w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
+          <div className="text-emerald-100/85 leading-relaxed">
+            <span className="font-semibold text-emerald-200">Governance: 48h timelock.</span>{" "}
+            Owner and slashing authority are both the timelock contract
+            (<code className="px-1 py-0.5 rounded bg-black/30 text-xs">{shortAddr(governance.owner)}</code>).
+            Every parameter change and slashing must sit on-chain for at least{" "}
+            {governance.timelockMinDelaySec ? Math.round(governance.timelockMinDelaySec / 3600) : 48}h
+            before it can execute.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-8 rounded-xl border border-amber-700/60 bg-amber-950/30 p-4 text-sm">
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 inline-block w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
+        <div className="text-amber-100/80 leading-relaxed">
+          <span className="font-semibold text-amber-200">Soft-mainnet:</span>{" "}
+          registry owner is the {ownerLabel}{" "}
+          (<code className="px-1 py-0.5 rounded bg-black/30 text-xs">{shortAddr(governance.owner)}</code>);
+          slashing authority is the {slashingLabel}{" "}
+          (<code className="px-1 py-0.5 rounded bg-black/30 text-xs">{shortAddr(governance.slashingAuthority)}</code>).
+          Multi-sig handoff pending co-signer onboarding.
+        </div>
+      </div>
     </div>
   );
 }

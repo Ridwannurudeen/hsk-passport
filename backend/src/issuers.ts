@@ -10,6 +10,8 @@ const ISSUER_REGISTRY_ABI = [
   "function issuers(address) view returns (uint256 stake, uint8 tier, uint256 stakedAt, uint256 totalIssued, uint256 totalRevoked, uint256 slashedAmount, bool active, string metadataURI)",
   "function getAllIssuers() view returns (address[])",
   "function reputationOf(address) view returns (int256)",
+  "function owner() view returns (address)",
+  "function slashingAuthority() view returns (address)",
 ];
 
 const TIER_NAMES = ["None", "Community", "KYC Provider", "Institutional"];
@@ -274,7 +276,7 @@ function isSafeUrl(v: unknown): string | undefined {
   if (typeof v !== "string") return undefined;
   if (!HTTPS_OR_IPFS_RE.test(v)) return undefined;
   // Reject URLs containing control chars / whitespace.
-  if (/[\s<>"\\ -]/.test(v)) return undefined;
+  if (/[\s<>"\\\x00-\x1F]/.test(v)) return undefined;
   return v.slice(0, 300);
 }
 
@@ -592,5 +594,56 @@ export async function getIssuersList(): Promise<{
   }
   const payload = await loadIssuersFresh();
   listCache = { fetchedAt: Date.now(), payload };
+  return payload;
+}
+
+// ── Governance state ─────────────────────────────────────────
+
+export interface RegistryGovernanceState {
+  registryAddress: string;
+  owner: string;
+  slashingAuthority: string;
+  ownerIsTimelock: boolean;
+  slashingIsTimelock: boolean;
+  timelockMinDelaySec: number | null;
+}
+
+let governanceCache: { fetchedAt: number; payload: RegistryGovernanceState } | null = null;
+const GOVERNANCE_TTL_MS = 60_000;
+
+const TIMELOCK_PROBE_ABI = ["function getMinDelay() view returns (uint256)"];
+
+async function probeIsTimelock(addr: string): Promise<number | null> {
+  if (!addr || addr === "0x0000000000000000000000000000000000000000") return null;
+  try {
+    const c = new Contract(addr, TIMELOCK_PROBE_ABI, provider);
+    const delay: bigint = await c.getMinDelay();
+    return Number(delay);
+  } catch {
+    return null;
+  }
+}
+
+export async function getGovernanceState(): Promise<RegistryGovernanceState> {
+  if (governanceCache && Date.now() - governanceCache.fetchedAt < GOVERNANCE_TTL_MS) {
+    return governanceCache.payload;
+  }
+  await assertMainnetChain();
+  const [owner, slashingAuthority]: [string, string] = await Promise.all([
+    registry.owner(),
+    registry.slashingAuthority(),
+  ]);
+  const ownerDelay = await probeIsTimelock(owner);
+  const slashingDelay = await probeIsTimelock(slashingAuthority);
+  const minDelay = ownerDelay ?? slashingDelay;
+  const payload: RegistryGovernanceState = {
+    registryAddress: CONFIG.mainnetIssuerRegistry,
+    owner,
+    slashingAuthority,
+    ownerIsTimelock: ownerDelay !== null,
+    slashingIsTimelock: slashingDelay !== null,
+    timelockMinDelaySec: minDelay,
+  };
+  governanceCache = { fetchedAt: Date.now(), payload };
   return payload;
 }
