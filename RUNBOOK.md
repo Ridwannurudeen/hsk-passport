@@ -119,11 +119,35 @@ After this, slashings require a 48h scheduled call. Owner is still the deployer
 EOA so we can roll back via `setSlashingAuthority(deployer)` if the timelock is
 misconfigured.
 
-### Phase B2 — transfer ownership (IRREVERSIBLE)
+### Phase B2 — schedule a test proposal (validates the timelock)
 
-Only run after Phase B1 has been live for at least one verified test proposal
-(schedule any owner-only call via the timelock, wait 48h, execute, confirm
-nothing reverted).
+```
+PRIVATE_KEY=… npx hardhat run \
+  --network hashkey-mainnet \
+  scripts/schedule-timelock-test.ts
+```
+
+Schedules `IssuerRegistry.slash(deployer, 0, "timelock-test")` through the
+timelock — amount=0 means slashed=0 with no economic effect, just an event.
+Records the operation hash + salt to `mainnet-timelock-test-177.json`.
+
+### Phase B3 — execute the test proposal (after 48h)
+
+Wait at least 48h from Phase B2. Then:
+
+```
+PRIVATE_KEY=… npx hardhat run \
+  --network hashkey-mainnet \
+  scripts/execute-timelock-test.ts
+```
+
+Reads the operation hash from the JSON record, calls `timelock.execute(...)`.
+If the call reverts or `IssuerSlashed(amount=0)` doesn't fire, **stop** —
+do not proceed to Phase B4.
+
+### Phase B4 — transfer ownership (IRREVERSIBLE)
+
+Only run after Phase B3 succeeded.
 
 ```
 HANDOFF_PHASE=ownership PRIVATE_KEY=… npx hardhat run \
