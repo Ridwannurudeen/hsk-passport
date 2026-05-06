@@ -54,10 +54,16 @@ export async function runIndexerOnce() {
   const cursor = Number(getSyncState("last_block") ?? CONFIG.deployBlock);
   const latest = await provider.getBlockNumber();
 
-  if (cursor >= latest) return { fromBlock: cursor, toBlock: latest, issued: 0, revoked: 0 };
+  if (cursor >= latest) {
+    setSyncState("last_synced_at", String(Date.now()));
+    setSyncState("last_sync_error", "");
+    return { fromBlock: cursor, toBlock: latest, issued: 0, revoked: 0 };
+  }
 
   const r = await syncInChunks(cursor, latest);
   setSyncState("last_block", String(latest));
+  setSyncState("last_synced_at", String(Date.now()));
+  setSyncState("last_sync_error", "");
   return { fromBlock: cursor, toBlock: latest, issued: r.issuedCount, revoked: r.revokedCount };
 }
 
@@ -73,7 +79,12 @@ export function startIndexer() {
         console.log(`[indexer] blocks ${r.fromBlock}-${r.toBlock}: +${r.issued} issued, +${r.revoked} revoked`);
       }
     } catch (e) {
-      console.error("[indexer] sync error:", (e as Error).message);
+      const msg = (e as Error).message;
+      console.error("[indexer] sync error:", msg);
+      // Record the failure for /healthz so monitors can alert. last_synced_at is
+      // intentionally NOT updated — secondsSinceSync should keep growing until
+      // the next successful sync clears the error.
+      setSyncState("last_sync_error", msg.slice(0, 500));
     } finally {
       running = false;
     }

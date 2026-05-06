@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import { ToastProviderWrapper } from "@/components/ToastWrapper";
 import Nav from "@/components/Nav";
+import { HealthIndicator } from "@/components/HealthIndicator";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -137,10 +138,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                 Built for HashKey Chain Horizon Hackathon 2026 · MIT License
               </div>
               <div className="flex items-center gap-4 text-xs" style={{ color: "var(--text-muted)" }}>
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--success)" }} />
-                  All systems operational
-                </span>
+                <HealthIndicator />
                 <a
                   href="https://hashkey-testnet.blockscout.com/address/0x7d2E692A08f2fb0724238396e0436106b4FbD792"
                   target="_blank" rel="noopener noreferrer"
