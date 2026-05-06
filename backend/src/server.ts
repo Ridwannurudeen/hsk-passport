@@ -12,11 +12,14 @@ import {
   getKYCQueue,
   getKYCRequest,
   getKYCByCommitment,
+  getFreshnessLeafByCommitment,
+  setFreshnessCommitment,
   updateKYCStatus,
 } from "./db.js";
 import { startIndexer } from "./indexer.js";
 import { startAutoIssuer } from "./auto-issuer.js";
 import { buildHealthReport, buildPrometheusMetrics } from "./health.js";
+import { startAutoFreshness, getTreeState } from "./auto-freshness.js";
 import {
   sumsubConfig,
   createApplicant,
@@ -137,6 +140,7 @@ app.post("/api/kyc/submit", async (request, reply) => {
     credentialType?: string;
     documentType?: string;
     notifyEmail?: string;
+    freshnessCommitment?: string;
   };
 
   if (!body.commitment || !body.wallet || !body.jurisdiction || !body.credentialType) {
@@ -159,10 +163,22 @@ app.post("/api/kyc/submit", async (request, reply) => {
     reply.code(400);
     return { error: "notifyEmail is not a valid email address" };
   }
+  if (body.freshnessCommitment !== undefined) {
+    if (!/^\d+$/.test(body.freshnessCommitment) || body.freshnessCommitment.length > 80) {
+      reply.code(400);
+      return { error: "freshnessCommitment must be a numeric string (Poseidon(secret))" };
+    }
+  }
 
   // Check for existing pending request
   const existing = getKYCByCommitment(body.commitment) as any;
   if (existing && existing.status === "pending") {
+    // Allow attaching a freshness commitment to an already-pending request,
+    // which happens if the user generated their freshness identity after the
+    // initial Sumsub-init placeholder was created.
+    if (body.freshnessCommitment) {
+      setFreshnessCommitment(existing.id, body.freshnessCommitment);
+    }
     return { id: existing.id, status: "pending", message: "already submitted" };
   }
 
@@ -175,9 +191,33 @@ app.post("/api/kyc/submit", async (request, reply) => {
     credentialType: body.credentialType,
     documentType: body.documentType,
     notifyEmail: body.notifyEmail,
+    freshnessCommitment: body.freshnessCommitment,
   });
 
   return { id, status: "pending" };
+});
+
+// v6 freshness - Sumsub-flow users may not have submitted a /api/kyc/submit
+// request explicitly. This endpoint lets the frontend attach a freshness
+// commitment to whatever pending request exists for their Semaphore commitment,
+// or 404 if there is nothing to attach to.
+app.post("/api/kyc/freshness/attach", async (request, reply) => {
+  const body = request.body as { commitment?: string; freshnessCommitment?: string };
+  if (!body.commitment || !/^\d+$/.test(body.commitment)) {
+    reply.code(400);
+    return { error: "missing or invalid commitment" };
+  }
+  if (!body.freshnessCommitment || !/^\d+$/.test(body.freshnessCommitment) || body.freshnessCommitment.length > 80) {
+    reply.code(400);
+    return { error: "missing or invalid freshnessCommitment" };
+  }
+  const existing = getKYCByCommitment(body.commitment) as { id?: string } | undefined;
+  if (!existing?.id) {
+    reply.code(404);
+    return { error: "no KYC request found for that commitment" };
+  }
+  setFreshnessCommitment(existing.id, body.freshnessCommitment);
+  return { id: existing.id, ok: true };
 });
 
 interface KYCRow {
@@ -421,7 +461,12 @@ app.post("/api/kyc/sumsub/init", async (request, reply) => {
     return { error: "Sumsub not configured on this server" };
   }
 
-  const body = request.body as { commitment?: string; notifyEmail?: string; country?: string };
+  const body = request.body as {
+    commitment?: string;
+    notifyEmail?: string;
+    country?: string;
+    freshnessCommitment?: string;
+  };
   if (!body.commitment || !/^\d+$/.test(body.commitment)) {
     reply.code(400);
     return { error: "missing or invalid commitment (must be numeric string)" };
@@ -434,6 +479,12 @@ app.post("/api/kyc/sumsub/init", async (request, reply) => {
     reply.code(400);
     return { error: "country must be a 3-letter uppercase ISO 3166-1 alpha-3 code" };
   }
+  if (body.freshnessCommitment !== undefined) {
+    if (!/^\d+$/.test(body.freshnessCommitment) || body.freshnessCommitment.length > 80) {
+      reply.code(400);
+      return { error: "freshnessCommitment must be a numeric string" };
+    }
+  }
 
   try {
     // Create or fetch applicant for this commitment. Country, if provided, seeds
@@ -444,10 +495,13 @@ app.post("/api/kyc/sumsub/init", async (request, reply) => {
       applicant = await createApplicant(body.commitment, body.country);
     }
 
-    // If user provided an email and we haven't stored a request for this commitment yet,
-    // create a placeholder so the webhook can find the email later.
-    if (body.notifyEmail) {
-      const existing = getKYCByCommitment(body.commitment) as { id?: string; notify_email?: string } | undefined;
+    // Create or update the placeholder KYC row. We need a row whenever the user
+    // has provided either an email (so the webhook can email them) or a
+    // freshness commitment (so the auto-freshness loop has somewhere to look up
+    // the commitment after the webhook approves them). If neither, the row will
+    // be created in the webhook handler.
+    if (body.notifyEmail || body.freshnessCommitment) {
+      const existing = getKYCByCommitment(body.commitment) as { id?: string } | undefined;
       if (!existing) {
         insertKYCRequest({
           id: randomUUID(),
@@ -457,7 +511,10 @@ app.post("/api/kyc/sumsub/init", async (request, reply) => {
           credentialType: "KYCVerified",
           documentType: `sumsub:${(applicant.id || "").slice(0, 10)}`,
           notifyEmail: body.notifyEmail,
+          freshnessCommitment: body.freshnessCommitment,
         });
+      } else if (body.freshnessCommitment) {
+        setFreshnessCommitment(existing.id!, body.freshnessCommitment);
       }
     }
 
@@ -617,6 +674,47 @@ app.post("/api/kyc/sumsub/webhook", async (request, reply) => {
 app.get("/api/notify/status", async () => ({ enabled: emailConfig.enabled, from: emailConfig.from }));
 
 // ================================================================
+// v6 freshness - tree state + per-user identity lookup
+// ================================================================
+
+const KNOWN_GROUPS = new Set<number>(Object.values(CONFIG.groups));
+
+app.get("/api/freshness/state/:groupId", async (request, reply) => {
+  const { groupId } = request.params as { groupId: string };
+  const gid = Number(groupId);
+  if (!Number.isInteger(gid) || !KNOWN_GROUPS.has(gid)) {
+    reply.code(400);
+    return { error: "unknown groupId" };
+  }
+  reply.header("Cache-Control", "no-store");
+  return getTreeState(gid);
+});
+
+app.get("/api/freshness/identity/:commitment", async (request, reply) => {
+  const { commitment } = request.params as { commitment: string };
+  if (!/^\d+$/.test(commitment) || commitment.length > 80) {
+    reply.code(400);
+    return { error: "commitment must be a numeric string" };
+  }
+  const row = getFreshnessLeafByCommitment(commitment);
+  if (!row) {
+    reply.code(404);
+    return { status: "not_found" };
+  }
+  reply.header("Cache-Control", "no-store");
+  return {
+    status: "ok",
+    groupId: row.group_id,
+    leafIndex: row.leaf_index,
+    leaf: row.leaf,
+    issuanceTime: row.issuance_time,
+    rootAfterInsert: row.root_after_insert,
+    postedTx: row.posted_tx,
+    postedAt: row.posted_at,
+  };
+});
+
+// ================================================================
 // Third-party issuers (public directory + onboarding)
 // ================================================================
 
@@ -673,3 +771,4 @@ console.log(`[server] HSK Passport API listening on :${port}`);
 
 startIndexer();
 startAutoIssuer();
+startAutoFreshness();

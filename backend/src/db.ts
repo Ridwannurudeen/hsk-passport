@@ -50,11 +50,15 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_kyc_wallet ON kyc_requests(wallet_address);
 `);
 
-// Lightweight migration: add the email-notification columns if they don't exist yet
-// (SQLite doesn't support ADD COLUMN IF NOT EXISTS)
+// Lightweight migration: add the email-notification + freshness columns if they
+// don't exist yet (SQLite doesn't support ADD COLUMN IF NOT EXISTS).
 for (const col of [
   ["notify_email", "TEXT"],
   ["notified_at", "INTEGER"],
+  // freshness_commitment = Poseidon(freshnessSecret), bound to this KYC request.
+  // Optional: only set when the frontend supports v6 freshness proofs. Stored as
+  // a decimal-string bigint to match how Semaphore commitments are persisted.
+  ["freshness_commitment", "TEXT"],
 ]) {
   try {
     db.exec(`ALTER TABLE kyc_requests ADD COLUMN ${col[0]} ${col[1]}`);
@@ -76,6 +80,25 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_proofs_group ON proof_verifications(group_id);
+
+  -- v6 freshness leaves: ordered append-only log of leaves the auto-freshness
+  -- module has posted to FreshnessRegistry, one row per (group, leaf_index).
+  -- Used to (a) avoid double-posting after restart, (b) reconstruct the per-user
+  -- Merkle path the frontend needs for a freshness proof.
+  CREATE TABLE IF NOT EXISTS freshness_leaves (
+    group_id INTEGER NOT NULL,
+    leaf_index INTEGER NOT NULL,
+    freshness_commitment TEXT NOT NULL,
+    issuance_time INTEGER NOT NULL,
+    leaf TEXT NOT NULL,
+    root_after_insert TEXT NOT NULL,
+    posted_tx TEXT NOT NULL,
+    posted_at INTEGER NOT NULL,
+    PRIMARY KEY (group_id, leaf_index)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_freshness_commitment
+    ON freshness_leaves(freshness_commitment);
 `);
 
 export function getSyncState(key: string): string | null {
@@ -166,11 +189,12 @@ export function insertKYCRequest(req: {
   credentialType: string;
   documentType?: string;
   notifyEmail?: string;
+  freshnessCommitment?: string;
 }) {
   db.prepare(
     `INSERT INTO kyc_requests
-     (id, identity_commitment, wallet_address, jurisdiction, credential_type, document_type, status, submitted_at, notify_email)
-     VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)`
+     (id, identity_commitment, wallet_address, jurisdiction, credential_type, document_type, status, submitted_at, notify_email, freshness_commitment)
+     VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`
   ).run(
     req.id,
     req.commitment,
@@ -179,8 +203,18 @@ export function insertKYCRequest(req: {
     req.credentialType,
     req.documentType || null,
     Date.now(),
-    req.notifyEmail || null
+    req.notifyEmail || null,
+    req.freshnessCommitment || null
   );
+}
+
+/** Update the freshness commitment on an existing pending request — the user
+ *  may have generated their freshness identity after the initial submission
+ *  (e.g. between the Sumsub init call and the Sumsub webhook firing). */
+export function setFreshnessCommitment(id: string, freshnessCommitment: string) {
+  db.prepare(
+    "UPDATE kyc_requests SET freshness_commitment = ? WHERE id = ? AND freshness_commitment IS NULL",
+  ).run(freshnessCommitment, id);
 }
 
 export function markKYCNotified(id: string) {
@@ -223,4 +257,91 @@ export function updateKYCStatus(
     extras.rejectionReason || null,
     id
   );
+}
+
+// -------------------------------------------------------------------------
+// v6 freshness leaves
+// -------------------------------------------------------------------------
+
+export interface FreshnessLeafRow {
+  group_id: number;
+  leaf_index: number;
+  freshness_commitment: string;
+  issuance_time: number;
+  leaf: string;
+  root_after_insert: string;
+  posted_tx: string;
+  posted_at: number;
+}
+
+/** All approved KYC rows that have a freshness commitment but no leaf posted yet. */
+export function getPendingFreshnessIssuances(): {
+  id: string;
+  freshness_commitment: string;
+  credential_type: string;
+  reviewed_at: number | null;
+  tx_hash: string | null;
+}[] {
+  return db
+    .prepare(
+      `SELECT k.id, k.freshness_commitment, k.credential_type, k.reviewed_at, k.tx_hash
+       FROM kyc_requests k
+       WHERE k.status = 'approved'
+         AND k.freshness_commitment IS NOT NULL
+         AND NOT EXISTS (
+           SELECT 1 FROM freshness_leaves f
+           WHERE f.freshness_commitment = k.freshness_commitment
+         )
+       ORDER BY k.reviewed_at ASC`,
+    )
+    .all() as {
+      id: string;
+      freshness_commitment: string;
+      credential_type: string;
+      reviewed_at: number | null;
+      tx_hash: string | null;
+    }[];
+}
+
+export function insertFreshnessLeaf(row: FreshnessLeafRow) {
+  db.prepare(
+    `INSERT INTO freshness_leaves
+     (group_id, leaf_index, freshness_commitment, issuance_time, leaf, root_after_insert, posted_tx, posted_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    row.group_id,
+    row.leaf_index,
+    row.freshness_commitment,
+    row.issuance_time,
+    row.leaf,
+    row.root_after_insert,
+    row.posted_tx,
+    row.posted_at,
+  );
+}
+
+/** All leaves for a group, in insertion order. Used to rebuild the in-memory
+ *  Merkle tree on backend startup, and to serve `/api/freshness/state/:groupId`. */
+export function getFreshnessLeaves(groupId: number): FreshnessLeafRow[] {
+  return db
+    .prepare(
+      "SELECT * FROM freshness_leaves WHERE group_id = ? ORDER BY leaf_index ASC",
+    )
+    .all(groupId) as FreshnessLeafRow[];
+}
+
+/** Find a user's freshness leaf by their commitment. */
+export function getFreshnessLeafByCommitment(
+  freshnessCommitment: string,
+): FreshnessLeafRow | undefined {
+  return db
+    .prepare("SELECT * FROM freshness_leaves WHERE freshness_commitment = ?")
+    .get(freshnessCommitment) as FreshnessLeafRow | undefined;
+}
+
+export function getFreshnessLeafCount(groupId: number): number {
+  const row = db
+    .prepare("SELECT COUNT(*) AS c FROM freshness_leaves WHERE group_id = ?")
+    .get(groupId) as { c: number };
+  return row.c;
 }
