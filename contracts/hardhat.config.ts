@@ -2,7 +2,9 @@ import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
 import "dotenv/config";
 
-const PRIVATE_KEY = process.env.PRIVATE_KEY || "0x" + "0".repeat(64);
+const PRIVATE_KEY = process.env.PRIVATE_KEY;
+const DEPLOY_ACCOUNTS =
+  PRIVATE_KEY && /^0x[a-fA-F0-9]{64}$/.test(PRIVATE_KEY) ? [PRIVATE_KEY] : [];
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -18,12 +20,12 @@ const config: HardhatUserConfig = {
     "hashkey-testnet": {
       url: "https://testnet.hsk.xyz",
       chainId: 133,
-      accounts: [PRIVATE_KEY],
+      accounts: DEPLOY_ACCOUNTS,
     },
     "hashkey-mainnet": {
       url: "https://mainnet.hsk.xyz",
       chainId: 177,
-      accounts: [PRIVATE_KEY],
+      accounts: DEPLOY_ACCOUNTS,
     },
   },
 };

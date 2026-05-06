@@ -3,6 +3,16 @@ import type { NextConfig } from "next";
 const webpack = require("next/dist/compiled/webpack/webpack").webpack;
 
 const nextConfig: NextConfig = {
+  outputFileTracingRoot: process.cwd(),
+  async rewrites() {
+    const apiBase = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:4021";
+    return [
+      {
+        source: "/api/:path*",
+        destination: `${apiBase}/api/:path*`,
+      },
+    ];
+  },
   webpack: (config, { isServer }) => {
     config.experiments = {
       ...config.experiments,
