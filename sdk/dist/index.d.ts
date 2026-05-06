@@ -5,7 +5,12 @@ import { type NetworkName } from "./addresses";
 export { DEPLOYMENTS, type NetworkName } from "./addresses";
 export { Identity } from "@semaphore-protocol/identity";
 export type { SemaphoreProof } from "@semaphore-protocol/proof";
+/** Convert a string scope ("kyc-mint", "rwa-airdrop", ...) to the bigint the Semaphore
+ *  circuit expects. Numeric / bigint scopes pass through. UTF-8 byte encoding works
+ *  in browser and node — avoids the Node-only `Buffer` dependency. */
+export declare function scopeToField(scope: number | bigint | string): bigint;
 export { FreshnessTree, FRESHNESS_TREE_DEPTH, DEFAULT_ARTEFACTS, createFreshnessIdentity, generateFreshnessProof, HSKPassportFreshnessClient, type FreshnessIdentity, type FreshnessMerkleProof, type FreshnessProof, type ArtefactUrls, type FreshnessClientOptions, } from "./freshness";
+export { HSK_ELIGIBILITY_VERIFIER_ABI, HSKEligibilityClient, buildEligibilityProof, eligibilityFreshnessScope, eligibilityPolicyId, type EligibilityClientOptions, type EligibilityPolicyConfig, type EligibilityProofInput, type SemaphoreProofLike, } from "./eligibility";
 /** Credential status for a specific group */
 export interface CredentialStatus {
     groupId: number;

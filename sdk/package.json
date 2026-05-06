@@ -18,6 +18,10 @@
     "./react": {
       "types": "./dist/react.d.ts",
       "default": "./dist/react.js"
+    },
+    "./eligibility": {
+      "types": "./dist/eligibility.d.ts",
+      "default": "./dist/eligibility.js"
     }
   },
   "scripts": {

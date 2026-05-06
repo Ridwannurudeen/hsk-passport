@@ -1,4 +1,4 @@
-import { Contract, JsonRpcProvider, Signer, type TransactionReceipt } from "ethers";
+import { Contract, JsonRpcProvider, Signer, toUtf8Bytes, type TransactionReceipt } from "ethers";
 import { Identity } from "@semaphore-protocol/identity";
 import { Group } from "@semaphore-protocol/group";
 import { generateProof, type SemaphoreProof } from "@semaphore-protocol/proof";
@@ -8,6 +8,22 @@ import { HSK_PASSPORT_ABI, SEMAPHORE_ABI, DEMO_ISSUER_ABI, CREDENTIAL_REGISTRY_A
 export { DEPLOYMENTS, type NetworkName } from "./addresses";
 export { Identity } from "@semaphore-protocol/identity";
 export type { SemaphoreProof } from "@semaphore-protocol/proof";
+
+const SEMAPHORE_FIELD_MODULUS = 2n ** 253n;
+
+/** Convert a string scope ("kyc-mint", "rwa-airdrop", ...) to the bigint the Semaphore
+ *  circuit expects. Numeric / bigint scopes pass through. UTF-8 byte encoding works
+ *  in browser and node — avoids the Node-only `Buffer` dependency. */
+export function scopeToField(scope: number | bigint | string): bigint {
+  if (typeof scope === "bigint") return scope;
+  if (typeof scope === "number") return BigInt(scope);
+
+  let value = 0n;
+  for (const byte of toUtf8Bytes(scope)) {
+    value = (value << 8n) + BigInt(byte);
+  }
+  return value % SEMAPHORE_FIELD_MODULUS;
+}
 
 // Per-prover ZK credential-freshness (additive; unrelated to the Semaphore identity path above).
 export {
@@ -23,6 +39,22 @@ export {
   type ArtefactUrls,
   type FreshnessClientOptions,
 } from "./freshness";
+
+// Eligibility verifier — high-level policy abstraction over the raw
+// HSKPassport + freshness primitives. dApps register a policyId that bundles
+// required credential groups + jurisdictions + freshness window, and verify
+// with a single call.
+export {
+  HSK_ELIGIBILITY_VERIFIER_ABI,
+  HSKEligibilityClient,
+  buildEligibilityProof,
+  eligibilityFreshnessScope,
+  eligibilityPolicyId,
+  type EligibilityClientOptions,
+  type EligibilityPolicyConfig,
+  type EligibilityProofInput,
+  type SemaphoreProofLike,
+} from "./eligibility";
 
 /** Credential status for a specific group */
 export interface CredentialStatus {
@@ -220,9 +252,7 @@ export class HSKPassport {
       group.addMember(member);
     }
 
-    const scopeValue = typeof scope === "string" ? BigInt("0x" + Buffer.from(scope).toString("hex")) % (2n ** 253n) : scope;
-
-    const raw = await generateProof(identity, group, message, scopeValue);
+    const raw = await generateProof(identity, group, message, scopeToField(scope));
 
     return {
       merkleTreeDepth: raw.merkleTreeDepth,

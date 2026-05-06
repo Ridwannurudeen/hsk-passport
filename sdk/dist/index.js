@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.HSKPassport = exports.HSKPassportFreshnessClient = exports.generateFreshnessProof = exports.createFreshnessIdentity = exports.DEFAULT_ARTEFACTS = exports.FRESHNESS_TREE_DEPTH = exports.FreshnessTree = exports.Identity = exports.DEPLOYMENTS = void 0;
+exports.HSKPassport = exports.eligibilityPolicyId = exports.eligibilityFreshnessScope = exports.buildEligibilityProof = exports.HSKEligibilityClient = exports.HSK_ELIGIBILITY_VERIFIER_ABI = exports.HSKPassportFreshnessClient = exports.generateFreshnessProof = exports.createFreshnessIdentity = exports.DEFAULT_ARTEFACTS = exports.FRESHNESS_TREE_DEPTH = exports.FreshnessTree = exports.Identity = exports.DEPLOYMENTS = void 0;
+exports.scopeToField = scopeToField;
 const ethers_1 = require("ethers");
 const identity_1 = require("@semaphore-protocol/identity");
 const group_1 = require("@semaphore-protocol/group");
@@ -11,6 +12,21 @@ var addresses_2 = require("./addresses");
 Object.defineProperty(exports, "DEPLOYMENTS", { enumerable: true, get: function () { return addresses_2.DEPLOYMENTS; } });
 var identity_2 = require("@semaphore-protocol/identity");
 Object.defineProperty(exports, "Identity", { enumerable: true, get: function () { return identity_2.Identity; } });
+const SEMAPHORE_FIELD_MODULUS = 2n ** 253n;
+/** Convert a string scope ("kyc-mint", "rwa-airdrop", ...) to the bigint the Semaphore
+ *  circuit expects. Numeric / bigint scopes pass through. UTF-8 byte encoding works
+ *  in browser and node — avoids the Node-only `Buffer` dependency. */
+function scopeToField(scope) {
+    if (typeof scope === "bigint")
+        return scope;
+    if (typeof scope === "number")
+        return BigInt(scope);
+    let value = 0n;
+    for (const byte of (0, ethers_1.toUtf8Bytes)(scope)) {
+        value = (value << 8n) + BigInt(byte);
+    }
+    return value % SEMAPHORE_FIELD_MODULUS;
+}
 // Per-prover ZK credential-freshness (additive; unrelated to the Semaphore identity path above).
 var freshness_1 = require("./freshness");
 Object.defineProperty(exports, "FreshnessTree", { enumerable: true, get: function () { return freshness_1.FreshnessTree; } });
@@ -19,6 +35,16 @@ Object.defineProperty(exports, "DEFAULT_ARTEFACTS", { enumerable: true, get: fun
 Object.defineProperty(exports, "createFreshnessIdentity", { enumerable: true, get: function () { return freshness_1.createFreshnessIdentity; } });
 Object.defineProperty(exports, "generateFreshnessProof", { enumerable: true, get: function () { return freshness_1.generateFreshnessProof; } });
 Object.defineProperty(exports, "HSKPassportFreshnessClient", { enumerable: true, get: function () { return freshness_1.HSKPassportFreshnessClient; } });
+// Eligibility verifier — high-level policy abstraction over the raw
+// HSKPassport + freshness primitives. dApps register a policyId that bundles
+// required credential groups + jurisdictions + freshness window, and verify
+// with a single call.
+var eligibility_1 = require("./eligibility");
+Object.defineProperty(exports, "HSK_ELIGIBILITY_VERIFIER_ABI", { enumerable: true, get: function () { return eligibility_1.HSK_ELIGIBILITY_VERIFIER_ABI; } });
+Object.defineProperty(exports, "HSKEligibilityClient", { enumerable: true, get: function () { return eligibility_1.HSKEligibilityClient; } });
+Object.defineProperty(exports, "buildEligibilityProof", { enumerable: true, get: function () { return eligibility_1.buildEligibilityProof; } });
+Object.defineProperty(exports, "eligibilityFreshnessScope", { enumerable: true, get: function () { return eligibility_1.eligibilityFreshnessScope; } });
+Object.defineProperty(exports, "eligibilityPolicyId", { enumerable: true, get: function () { return eligibility_1.eligibilityPolicyId; } });
 /**
  * HSK Passport SDK — Privacy-preserving ZK credential verification for HashKey Chain
  *
@@ -145,8 +171,7 @@ class HSKPassport {
         for (const member of members) {
             group.addMember(member);
         }
-        const scopeValue = typeof scope === "string" ? BigInt("0x" + Buffer.from(scope).toString("hex")) % (2n ** 253n) : scope;
-        const raw = await (0, proof_1.generateProof)(identity, group, message, scopeValue);
+        const raw = await (0, proof_1.generateProof)(identity, group, message, scopeToField(scope));
         return {
             merkleTreeDepth: raw.merkleTreeDepth,
             merkleTreeRoot: BigInt(raw.merkleTreeRoot),
