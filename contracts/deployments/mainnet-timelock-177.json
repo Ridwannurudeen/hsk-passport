@@ -1,0 +1,9 @@
+{
+  "network": "chainId-177",
+  "chainId": 177,
+  "deployedAt": "2026-05-06T20:06:24.151Z",
+  "deployer": "0x0b17f12848e1E6FDF666A87e29A346336d7450DF",
+  "timelock": "0xd09e8Aec6B6A36588E7A105f606A9fe9a134CFE9",
+  "deployTx": "0x785a92d9f4c846097dd615358fabf0196631d060c39b80401d090243a5be65e9",
+  "minDelaySec": 172800
+}

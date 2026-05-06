@@ -365,3 +365,22 @@ export async function apiGetFreshnessIdentity(
   if (!res.ok) throw new Error(`API ${res.status}`);
   return res.json();
 }
+
+export interface RegistryGovernanceState {
+  registryAddress: string;
+  owner: string;
+  slashingAuthority: string;
+  ownerIsTimelock: boolean;
+  slashingIsTimelock: boolean;
+  timelockMinDelaySec: number | null;
+}
+
+export async function apiGetRegistryGovernance(): Promise<RegistryGovernanceState | null> {
+  try {
+    const res = await fetch(`${apiBase()}/api/registry/governance`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}

@@ -31,7 +31,7 @@ import {
 } from "./sumsub.js";
 import { emailConfig, notifyCredentialApproved, notifyCredentialRejected } from "./notify.js";
 import { markKYCNotified } from "./db.js";
-import { getIssuersList } from "./issuers.js";
+import { getIssuersList, getGovernanceState } from "./issuers.js";
 
 const app = Fastify({ logger: { level: "info" } });
 
@@ -758,6 +758,17 @@ app.get("/api/issuers", async (request, reply) => {
     request.log.error({ err: e }, "/api/issuers failed");
     reply.code(502);
     return { error: "issuer registry unavailable" };
+  }
+});
+
+app.get("/api/registry/governance", async (_request, reply) => {
+  try {
+    const state = await getGovernanceState();
+    reply.header("Cache-Control", "public, max-age=30");
+    return state;
+  } catch (e) {
+    reply.code(502);
+    return { error: (e as Error).message.slice(0, 200) };
   }
 });
 
