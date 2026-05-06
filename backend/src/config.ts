@@ -13,6 +13,10 @@ export const CONFIG = {
   mainnetRpcUrl: process.env.MAINNET_RPC_URL || "https://mainnet.hsk.xyz",
   mainnetChainId: 177,
   mainnetIssuerRegistry: "0xf109cBe3D8d54D77C85ECF1367Cfcd6f075868e9",
+  // v6 freshness — tree depth must match circuits/src/credential_freshness.circom
+  // and frontend FreshnessTree. Leaves capped at 2**16 = 65,536 per group.
+  freshnessRegistry: "0xd251ecAD1a863299BAD2E25B93377B736a753938",
+  freshnessTreeDepth: 16,
   deployBlock: Number(process.env.DEPLOY_BLOCK ?? 26400000),
   groups: {
     KYC_VERIFIED: 25,

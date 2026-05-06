@@ -8,6 +8,7 @@ import {
   getCommitment,
   Identity,
 } from "@/lib/semaphore";
+import { ensureFreshnessIdentity } from "@/lib/freshness-identity";
 import { apiSubmitKYC, apiGetKYCStatus, apiGetSumsubConfig, apiSumsubInit, apiSumsubStatus, type KYCRequest } from "@/lib/api";
 import { SumsubVerification } from "@/components/SumsubVerification";
 import { DEFAULT_COUNTRY, toAlpha3 } from "@/lib/countries";
@@ -257,7 +258,17 @@ export default function KYCPage() {
     const controller = new AbortController();
     sumsubInitRef.current = { controller, commitment };
     try {
-      const init = await apiSumsubInit(commitment, notifyEmail || undefined, toAlpha3(sumsubCountry), controller.signal);
+      // v6 freshness: ensure the user has a freshness identity tied to their
+      // wallet so the auto-freshness loop can post their leaf to the on-chain
+      // FreshnessRegistry once Sumsub approves them. Idempotent.
+      const freshness = currentWallet ? ensureFreshnessIdentity(currentWallet) : null;
+      const init = await apiSumsubInit(
+        commitment,
+        notifyEmail || undefined,
+        toAlpha3(sumsubCountry),
+        controller.signal,
+        freshness?.commitment.toString(),
+      );
       if (controller.signal.aborted) return;
       setSumsubAccessToken(init.accessToken);
       setSumsubLevelName(init.levelName);
@@ -290,12 +301,14 @@ export default function KYCPage() {
       // Submit to our backend KYC queue for credential issuance
       try {
         const { address } = await connectWallet("testnet");
+        const freshness = ensureFreshnessIdentity(address);
         await apiSubmitKYC({
           commitment: getCommitment(identity).toString(),
           wallet: address,
           jurisdiction: "SUMSUB_VERIFIED",
           credentialType,
           documentType: "sumsub",
+          freshnessCommitment: freshness.commitment.toString(),
         });
         toast("Sumsub approved! Credential will be issued on-chain shortly.", "success");
         setStage("submitted");
@@ -490,6 +503,7 @@ export default function KYCPage() {
     try {
       const { address } = await connectWallet("testnet");
       const dataHash = await hashExtractedData(extractedData);
+      const freshness = ensureFreshnessIdentity(address);
 
       const result = await apiSubmitKYC({
         commitment: getCommitment(identity).toString(),
@@ -497,6 +511,7 @@ export default function KYCPage() {
         jurisdiction: extractedData.possibleCountry || "UNKNOWN",
         credentialType,
         documentType: `hash:${dataHash.slice(0, 10)}`,
+        freshnessCommitment: freshness.commitment.toString(),
       });
 
       toast("Submitted! Waiting for issuer review.", "success");

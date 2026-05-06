@@ -50,6 +50,7 @@ export async function apiSubmitKYC(body: {
   jurisdiction: string;
   credentialType: string;
   documentType?: string;
+  freshnessCommitment?: string;
 }): Promise<{ id: string; status: string; message?: string }> {
   const res = await fetch(`${apiBase()}/api/kyc/submit`, {
     method: "POST",
@@ -57,6 +58,23 @@ export async function apiSubmitKYC(body: {
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`KYC submit failed: ${res.status}`);
+  return res.json();
+}
+
+/** v6 - attach a freshness commitment to a Sumsub-flow KYC request after the
+ *  user has generated their freshness identity. The Sumsub init path creates
+ *  the placeholder row before the user picks freshness, so this fills it in. */
+export async function apiAttachFreshnessCommitment(
+  commitment: string,
+  freshnessCommitment: string,
+): Promise<{ id?: string; ok?: boolean; error?: string }> {
+  const res = await fetch(`${apiBase()}/api/kyc/freshness/attach`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ commitment, freshnessCommitment }),
+  });
+  // 404 is "no pending request yet" - caller decides whether to retry.
+  if (!res.ok && res.status !== 404) throw new Error(`API ${res.status}`);
   return res.json();
 }
 
@@ -138,7 +156,8 @@ export async function apiSumsubInit(
   commitment: string,
   notifyEmail?: string,
   country?: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  freshnessCommitment?: string,
 ): Promise<{
   applicantId: string;
   accessToken: string;
@@ -150,6 +169,7 @@ export async function apiSumsubInit(
     commitment,
     notifyEmail: notifyEmail || undefined,
     country: country || undefined,
+    freshnessCommitment: freshnessCommitment || undefined,
   });
   // Retry once on network-level failure (TypeError from fetch). Sumsub's create-applicant
   // is idempotent on externalUserId (= commitment), so a retry is safe. Skip retry on
@@ -270,6 +290,45 @@ export interface IssuerRegistryStats {
 
 export async function apiGetIssuers(): Promise<{ stats: IssuerRegistryStats; issuers: IssuerView[] }> {
   const res = await fetch(`${apiBase()}/api/issuers`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`API ${res.status}`);
+  return res.json();
+}
+
+// v6 freshness
+
+export interface FreshnessTreeState {
+  groupId: number;
+  depth: number;
+  leafCount: number;
+  root: string;
+  leaves: string[];
+}
+
+export interface FreshnessIdentityState {
+  status: "ok" | "not_found";
+  groupId?: number;
+  leafIndex?: number;
+  leaf?: string;
+  issuanceTime?: number;
+  rootAfterInsert?: string;
+  postedTx?: string;
+  postedAt?: number;
+}
+
+export async function apiGetFreshnessState(groupId: number): Promise<FreshnessTreeState> {
+  const res = await fetch(`${apiBase()}/api/freshness/state/${groupId}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`API ${res.status}`);
+  return res.json();
+}
+
+export async function apiGetFreshnessIdentity(
+  freshnessCommitment: string,
+): Promise<FreshnessIdentityState> {
+  const res = await fetch(
+    `${apiBase()}/api/freshness/identity/${freshnessCommitment}`,
+    { cache: "no-store" },
+  );
+  if (res.status === 404) return { status: "not_found" };
   if (!res.ok) throw new Error(`API ${res.status}`);
   return res.json();
 }

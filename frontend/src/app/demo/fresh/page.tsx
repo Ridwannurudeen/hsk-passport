@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Contract, JsonRpcProvider } from "ethers";
 import {
   FreshnessTree,
@@ -18,6 +18,13 @@ import {
   EXPLORER_URL,
 } from "@/lib/contracts";
 import demoData from "@/lib/freshness-demo-data.json";
+import { loadFreshnessIdentity } from "@/lib/freshness-identity";
+import {
+  apiGetFreshnessIdentity,
+  apiGetFreshnessState,
+  type FreshnessTreeState,
+  type FreshnessIdentityState,
+} from "@/lib/api";
 
 const ZERO = "0x0000000000000000000000000000000000000000";
 const CONTRACTS_LIVE = FRESHNESS_ADDRESSES.hskPassportFreshness !== ZERO;
@@ -67,10 +74,58 @@ function buildSandboxTree(userLeaf: bigint): { tree: FreshnessTree; index: numbe
 // Page
 // -----------------------------------------------------------------------------
 
-type Mode = "live" | "sandbox";
+type Mode = "live" | "sandbox" | "user";
+
+interface UserCredentialState {
+  walletAddress: string;
+  secret: bigint;
+  commitment: bigint;
+  identity: FreshnessIdentityState & { status: "ok" };
+  treeState: FreshnessTreeState;
+}
 
 export default function FreshDemoPage() {
   const [mode, setMode] = useState<Mode>(CONTRACTS_LIVE ? "live" : "sandbox");
+
+  // User-mode discovery — runs once on mount; toggles availability of the
+  // "Your credential" tab if the wallet has a freshness identity AND the
+  // backend has posted a leaf for it.
+  const [userState, setUserState] = useState<UserCredentialState | null>(null);
+  const [userProbeError, setUserProbeError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function probe() {
+      try {
+        const eth = (typeof window !== "undefined" ? window.ethereum : null) as
+          | { request: (p: { method: string }) => Promise<string[]> }
+          | null;
+        if (!eth) return;
+        const accounts = await eth.request({ method: "eth_accounts" }).catch(() => []);
+        const wallet = accounts && accounts[0];
+        if (!wallet) return;
+        const localId = loadFreshnessIdentity(wallet);
+        if (!localId) return;
+        const id = await apiGetFreshnessIdentity(localId.commitment.toString());
+        if (id.status !== "ok" || cancelled) return;
+        const tree = await apiGetFreshnessState(id.groupId!);
+        if (cancelled) return;
+        setUserState({
+          walletAddress: wallet,
+          secret: localId.secret,
+          commitment: localId.commitment,
+          identity: id as FreshnessIdentityState & { status: "ok" },
+          treeState: tree,
+        });
+      } catch (e) {
+        if (!cancelled) setUserProbeError((e as Error).message);
+      }
+    }
+    probe();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // User inputs
   const [daysAcceptable, setDaysAcceptable] = useState(90);
@@ -84,18 +139,31 @@ export default function FreshDemoPage() {
   );
 
   // In live mode, identity + issuanceTime come from the seed. In sandbox mode,
-  // we generate fresh values each run.
+  // we generate fresh values each run. In user mode, both come from the
+  // backend's per-user record.
   const liveIdentitySecret = BigInt(demoData.demoIdentity.secret);
   const liveIssuanceTime = BigInt(demoData.demoIdentity.issuanceTime);
   const liveDaysSinceIssuance = Math.floor(
     (now - Number(liveIssuanceTime)) / 86_400
   );
 
+  const userIssuanceTime = userState ? BigInt(userState.identity.issuanceTime!) : 0n;
+  const userDaysSinceIssuance = userState
+    ? Math.floor((now - Number(userIssuanceTime)) / 86_400)
+    : 0;
+
   const issuanceTime =
     mode === "live"
       ? liveIssuanceTime
-      : BigInt(now) - SECONDS_PER_DAY * BigInt(daysSinceIssuance);
-  const effectiveDaysSince = mode === "live" ? liveDaysSinceIssuance : daysSinceIssuance;
+      : mode === "user" && userState
+        ? userIssuanceTime
+        : BigInt(now) - SECONDS_PER_DAY * BigInt(daysSinceIssuance);
+  const effectiveDaysSince =
+    mode === "live"
+      ? liveDaysSinceIssuance
+      : mode === "user" && userState
+        ? userDaysSinceIssuance
+        : daysSinceIssuance;
   const isFresh = effectiveDaysSince <= daysAcceptable;
 
   // Flow state
@@ -153,6 +221,13 @@ export default function FreshDemoPage() {
         identitySecret = liveIdentitySecret;
         const { tree, index } = buildSeededTree();
         mp = tree.proof(index);
+      } else if (mode === "user" && userState) {
+        identitySecret = userState.secret;
+        const tree = new FreshnessTree();
+        for (const leafStr of userState.treeState.leaves) {
+          tree.insert(BigInt(leafStr));
+        }
+        mp = tree.proof(userState.identity.leafIndex!);
       } else {
         identitySecret = randomSecret();
         const commitment = FreshnessTree.identityCommitment(identitySecret);
@@ -226,8 +301,12 @@ export default function FreshDemoPage() {
         HSK_PASSPORT_FRESHNESS_ABI,
         provider
       );
+      const groupForVerify =
+        mode === "user" && userState
+          ? BigInt(userState.identity.groupId!)
+          : BigInt(GROUPS.KYC_VERIFIED);
       const ok: boolean = await composer.previewVerifyFresh(
-        BigInt(GROUPS.KYC_VERIFIED),
+        groupForVerify,
         proof.merkleRoot,
         proof.earliestAcceptable,
         proof.scope,
@@ -272,7 +351,23 @@ export default function FreshDemoPage() {
       </header>
 
       {/* Mode toggle */}
-      <div className="mb-6 flex items-center gap-2 rounded-xl border border-gray-200 bg-white p-2 shadow-sm">
+      <div className="mb-6 flex flex-col items-stretch gap-2 rounded-xl border border-gray-200 bg-white p-2 shadow-sm sm:flex-row sm:items-center">
+        {userState && (
+          <button
+            onClick={() => {
+              setMode("user");
+              setStage("idle");
+              setProof(null);
+            }}
+            className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${
+              mode === "user"
+                ? "bg-emerald-600 text-white shadow-sm"
+                : "bg-gray-50 text-gray-700 hover:bg-gray-100"
+            }`}
+          >
+            Your credential · real on-chain leaf
+          </button>
+        )}
         <button
           onClick={() => {
             setMode("live");
@@ -303,10 +398,42 @@ export default function FreshDemoPage() {
           Sandbox · arbitrary age, simulated verify
         </button>
       </div>
+      {userProbeError && (
+        <p className="mb-4 rounded bg-amber-50 p-2 text-xs text-amber-800">
+          Couldn&apos;t check whether you have a freshness credential: {userProbeError}
+        </p>
+      )}
 
       <section className="mb-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <h2 className="mb-4 text-lg font-semibold">1. Scenario</h2>
-        {mode === "live" ? (
+        {mode === "user" && userState ? (
+          <div className="rounded-lg bg-emerald-50 p-4 text-sm">
+            <p className="mb-2 text-gray-800">
+              You hold a real freshness credential — the auto-issuer posted your leaf to{" "}
+              <code className="rounded bg-white px-1 font-mono text-xs">FreshnessRegistry</code>{" "}
+              when your KYC was approved. The proof you generate below verifies against the live
+              on-chain root.
+            </p>
+            <div className="grid grid-cols-1 gap-1 font-mono text-xs text-gray-800 md:grid-cols-2">
+              <div>
+                <span className="text-gray-500">issuanceTime (on-chain):</span>{" "}
+                {new Date(userState.identity.issuanceTime! * 1000).toISOString().slice(0, 10)} ·{" "}
+                {userDaysSinceIssuance} days ago
+              </div>
+              <div>
+                <span className="text-gray-500">group:</span>{" "}
+                {GROUP_NAMES[userState.identity.groupId!] ?? `group ${userState.identity.groupId}`}
+              </div>
+              <div>
+                <span className="text-gray-500">your leaf index:</span> {userState.identity.leafIndex}
+              </div>
+              <div>
+                <span className="text-gray-500">tree root (on-chain):</span>{" "}
+                {short(BigInt(userState.treeState.root))}
+              </div>
+            </div>
+          </div>
+        ) : mode === "live" ? (
           <div className="rounded-lg bg-gray-50 p-4 text-sm">
             <p className="mb-2 text-gray-700">
               A demo credential was seeded on HashKey testnet when{" "}
