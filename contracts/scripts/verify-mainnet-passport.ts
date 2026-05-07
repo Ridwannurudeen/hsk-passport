@@ -51,12 +51,18 @@ async function main() {
   const sem = await passport.semaphore();
   const deployerApproved = await passport.approvedIssuers(deployer);
   const randomApproved = await passport.approvedIssuers(random);
+  const pauser = await passport.pauser();
+  const isPaused = await passport.paused();
+  const deployerIssuerPaused = await passport.issuerPaused(deployer);
 
   check("owner == deployer", owner.toLowerCase() === deployer.toLowerCase(), owner, deployer);
   check("pendingOwner == address(0)", pendingOwner === ethers.ZeroAddress, pendingOwner, ethers.ZeroAddress);
   check("semaphore wired correctly", sem.toLowerCase() === Semaphore.toLowerCase(), sem, Semaphore);
   check("approvedIssuers[deployer] == true", deployerApproved === true, deployerApproved, true);
   check("approvedIssuers[random] == false", randomApproved === false, randomApproved, false);
+  check("pauser == deployer", pauser.toLowerCase() === deployer.toLowerCase(), pauser, deployer);
+  check("paused == false", isPaused === false, isPaused, false);
+  check("issuerPaused[deployer] == false", deployerIssuerPaused === false, deployerIssuerPaused, false);
 
   // ---- Inert-state invariants ----
   console.log("\n[3/4] Inert-state invariants (safe-mode)");

@@ -3,6 +3,10 @@
 // Safe-mode posture:
 //   - Deploys: PoseidonT3, SemaphoreVerifier, Semaphore, HSKPassport.
 //   - Owner = deployer EOA (sole approved issuer via constructor auto-approval).
+//   - Pauser = deployer EOA (constructor auto-init). Asymmetric governance:
+//     pauser can pause; only owner can unpause. Transfer pauser to a separate
+//     guardian/multisig post-audit via setPauser().
+//   - paused = false, no issuer-level pauses set.
 //   - Zero credential groups created.
 //   - No additional issuers approved.
 //   - No dApps wired up (CredentialRegistry, DemoIssuer, GatedRWA, etc. NOT deployed).
@@ -115,7 +119,7 @@ async function main() {
     deployedAt: new Date().toISOString(),
     deployer: deployer.address,
     posture: "safe-mode",
-    notes: "Deployed for prize payout. Inert: 0 groups, deployer is sole approved issuer. No further issuers or groups until post-audit.",
+    notes: "Inert: 0 groups, deployer is sole approved issuer + pauser. Asymmetric pause governance (pauser can pause, only owner can unpause). No further issuers or groups until post-audit.",
     contracts: {
       SemaphoreVerifier: verifierAddr,
       PoseidonT3: poseidonAddr,

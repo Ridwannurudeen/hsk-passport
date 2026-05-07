@@ -385,4 +385,141 @@ describe("HSK Passport Protocol", function () {
       ).to.be.revertedWithCustomError(passport, "NotGroupIssuerOrDelegate");
     });
   });
+
+  describe("HSKPassport — Pause Logic", function () {
+    let p: any;
+    let groupId: number;
+    let pauser: any;
+    let other: any;
+
+    beforeEach(async function () {
+      [owner, pauser, other, user1, user2] = await ethers.getSigners();
+      const HSKPassport = await ethers.getContractFactory("HSKPassport");
+      p = await HSKPassport.connect(owner).deploy(await semaphore.getAddress());
+      const tx = await p.createCredentialGroup("Pause Test", ethers.ZeroHash);
+      const rc = await tx.wait();
+      const ev = rc.logs.find((l: any) => l.fragment?.name === "CredentialGroupCreated");
+      groupId = Number(ev.args.groupId);
+    });
+
+    it("constructor sets pauser to deployer", async function () {
+      expect(await p.pauser()).to.equal(owner.address);
+      expect(await p.paused()).to.equal(false);
+    });
+
+    it("setPauser is owner-only and emits event", async function () {
+      await expect(p.connect(other).setPauser(pauser.address))
+        .to.be.revertedWithCustomError(p, "NotOwner");
+      await expect(p.connect(owner).setPauser(pauser.address))
+        .to.emit(p, "PauserSet").withArgs(owner.address, pauser.address);
+      expect(await p.pauser()).to.equal(pauser.address);
+    });
+
+    it("pause is pauser-only", async function () {
+      await p.connect(owner).setPauser(pauser.address);
+      await expect(p.connect(other).pause()).to.be.revertedWithCustomError(p, "NotPauser");
+      await expect(p.connect(owner).pause()).to.be.revertedWithCustomError(p, "NotPauser");
+      await expect(p.connect(pauser).pause()).to.emit(p, "Paused");
+      expect(await p.paused()).to.equal(true);
+    });
+
+    it("pause reverts if already paused", async function () {
+      await p.connect(owner).pause();
+      await expect(p.connect(owner).pause()).to.be.revertedWithCustomError(p, "AlreadyPaused");
+    });
+
+    it("unpause is owner-only (asymmetric — pauser cannot unpause)", async function () {
+      await p.connect(owner).setPauser(pauser.address);
+      await p.connect(pauser).pause();
+      await expect(p.connect(pauser).unpause()).to.be.revertedWithCustomError(p, "NotOwner");
+      await expect(p.connect(other).unpause()).to.be.revertedWithCustomError(p, "NotOwner");
+      await expect(p.connect(owner).unpause()).to.emit(p, "Unpaused");
+      expect(await p.paused()).to.equal(false);
+    });
+
+    it("unpause reverts if not paused", async function () {
+      await expect(p.connect(owner).unpause()).to.be.revertedWithCustomError(p, "NotPausedError");
+    });
+
+    it("global pause blocks issueCredential", async function () {
+      await p.connect(owner).pause();
+      const id = new Identity("paused-test");
+      await expect(p.issueCredential(groupId, id.commitment))
+        .to.be.revertedWithCustomError(p, "PausedGlobally");
+    });
+
+    it("global pause blocks batchIssueCredentials", async function () {
+      await p.connect(owner).pause();
+      const id1 = new Identity("paused-batch-1");
+      const id2 = new Identity("paused-batch-2");
+      await expect(p.batchIssueCredentials(groupId, [id1.commitment, id2.commitment]))
+        .to.be.revertedWithCustomError(p, "PausedGlobally");
+    });
+
+    it("global pause blocks createCredentialGroup", async function () {
+      await p.connect(owner).pause();
+      await expect(p.createCredentialGroup("Blocked", ethers.ZeroHash))
+        .to.be.revertedWithCustomError(p, "PausedGlobally");
+    });
+
+    it("global pause blocks approveDelegate", async function () {
+      await p.connect(owner).pause();
+      await expect(p.approveDelegate(groupId, user1.address))
+        .to.be.revertedWithCustomError(p, "PausedGlobally");
+    });
+
+    it("global pause does NOT block revokeCredential", async function () {
+      const id = new Identity("revoke-during-pause");
+      await p.issueCredential(groupId, id.commitment);
+      await p.connect(owner).pause();
+      const group = new Group();
+      group.addMember(id.commitment);
+      await expect(p.revokeCredential(groupId, id.commitment, [])).to.not.be.reverted;
+    });
+
+    it("global pause does NOT block governance (approveIssuer, transferOwnership)", async function () {
+      await p.connect(owner).pause();
+      await expect(p.connect(owner).approveIssuer(other.address)).to.not.be.reverted;
+      await expect(p.connect(owner).transferOwnership(other.address)).to.not.be.reverted;
+    });
+
+    it("after unpause, issuance works again", async function () {
+      await p.connect(owner).pause();
+      await p.connect(owner).unpause();
+      const id = new Identity("post-unpause");
+      await expect(p.issueCredential(groupId, id.commitment))
+        .to.emit(p, "CredentialIssued");
+    });
+
+    it("pauseIssuer is pauser-only and surgical (doesn't affect other issuers)", async function () {
+      await p.connect(owner).approveIssuer(other.address);
+      const otherGroupTx = await p.connect(other).createCredentialGroup("Other Group", ethers.ZeroHash);
+      const otherRc = await otherGroupTx.wait();
+      const otherEv = otherRc.logs.find((l: any) => l.fragment?.name === "CredentialGroupCreated");
+      const otherGroupId = Number(otherEv.args.groupId);
+
+      await expect(p.connect(user1).pauseIssuer(owner.address))
+        .to.be.revertedWithCustomError(p, "NotPauser");
+      await expect(p.connect(owner).pauseIssuer(owner.address)).to.emit(p, "IssuerPaused");
+      expect(await p.issuerPaused(owner.address)).to.equal(true);
+
+      const id = new Identity("paused-issuer-test");
+      await expect(p.issueCredential(groupId, id.commitment))
+        .to.be.revertedWithCustomError(p, "IssuerIsPaused");
+
+      const id2 = new Identity("other-issuer-still-works");
+      await expect(p.connect(other).issueCredential(otherGroupId, id2.commitment))
+        .to.emit(p, "CredentialIssued");
+    });
+
+    it("unpauseIssuer is owner-only (asymmetric)", async function () {
+      await p.connect(owner).setPauser(pauser.address);
+      await p.connect(pauser).pauseIssuer(owner.address);
+      await expect(p.connect(pauser).unpauseIssuer(owner.address))
+        .to.be.revertedWithCustomError(p, "NotOwner");
+      await expect(p.connect(owner).unpauseIssuer(owner.address))
+        .to.emit(p, "IssuerUnpaused");
+      expect(await p.issuerPaused(owner.address)).to.equal(false);
+    });
+  });
 });

@@ -41,6 +41,13 @@ contract HSKPassport {
     /// @dev issuer address => whether they're an approved issuer
     mapping(address => bool) public approvedIssuers;
 
+    /// @dev Pause state. Asymmetric governance: a fast `pauser` role can pause
+    ///      to halt new issuance during an incident, but only `owner` can
+    ///      unpause — preventing a compromised pauser from un-pausing to attack.
+    address public pauser;
+    bool public paused;
+    mapping(address => bool) public issuerPaused;
+
     /// @dev groupId => identityCommitment => whether issued
     mapping(uint256 => mapping(uint256 => bool)) public credentials;
 
@@ -68,9 +75,35 @@ contract HSKPassport {
 
     event OwnershipTransferStarted(address indexed previousOwner, address indexed newOwner);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    event PauserSet(address indexed previousPauser, address indexed newPauser);
+    event Paused();
+    event Unpaused();
+    event IssuerPaused(address indexed issuer);
+    event IssuerUnpaused(address indexed issuer);
+
+    error NotPauser();
+    error AlreadyPaused();
+    error NotPausedError();
+    error PausedGlobally();
+    error IssuerIsPaused();
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();
+        _;
+    }
+
+    modifier onlyPauser() {
+        if (msg.sender != pauser) revert NotPauser();
+        _;
+    }
+
+    modifier whenNotPaused() {
+        if (paused) revert PausedGlobally();
+        _;
+    }
+
+    modifier whenIssuerNotPaused(address issuer) {
+        if (issuerPaused[issuer]) revert IssuerIsPaused();
         _;
     }
 
@@ -107,8 +140,10 @@ contract HSKPassport {
     constructor(ISemaphore _semaphore) {
         semaphore = _semaphore;
         owner = msg.sender;
+        pauser = msg.sender;
         approvedIssuers[msg.sender] = true;
         emit IssuerApproved(msg.sender);
+        emit PauserSet(address(0), msg.sender);
     }
 
     /// @notice Approve a new credential issuer
@@ -126,7 +161,12 @@ contract HSKPassport {
     /// @notice Approve a delegate contract for a specific group
     /// @dev Only the group's original issuer (still approved) can grant delegates.
     ///      Delegates cannot grant more delegates — prevents privilege escalation.
-    function approveDelegate(uint256 groupId, address delegate) external onlyGroupIssuer(groupId) {
+    function approveDelegate(uint256 groupId, address delegate)
+        external
+        onlyGroupIssuer(groupId)
+        whenNotPaused
+        whenIssuerNotPaused(msg.sender)
+    {
         groupDelegates[groupId][delegate] = true;
         emit DelegateApproved(groupId, delegate);
     }
@@ -144,7 +184,13 @@ contract HSKPassport {
     /// @param name Human-readable name for the credential type
     /// @param schemaHash Schema hash from CredentialRegistry (use bytes32(0) for no schema)
     /// @return groupId The Semaphore group ID created
-    function createCredentialGroup(string calldata name, bytes32 schemaHash) external onlyApprovedIssuer returns (uint256 groupId) {
+    function createCredentialGroup(string calldata name, bytes32 schemaHash)
+        external
+        onlyApprovedIssuer
+        whenNotPaused
+        whenIssuerNotPaused(msg.sender)
+        returns (uint256 groupId)
+    {
         groupId = semaphore.createGroup(address(this));
 
         credentialGroups[groupId] = CredentialGroup({
@@ -174,7 +220,12 @@ contract HSKPassport {
     function issueCredential(
         uint256 groupId,
         uint256 identityCommitment
-    ) external onlyGroupIssuerOrDelegate(groupId) {
+    )
+        external
+        onlyGroupIssuerOrDelegate(groupId)
+        whenNotPaused
+        whenIssuerNotPaused(credentialGroups[groupId].issuer)
+    {
         if (!credentialGroups[groupId].active) revert GroupNotActive();
         if (credentials[groupId][identityCommitment]) revert CredentialAlreadyIssued();
 
@@ -192,7 +243,12 @@ contract HSKPassport {
     function batchIssueCredentials(
         uint256 groupId,
         uint256[] calldata identityCommitments
-    ) external onlyGroupIssuerOrDelegate(groupId) {
+    )
+        external
+        onlyGroupIssuerOrDelegate(groupId)
+        whenNotPaused
+        whenIssuerNotPaused(credentialGroups[groupId].issuer)
+    {
         if (!credentialGroups[groupId].active) revert GroupNotActive();
 
         for (uint256 i = 0; i < identityCommitments.length; i++) {
@@ -331,5 +387,43 @@ contract HSKPassport {
         owner = pendingOwner;
         pendingOwner = address(0);
         emit OwnershipTransferred(previousOwner, msg.sender);
+    }
+
+    /// @notice Replace the pauser role. Owner-only.
+    function setPauser(address newPauser) external onlyOwner {
+        address prev = pauser;
+        pauser = newPauser;
+        emit PauserSet(prev, newPauser);
+    }
+
+    /// @notice Halt all credential issuance + delegation globally.
+    /// @dev Pauser-only. Does NOT block revocation, verification, or governance.
+    function pause() external onlyPauser {
+        if (paused) revert AlreadyPaused();
+        paused = true;
+        emit Paused();
+    }
+
+    /// @notice Resume issuance after a global pause. Owner-only by design —
+    ///         see asymmetric-governance docstring on `pauser`.
+    function unpause() external onlyOwner {
+        if (!paused) revert NotPausedError();
+        paused = false;
+        emit Unpaused();
+    }
+
+    /// @notice Halt issuance + delegation for a single issuer's groups, leaving
+    ///         the rest of the protocol live. Use for surgical incident response.
+    function pauseIssuer(address issuer) external onlyPauser {
+        if (issuerPaused[issuer]) revert AlreadyPaused();
+        issuerPaused[issuer] = true;
+        emit IssuerPaused(issuer);
+    }
+
+    /// @notice Resume issuance for a previously paused issuer. Owner-only.
+    function unpauseIssuer(address issuer) external onlyOwner {
+        if (!issuerPaused[issuer]) revert NotPausedError();
+        issuerPaused[issuer] = false;
+        emit IssuerUnpaused(issuer);
     }
 }
