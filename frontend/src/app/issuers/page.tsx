@@ -139,7 +139,7 @@ export default function IssuersPage() {
             Apply to become an issuer →
           </Link>
           <a
-            href="https://github.com/Ridwannurudeen/hsk-passport/blob/main/schemas/Issuer.json"
+            href="https://github.com/Ridwannurudeen/hsk-passport/blob/master/schemas/Issuer.json"
             target="_blank"
             rel="noreferrer"
             className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-700 text-gray-300 hover:border-gray-600 transition-colors"

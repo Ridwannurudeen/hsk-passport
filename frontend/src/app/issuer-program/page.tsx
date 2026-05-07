@@ -290,7 +290,7 @@ export default function IssuerProgramPage() {
             On-chain we store your stake, tier, and reputation. Off-chain at your{" "}
             <code className="px-1 py-0.5 rounded bg-black/40 text-xs">metadataURI</code> we expect this JSON shape (
             <a
-              href="https://github.com/Ridwannurudeen/hsk-passport/blob/main/schemas/Issuer.json"
+              href="https://github.com/Ridwannurudeen/hsk-passport/blob/master/schemas/Issuer.json"
               target="_blank"
               rel="noreferrer"
               className="text-purple-400 hover:underline"
