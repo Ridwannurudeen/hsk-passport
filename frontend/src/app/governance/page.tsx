@@ -69,6 +69,41 @@ export default function GovernancePage() {
               {MAINNET_ADDRESSES.issuerRegistry.slice(0, 10)}...{MAINNET_ADDRESSES.issuerRegistry.slice(-6)}
             </a>
           </div>
+          <div className="flex items-center justify-between pb-3 border-b border-gray-800">
+            <div>
+              <div className="font-medium">
+                HSKPassport
+                <span className="ml-2 px-1.5 py-0.5 text-[10px] font-mono rounded bg-emerald-950/40 border border-emerald-800/60 text-emerald-300">mainnet</span>
+                <span className="ml-1.5 px-1.5 py-0.5 text-[10px] font-mono rounded bg-amber-950/40 border border-amber-800/60 text-amber-300">safe-mode</span>
+              </div>
+              <div className="text-xs text-gray-500">Deployed inert on chain 177 (0 groups, deployer-only issuer) — activates after third-party audit</div>
+            </div>
+            <a
+              href={`${MAINNET_EXPLORER_URL}/address/${MAINNET_ADDRESSES.hskPassport}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono text-xs text-purple-300 hover:text-purple-200"
+            >
+              {MAINNET_ADDRESSES.hskPassport.slice(0, 10)}...{MAINNET_ADDRESSES.hskPassport.slice(-6)}
+            </a>
+          </div>
+          <div className="flex items-center justify-between pb-3 border-b border-gray-800">
+            <div>
+              <div className="font-medium">
+                Mainnet Timelock
+                <span className="ml-2 px-1.5 py-0.5 text-[10px] font-mono rounded bg-emerald-950/40 border border-emerald-800/60 text-emerald-300">mainnet</span>
+              </div>
+              <div className="text-xs text-gray-500">OpenZeppelin TimelockController on chain 177 — holds slashingAuthority on IssuerRegistry, 48h MIN_DELAY</div>
+            </div>
+            <a
+              href={`${MAINNET_EXPLORER_URL}/address/${MAINNET_ADDRESSES.timelock}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono text-xs text-purple-300 hover:text-purple-200"
+            >
+              {MAINNET_ADDRESSES.timelock.slice(0, 10)}...{MAINNET_ADDRESSES.timelock.slice(-6)}
+            </a>
+          </div>
           <div className="flex items-center justify-between">
             <div>
               <div className="font-medium">Safe</div>
