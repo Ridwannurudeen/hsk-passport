@@ -66,6 +66,7 @@ const LINKS: Array<{ href: string; label: string; highlight?: boolean }> = [
   { href: "/demo", label: "Demo" },
   { href: "/demo/fresh", label: "Fresh ZK · v6", highlight: true },
   { href: "/issuers", label: "Issuers" },
+  { href: "/governance", label: "Governance" },
   { href: "/ecosystem", label: "Ecosystem" },
   { href: "/developers", label: "Developers" },
   { href: "/user", label: "Dashboard", highlight: true },
