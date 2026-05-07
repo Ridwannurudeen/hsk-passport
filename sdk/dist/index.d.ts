@@ -86,6 +86,20 @@ export declare class HSKPassport {
             readonly SG_RESIDENT: 28;
             readonly AE_RESIDENT: 29;
         };
+    } | {
+        readonly chainId: 177;
+        readonly rpcUrl: "https://mainnet.hsk.xyz";
+        readonly explorerUrl: "https://explorer.hsk.xyz";
+        readonly contracts: {
+            readonly issuerRegistry: "0xf109cBe3D8d54D77C85ECF1367Cfcd6f075868e9";
+            readonly timelock: "0xd09e8Aec6B6A36588E7A105f606A9fe9a134CFE9";
+            readonly hskPassport: "0x5E99a3a13952E7d7a0b2a4f10294dA645d320A9e";
+            readonly semaphore: "0x728bB8D8269a826b54a45385cF87ebDD785Ed1D6";
+            readonly semaphoreVerifier: "0x400351258Cd54b6093320b92B85942eEf48Ef128";
+            readonly poseidonT3: "0x20265dAe4711B3CeF88D7078bf1290f815279De1";
+        };
+        readonly deployBlock: 21901194;
+        readonly groups: Record<string, number>;
     };
     /** Get group info from chain */
     getGroupInfo(groupId: number): Promise<GroupInfo>;

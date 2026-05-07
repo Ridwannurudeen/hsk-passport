@@ -1,7 +1,19 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DEPLOYMENTS = void 0;
-/** Deployed contract addresses per network (v5 — on-chain expiry + timelock-gated slashing) */
+/** Deployed contract addresses per network.
+ *
+ *  hashkey-testnet: full live stack — credentials issued, gated dApps live,
+ *  v6 freshness verifier wired up. Use for development, integration tests,
+ *  and live demos.
+ *
+ *  hashkey-mainnet: soft-mainnet posture. IssuerRegistry is live for
+ *  real-money issuer staking. HSKPassport v2 (with asymmetric pauser role)
+ *  is deployed but in SAFE MODE: deployer-only issuer, zero credential
+ *  groups, inert until third-party audit completes. Active credentials
+ *  continue to issue on testnet only. Reading mainnet via the SDK is
+ *  supported; calling issuance / credential methods will revert pre-audit.
+ */
 exports.DEPLOYMENTS = {
     "hashkey-testnet": {
         chainId: 133,
@@ -33,5 +45,31 @@ exports.DEPLOYMENTS = {
             SG_RESIDENT: 28,
             AE_RESIDENT: 29,
         },
+    },
+    "hashkey-mainnet": {
+        chainId: 177,
+        rpcUrl: "https://mainnet.hsk.xyz",
+        explorerUrl: "https://explorer.hsk.xyz",
+        contracts: {
+            // Live: real-money issuer staking.
+            issuerRegistry: "0xf109cBe3D8d54D77C85ECF1367Cfcd6f075868e9",
+            // Live: 48h TimelockController. Currently slashingAuthority of the
+            // IssuerRegistry. Will become owner after Phase B of the handoff
+            // (see RUNBOOK.md §5).
+            timelock: "0xd09e8Aec6B6A36588E7A105f606A9fe9a134CFE9",
+            // SAFE MODE: deployed but inert. Zero credential groups, deployer-only
+            // issuer, paused=false. Will not accept credentials until the audit
+            // completes and groups are created. Pauser-role enabled for surgical
+            // incident response.
+            hskPassport: "0x5E99a3a13952E7d7a0b2a4f10294dA645d320A9e",
+            semaphore: "0x728bB8D8269a826b54a45385cF87ebDD785Ed1D6",
+            semaphoreVerifier: "0x400351258Cd54b6093320b92B85942eEf48Ef128",
+            poseidonT3: "0x20265dAe4711B3CeF88D7078bf1290f815279De1",
+        },
+        deployBlock: 21901194,
+        // No groups exist on mainnet yet — SAFE MODE. SDK consumers reading
+        // mainnet will see zero members for any group ID until post-audit
+        // group creation.
+        groups: {},
     },
 };

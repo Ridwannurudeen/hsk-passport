@@ -116,7 +116,7 @@ contract MyRWAToken {
 
 Connect to HSK Passport on a network.
 
-- `network`: `"hashkey-testnet"` (more networks added after mainnet deploy)
+- `network`: `"hashkey-testnet"` (full live stack) or `"hashkey-mainnet"` (HSKPassport + IssuerRegistry deployed in safe mode — read-only until post-audit)
 - `signerOrProvider`: an ethers `Signer` (for transactions) or `JsonRpcProvider` (read-only)
 
 Returns an `HSKPassport` instance.
