@@ -1,20 +1,20 @@
 {
   "chainId": 177,
   "network": "hashkey-mainnet",
-  "deployedAt": "2026-05-07T08:46:50.662Z",
+  "deployedAt": "2026-05-07T10:25:24.408Z",
   "deployer": "0x0b17f12848e1E6FDF666A87e29A346336d7450DF",
   "posture": "safe-mode",
-  "notes": "Deployed for prize payout. Inert: 0 groups, deployer is sole approved issuer. No further issuers or groups until post-audit.",
+  "notes": "Inert: 0 groups, deployer is sole approved issuer + pauser. Asymmetric pause governance (pauser can pause, only owner can unpause). No further issuers or groups until post-audit.",
   "contracts": {
-    "SemaphoreVerifier": "0x1481182BeDc67c903AdeAD7BEf9D0C6B0BBDDc4D",
-    "PoseidonT3": "0xe5B76adC05d83689c71f40C4b945F6D1b09cA188",
-    "Semaphore": "0xa36c64bb8E063042a0467Da12ed4cD51F71bAE59",
-    "HSKPassport": "0x74dea114438341ef5e1bf7675058bEf8a7D0d64d"
+    "SemaphoreVerifier": "0x400351258Cd54b6093320b92B85942eEf48Ef128",
+    "PoseidonT3": "0x20265dAe4711B3CeF88D7078bf1290f815279De1",
+    "Semaphore": "0x728bB8D8269a826b54a45385cF87ebDD785Ed1D6",
+    "HSKPassport": "0x5E99a3a13952E7d7a0b2a4f10294dA645d320A9e"
   },
   "txs": {
-    "SemaphoreVerifier": "0x6acc4d247b856e63e803e14d63464058132435f18661bd654860d637b21eb8f8",
-    "PoseidonT3": "0x5be3e7263413e3a4fd46c065f6c0e2cb65ad6ce25d5b2fb0804eb98b93101991",
-    "Semaphore": "0xe817353f0e6e3df3573c352168165b667a5681ea1b6f5a8956177cddc8da7c09",
-    "HSKPassport": "0xc4022d0a09e2ac755f6331579ec199e7159f55a9063718ac1813ad60f68673bf"
+    "SemaphoreVerifier": "0x54b50b45bd0cb9a2e9026d9bce2de0e5cd400bcdc833fb7c4091cf3d5b24367b",
+    "PoseidonT3": "0x20f9d72ba266f0f9c4af85c5d856423081e9d9da527dcb758771ab291950f75a",
+    "Semaphore": "0x6bad6acf95252ea7d162815973b01a4fbae4c0138616adb84c52c8837900ea5b",
+    "HSKPassport": "0xb7cc9fbc3a4006ff13e4be3ac2ed190d1814b474e3451bcb3ac5c0de60e19c17"
   }
 }

@@ -14,10 +14,10 @@ export const MAINNET_EXPLORER_URL = "https://explorer.hsk.xyz";
 export const MAINNET_ADDRESSES = {
   issuerRegistry: "0xf109cBe3D8d54D77C85ECF1367Cfcd6f075868e9",
   timelock: "0xd09e8Aec6B6A36588E7A105f606A9fe9a134CFE9",
-  hskPassport: "0x74dea114438341ef5e1bf7675058bEf8a7D0d64d",
-  semaphore: "0xa36c64bb8E063042a0467Da12ed4cD51F71bAE59",
-  semaphoreVerifier: "0x1481182BeDc67c903AdeAD7BEf9D0C6B0BBDDc4D",
-  poseidonT3: "0xe5B76adC05d83689c71f40C4b945F6D1b09cA188",
+  hskPassport: "0x5E99a3a13952E7d7a0b2a4f10294dA645d320A9e",
+  semaphore: "0x728bB8D8269a826b54a45385cF87ebDD785Ed1D6",
+  semaphoreVerifier: "0x400351258Cd54b6093320b92B85942eEf48Ef128",
+  poseidonT3: "0x20265dAe4711B3CeF88D7078bf1290f815279De1",
 };
 
 // V5 addresses — expiry enforcement + issuer slashing via timelock
