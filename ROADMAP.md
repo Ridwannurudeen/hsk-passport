@@ -1,30 +1,32 @@
 # HSK Passport Roadmap
 
-## Status (May 2026)
+## Status (June 2026)
 
-**Testnet live, hackathon-validated.** All protocol contracts deployed on HashKey Chain testnet (chain ID 133), 16 contracts, 74 passing tests across 3 audit rounds. Public issuer directory and onboarding program live at `/issuers` and `/issuer-program`. SDK published to npm.
+**Testnet live + soft-mainnet deployed, hackathon-validated.** All protocol contracts deployed on HashKey Chain testnet (chain ID 133); HSKPassport v2 (safe-mode + pauser) and IssuerRegistry now also deployed on mainnet (chain ID 177) but kept inert pending third-party audit. 89 passing contract tests on master (74 base + 15 anonymity-set gate). Public issuer directory and onboarding program live at `/issuers` and `/issuer-program`. SDK published to npm. Live at https://hskpassport.gudman.xyz.
 
 🏆 **3rd place — HashKey Chain Horizon 2026 ZKID Track** (Apr 24 2026).
+
+**Legend:** ✅ done · 🟡 partial / in progress · ☐ not started
 
 ---
 
 ## Q2 2026 — Production Launch
 
-- [ ] **Mainnet deployment** on HashKey Chain (chain ID 177) — Hardhat networks already configured; awaiting audit decision and `PRIVATE_KEY` for mainnet deployer
+- [x] 🟡 **Mainnet deployment** on HashKey Chain (chain ID 177) — HSKPassport v2 (safe-mode + asymmetric pauser) + IssuerRegistry + Timelock deployed (see `contracts/deployments/mainnet-*-177.json`). Kept **inert** (no `approveIssuer`, no groups) until audit completes — credentials still issue on testnet.
 - [ ] **Third-party security audit** of contracts and circuits — Trail of Bits or OpenZeppelin (~$100-200K, 6-8 weeks)
 - [x] **SDK v1.0 published** to npm — `hsk-passport-sdk@1.1.0` (incl. v6 freshness module)
 - [ ] **Integration with HashKey Exchange KYC** — first production issuer
 - [x] **Third-party issuer onboarding program** — `Issuer.json` schema + `/issuer-program` registration page + `/issuers` public directory + `GET /api/issuers` enrichment endpoint
-- [ ] **Monitoring & uptime SLA** for indexer API — Grafana dashboard, alerting, public status page
+- [x] 🟡 **Monitoring & uptime SLA** for indexer API — `/api/healthz` + `/api/metrics` + `HealthIndicator` + `RUNBOOK.md` live (`backend/src/health.ts`). Remaining: Grafana dashboard, alerting, public status page.
 
 ## Q3 2026 — Production Hardening
 
-- [ ] **Issuer-side v6 auto-registration** — backend `auto-issuer.ts` posts `Poseidon(commitment, issuanceTime)` to `FreshnessRegistry` at issuance time
+- [x] 🟡 **Issuer-side v6 auto-registration** — `backend/src/auto-issuer.ts` posts Poseidon leaves to `FreshnessRegistry`; issuer EOA authorized on testnet groups 25/26/27, loop running. Awaiting first KYC carrying a `freshness_commitment` to exercise end-to-end.
 - [ ] **Blind-signature issuance** — backend never learns commitment ↔ Sumsub applicant mapping; eliminates backend-correlation risk
-- [ ] **Multi-sig governance handoff** — 3-of-5 Safe with core contributors; Timelock as executor
+- [x] 🟡 **Multi-sig governance handoff** — `HSKPassportTimelock` (48h delay) deployed on mainnet; IssuerRegistry `slashingAuthority` already transferred to it (`slashingIsTimelock: true`). Remaining: transfer ownership (Phase B, gated on audit) and stand up the 3-of-5 Safe.
 - [ ] **HSM-protected issuer keys** — YubiHSM or AWS CloudHSM; no more `.env` secrets on VPS
 - [ ] **Sumsub production tier** — switch from sandbox to prod token; iBeta L2 liveness, document authenticity, internal dedup
-- [ ] **Anonymity-set floor enforcement** — reject proofs from groups below 1000 members; verifier warns below 10000
+- [x] 🟡 **Anonymity-set floor enforcement** — `AnonymitySetGate.sol` built with deploy script + 15 passing tests (hard floor + soft warning, opt-in per dApp). Deployed-ready but **not yet on-chain**.
 - [ ] **HashKey DID bridge** — compose HSK Passport credentials with `.key` DIDs without revealing the DID in ZK proofs
 - [ ] **Jurisdiction-aware credential types** — separate groups for EU/GDPR, Singapore MAS, UAE VARA, US SEC accredited investor
 
