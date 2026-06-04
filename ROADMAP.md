@@ -8,12 +8,43 @@
 
 **Legend:** ✅ done · 🟡 partial / in progress · ☐ not started
 
+> **Roadmap philosophy.** Near-term quarters (Adoption, Q2, Q3) are committed,
+> sequenced work. The **Research / Exploratory Backlog** at the bottom is
+> deliberately *unscheduled* — high-value directions we'll pull forward as
+> adoption, funding, and team size justify them. We'd rather ship a small
+> roadmap fully than a large one partially.
+
 ---
+
+## Adoption & Sustainability — the success metric
+
+A reusable compliance layer is only as valuable as the dApps that integrate it.
+This track is the top priority: everything else exists to serve it.
+
+- [ ] **First 3 design-partner dApps** integrated against the SDK (one `require`
+  line eligibility check live in production on each) — target end of Q3 2026
+- [ ] **Usage north-star metrics** published on the status page: credentials
+  issued, verifications / month, active groups, integrating dApps. Baseline
+  today: **13 active credentials, 0 integrating dApps** — the number to move.
+- [ ] **Audit funding secured** — the third-party audit costs ~$100–200K and
+  gates real mainnet launch. Path: HashKey Chain ecosystem grant +
+  Ethereum Foundation PSE / privacy grant applications. **Owner action:
+  no mainnet go-live until this is funded.**
+- [ ] **Regulator conversation opened** with HK SFC (or via HashKey's existing
+  licence) — validate the ZK-compliance posture *before* full launch, not
+  after. Existential for a KYC product; pulled forward from Q4.
+- [ ] **Sustainability model** decided — issuer staking fees, per-verification
+  pricing, or grant-funded public good. Document the chosen model.
 
 ## Q2 2026 — Production Launch
 
 - [x] 🟡 **Mainnet deployment** on HashKey Chain (chain ID 177) — HSKPassport v2 (safe-mode + asymmetric pauser) + IssuerRegistry + Timelock deployed (see `contracts/deployments/mainnet-*-177.json`). Kept **inert** (no `approveIssuer`, no groups) until audit completes — credentials still issue on testnet.
-- [ ] **Third-party security audit** of contracts and circuits — Trail of Bits or OpenZeppelin (~$100-200K, 6-8 weeks)
+- [ ] **Third-party security audit** of contracts and circuits — the critical path for full mainnet launch. Sequenced:
+  - [ ] Shortlist + outreach to firms (Trail of Bits / OpenZeppelin / Spearbit)
+  - [ ] Freeze audit scope (contracts + Circom circuits) and tag the commit
+  - [ ] Secure funding (see Adoption track) and sign engagement
+  - [ ] Engagement window (~6–8 weeks) + remediation buffer
+  - [ ] Re-verify fixes, publish report under `audits/`, then Phase B handoff
 - [x] **SDK v1.0 published** to npm — `hsk-passport-sdk@1.1.0` (incl. v6 freshness module)
 - [ ] **Integration with HashKey Exchange KYC** — first production issuer
 - [x] **Third-party issuer onboarding program** — `Issuer.json` schema + `/issuer-program` registration page + `/issuers` public directory + `GET /api/issuers` enrichment endpoint
@@ -25,26 +56,31 @@
 - [ ] **Blind-signature issuance** — backend never learns commitment ↔ Sumsub applicant mapping; eliminates backend-correlation risk
 - [x] 🟡 **Multi-sig governance handoff** — `HSKPassportTimelock` (48h delay) deployed on mainnet; IssuerRegistry `slashingAuthority` already transferred to it (`slashingIsTimelock: true`). Remaining: transfer ownership (Phase B, gated on audit) and stand up the 3-of-5 Safe.
 - [ ] **HSM-protected issuer keys** — YubiHSM or AWS CloudHSM; no more `.env` secrets on VPS
+- [ ] **Incident-response runbook + pause drill** — document issuer-key-compromise response; rehearse the `pause` / `pauseIssuer` path end-to-end on testnet so the asymmetric pauser is proven before it's ever needed in anger
 - [ ] **Sumsub production tier** — switch from sandbox to prod token; iBeta L2 liveness, document authenticity, internal dedup
 - [x] 🟡 **Anonymity-set floor enforcement** — `AnonymitySetGate.sol` built with deploy script + 15 passing tests (hard floor + soft warning, opt-in per dApp). Deployed-ready but **not yet on-chain**.
 - [ ] **HashKey DID bridge** — compose HSK Passport credentials with `.key` DIDs without revealing the DID in ZK proofs
 - [ ] **Jurisdiction-aware credential types** — separate groups for EU/GDPR, Singapore MAS, UAE VARA, US SEC accredited investor
 
-## Q4 2026 — Scale and Trust Minimization
+## Research / Exploratory Backlog — *unscheduled*
 
-- [ ] **Proof aggregation** — Nova/HyperNova folding or recursive Groth16 for batch verification at ≤50K gas per proof
-- [ ] **Cross-chain credential bridge** — verifiers callable from Arbitrum, Base, Ethereum mainnet via LayerZero or HashKey Bridge
-- [ ] **Decentralized issuer network** — permissionless Tier-3 issuers with reputation scoring and public audit logs
-- [ ] **Efficient revocation via accumulators** — RSA accumulator or MMR for O(log n) revocation checks
-- [ ] **Zupass / PCD interop** — import Semaphore-based event credentials from Zupass
-- [ ] **Regulatory audit report** — independent privacy and compliance posture review for HK SFC
+High-value but speculative directions. Each is a multi-quarter effort on its
+own; they are **not** committed to a quarter and will be pulled forward only as
+adoption, funding, and team capacity justify. Listed here to signal intent
+without over-promising a timeline.
 
-## 2027 — Advanced Privacy
+**Scale & trust-minimization**
+- **Proof aggregation** — Nova/HyperNova folding or recursive Groth16 for batch verification at ≤50K gas per proof
+- **Cross-chain credential bridge** — verifiers callable from Arbitrum, Base, Ethereum mainnet via LayerZero or HashKey Bridge
+- **Decentralized issuer network** — permissionless Tier-3 issuers with reputation scoring and public audit logs
+- **Efficient revocation via accumulators** — RSA accumulator or MMR for O(log n) revocation checks
+- **Zupass / PCD interop** — import Semaphore-based event credentials from Zupass
 
-- [ ] **Selective disclosure** — prove attributes (age range, jurisdiction, investor tier) without revealing the full credential
-- [ ] **Multi-issuer aggregation** — prove "at least N approved issuers verified me"
-- [ ] **PLONKish circuit migration** — replace Groth16 with halo2 / plonky2 for trustless-setup ZK
-- [ ] **Decentralized issuer DAO** — DAO governance for issuer approval, schema registry, parameter changes
+**Advanced privacy**
+- **Selective disclosure** — prove attributes (age range, jurisdiction, investor tier) without revealing the full credential
+- **Multi-issuer aggregation** — prove "at least N approved issuers verified me"
+- **PLONKish circuit migration** — replace Groth16 with halo2 / plonky2 for trustless-setup ZK
+- **Decentralized issuer DAO** — DAO governance for issuer approval, schema registry, parameter changes
 
 ---
 
