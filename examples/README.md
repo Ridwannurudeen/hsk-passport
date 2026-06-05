@@ -7,6 +7,7 @@ revealing any personal data; your contract gets a boolean.
 | Example | What it shows | Runs against |
 | --- | --- | --- |
 | [`gated-claim`](./gated-claim) | End-to-end client flow: derive identity → (self-issue a test credential) → generate a ZK proof bound to the caller → claim a KYC-gated airdrop | Live HashKey Chain **testnet** (chain 133) |
+| [`gated-rwa`](./gated-rwa) | Same flow against a different gate shape: mint a KYC-gated ERC-20 (`hSILVER`) verified directly against the Semaphore contract, one mint per identity | Live HashKey Chain **testnet** (chain 133) |
 
 ## The on-chain pattern (one `require` line)
 

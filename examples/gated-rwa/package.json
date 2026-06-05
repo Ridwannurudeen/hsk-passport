@@ -1,0 +1,21 @@
+{
+  "name": "hsk-passport-example-gated-rwa",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Minimal runnable example: mint a ZK-KYC-gated ERC-20 (hSILVER) on HashKey Chain testnet using hsk-passport-sdk.",
+  "scripts": {
+    "mint": "tsx src/mint.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "ethers": "^6.13.0",
+    "hsk-passport-sdk": "^1.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0"
+  }
+}
