@@ -11,15 +11,45 @@
  * Artefacts (wasm + zkey + vkey) are served from the `freshness/` path of the
  * hsk-passport frontend — configurable via {@link ArtefactUrls}.
  */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.HSKPassportFreshnessClient = exports.FreshnessTree = exports.DEFAULT_ARTEFACTS = exports.FRESHNESS_TREE_DEPTH = void 0;
 exports.createFreshnessIdentity = createFreshnessIdentity;
 exports.generateFreshnessProof = generateFreshnessProof;
 const ethers_1 = require("ethers");
 const poseidon_lite_1 = require("poseidon-lite");
-// snarkjs has no published types; require it at runtime
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const snarkjs = require("snarkjs");
 exports.FRESHNESS_TREE_DEPTH = 16;
 const HSK_PASSPORT_FRESHNESS_ABI = [
     "function verifyFresh(uint256 groupId, uint256 merkleRoot, uint256 earliestAcceptable, uint256 scope, uint256 nullifier, uint256[2] proofA, uint256[2][2] proofB, uint256[2] proofC) external",
@@ -148,7 +178,9 @@ async function generateFreshnessProof(args) {
         earliestAcceptable: BigInt(args.earliestAcceptable).toString(),
         scope: BigInt(args.scope).toString(),
     };
-    const { proof, publicSignals } = await snarkjs.groth16.fullProve(input, urls.wasm, urls.zkey);
+    // Lazy-load snarkjs so importing the SDK never pulls it in at module top level.
+    const { groth16 } = await Promise.resolve().then(() => __importStar(require("snarkjs")));
+    const { proof, publicSignals } = await groth16.fullProve(input, urls.wasm, urls.zkey);
     const [nullifier, merkleRoot, earliestAcceptable, scope] = publicSignals.map((s) => BigInt(s));
     return {
         proofA: [BigInt(proof.pi_a[0]), BigInt(proof.pi_a[1])],

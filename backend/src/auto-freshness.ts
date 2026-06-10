@@ -42,7 +42,8 @@ const CREDENTIAL_TYPE_TO_GROUP: Record<string, number> = {
 function computeZeroRoots(depth: number): bigint[] {
   const zeros: bigint[] = new Array(depth + 1);
   zeros[0] = 0n;
-  for (let i = 1; i <= depth; i++) zeros[i] = poseidon2([zeros[i - 1], zeros[i - 1]]);
+  for (let i = 1; i <= depth; i++)
+    zeros[i] = poseidon2([zeros[i - 1], zeros[i - 1]]);
   return zeros;
 }
 
@@ -69,14 +70,19 @@ interface GroupState {
   leaves: bigint[]; // in-memory mirror, indexed by leaf_index
 }
 
-export function makeFreshnessLeaf(freshnessCommitment: bigint, issuanceTime: bigint): bigint {
+export function makeFreshnessLeaf(
+  freshnessCommitment: bigint,
+  issuanceTime: bigint,
+): bigint {
   return poseidon2([freshnessCommitment, issuanceTime]);
 }
 
 function getIssuerWallet(): Wallet | null {
   const pk = process.env.ISSUER_PRIVATE_KEY;
   if (!pk) {
-    console.warn("[auto-freshness] ISSUER_PRIVATE_KEY not set — auto-freshness disabled");
+    console.warn(
+      "[auto-freshness] ISSUER_PRIVATE_KEY not set — auto-freshness disabled",
+    );
     return null;
   }
   const provider = new JsonRpcProvider(CONFIG.rpcUrl);
@@ -112,7 +118,10 @@ async function rebuildState(
  *  group — this is a "stop, don't make it worse" condition because posting a
  *  new root that doesn't extend the on-chain tree silently breaks everyone's
  *  proofs. */
-async function reconcileRoots(registry: Contract, state: Map<number, GroupState>) {
+async function reconcileRoots(
+  registry: Contract,
+  state: Map<number, GroupState>,
+) {
   for (const groupState of state.values()) {
     if (groupState.leaves.length === 0) continue;
     const localRoot = computeRoot(groupState.leaves, CONFIG.freshnessTreeDepth);
@@ -153,13 +162,16 @@ async function postLeaf(
     throw new Error(`addLeaf tx ${tx.hash} reverted`);
   }
 
-  // Only mutate in-memory state on confirmed success — keeps state aligned
-  // with on-chain even if a tx is dropped or replaced.
-  groupState.leaves.push(leaf);
+  // Tx is confirmed on-chain. Deliberately do NOT mutate in-memory state here —
+  // the caller persists the durable freshness_leaves row first and only then
+  // pushes to the in-memory mirror. That ordering makes a crash (or DB-write
+  // failure) between the tx and the DB row fail safe: the leaf is missing from
+  // both the DB and memory, so reconcileRoots catches the on-chain divergence
+  // on restart instead of the loop re-posting a duplicate leaf.
   return {
     leaf,
     root: newRoot,
-    index: groupState.leaves.length - 1,
+    index: groupState.leaves.length, // index this leaf will occupy once recorded
     txHash: tx.hash,
   };
 }
@@ -230,16 +242,31 @@ export function startAutoFreshness() {
             BigInt(row.freshness_commitment),
             issuanceTimeSec,
           );
-          insertFreshnessLeaf({
-            group_id: groupId,
-            leaf_index: result.index,
-            freshness_commitment: row.freshness_commitment,
-            issuance_time: Number(issuanceTimeSec),
-            leaf: result.leaf.toString(),
-            root_after_insert: result.root.toString(),
-            posted_tx: result.txHash,
-            posted_at: Date.now(),
-          });
+          try {
+            insertFreshnessLeaf({
+              group_id: groupId,
+              leaf_index: result.index,
+              freshness_commitment: row.freshness_commitment,
+              issuance_time: Number(issuanceTimeSec),
+              leaf: result.leaf.toString(),
+              root_after_insert: result.root.toString(),
+              posted_tx: result.txHash,
+              posted_at: Date.now(),
+            });
+          } catch (dbErr) {
+            // The leaf is already on-chain but we couldn't persist its dedup
+            // record. Halt this group rather than re-post the same leaf next
+            // tick; a restart will reconcile (or loudly surface) the divergence.
+            groupState.authorised = false;
+            console.error(
+              `[auto-freshness] DB write failed AFTER on-chain post group=${groupId} ` +
+                `kyc=${row.id.slice(0, 8)}: ${(dbErr as Error).message.slice(0, 200)}. ` +
+                "Halting group until restart.",
+            );
+            break;
+          }
+          // Mirror in memory only once the durable row exists.
+          groupState.leaves.push(result.leaf);
           console.log(
             `[auto-freshness] group ${groupId} +leaf[${result.index}] tx=${result.txHash.slice(0, 12)}…`,
           );

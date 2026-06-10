@@ -39,7 +39,9 @@ export async function apiGetGroupMembers(groupId: number): Promise<bigint[]> {
 }
 
 export async function apiGetGlobalStats(): Promise<GlobalStats> {
-  const res = await fetch(`${apiBase()}/api/stats/global`, { cache: "no-store" });
+  const res = await fetch(`${apiBase()}/api/stats/global`, {
+    cache: "no-store",
+  });
   if (!res.ok) throw new Error(`API ${res.status}`);
   return res.json();
 }
@@ -78,8 +80,12 @@ export async function apiAttachFreshnessCommitment(
   return res.json();
 }
 
-export async function apiGetKYCStatus(commitment: string): Promise<KYCRequest | { status: "none" }> {
-  const res = await fetch(`${apiBase()}/api/kyc/status/${commitment}`, { cache: "no-store" });
+export async function apiGetKYCStatus(
+  commitment: string,
+): Promise<KYCRequest | { status: "none" }> {
+  const res = await fetch(`${apiBase()}/api/kyc/status/${commitment}`, {
+    cache: "no-store",
+  });
   if (!res.ok) throw new Error(`API ${res.status}`);
   return res.json();
 }
@@ -111,7 +117,10 @@ export async function apiGetKYCQueue(
     headers["x-issuer-sig"] = auth.signature;
     headers["x-issuer-nonce"] = String(auth.nonce);
   }
-  const res = await fetch(`${apiBase()}/api/kyc/queue${q}`, { cache: "no-store", headers });
+  const res = await fetch(`${apiBase()}/api/kyc/queue${q}`, {
+    cache: "no-store",
+    headers,
+  });
   if (!res.ok) throw new Error(`API ${res.status}`);
   return res.json();
 }
@@ -132,13 +141,19 @@ export async function apiReviewKYC(body: {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-    throw new Error((err as { error?: string }).error || `KYC review failed: ${res.status}`);
+    throw new Error(
+      (err as { error?: string }).error || `KYC review failed: ${res.status}`,
+    );
   }
   return res.json();
 }
 
 /** Build the message a reviewer must sign */
-export function buildReviewMessage(id: string, action: "approve" | "reject", nonce: number): string {
+export function buildReviewMessage(
+  id: string,
+  action: "approve" | "reject",
+  nonce: number,
+): string {
   return `HSK Passport review: ${action} request ${id} at ${nonce}`;
 }
 
@@ -146,8 +161,13 @@ export function buildReviewMessage(id: string, action: "approve" | "reject", non
 // Sumsub integration
 // ============================================================
 
-export async function apiGetSumsubConfig(): Promise<{ enabled: boolean; levelName: string }> {
-  const res = await fetch(`${apiBase()}/api/kyc/sumsub/config`, { cache: "no-store" });
+export async function apiGetSumsubConfig(): Promise<{
+  enabled: boolean;
+  levelName: string;
+}> {
+  const res = await fetch(`${apiBase()}/api/kyc/sumsub/config`, {
+    cache: "no-store",
+  });
   if (!res.ok) return { enabled: false, levelName: "" };
   return res.json();
 }
@@ -184,8 +204,13 @@ export async function apiSumsubInit(
         signal,
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-        throw new Error((err as { error?: string }).error || `Sumsub init failed: ${res.status}`);
+        const err = await res
+          .json()
+          .catch(() => ({ error: `HTTP ${res.status}` }));
+        throw new Error(
+          (err as { error?: string }).error ||
+            `Sumsub init failed: ${res.status}`,
+        );
       }
       return res.json();
     } catch (e) {
@@ -199,26 +224,16 @@ export async function apiSumsubInit(
   throw lastErr;
 }
 
-export interface SumsubIdDoc {
-  idDocType?: string;
-  country?: string;
-  firstName?: string;
-  lastName?: string;
-  middleName?: string;
-  dob?: string;
-  issuedDate?: string;
-  validUntil?: string;
-  number?: string;
-}
-
 export async function apiSumsubData(commitment: string): Promise<{
   applicantId?: string;
   reviewStatus?: string;
   reviewAnswer?: string | null;
-  idDocs?: SumsubIdDoc[];
+  verified?: boolean;
   status?: string;
 }> {
-  const res = await fetch(`${apiBase()}/api/kyc/sumsub/data/${commitment}`, { cache: "no-store" });
+  const res = await fetch(`${apiBase()}/api/kyc/sumsub/data/${commitment}`, {
+    cache: "no-store",
+  });
   if (!res.ok) return {};
   return res.json();
 }
@@ -227,10 +242,11 @@ export async function apiSumsubStatus(commitment: string): Promise<{
   applicantId?: string;
   reviewStatus?: string;
   reviewAnswer?: string | null;
-  rejectLabels?: string[];
   status?: string;
 }> {
-  const res = await fetch(`${apiBase()}/api/kyc/sumsub/status/${commitment}`, { cache: "no-store" });
+  const res = await fetch(`${apiBase()}/api/kyc/sumsub/status/${commitment}`, {
+    cache: "no-store",
+  });
   if (!res.ok) return {};
   return res.json();
 }
@@ -288,7 +304,10 @@ export interface IssuerRegistryStats {
   activeIssuers: number;
 }
 
-export async function apiGetIssuers(): Promise<{ stats: IssuerRegistryStats; issuers: IssuerView[] }> {
+export async function apiGetIssuers(): Promise<{
+  stats: IssuerRegistryStats;
+  issuers: IssuerView[];
+}> {
   const res = await fetch(`${apiBase()}/api/issuers`, { cache: "no-store" });
   if (!res.ok) throw new Error(`API ${res.status}`);
   return res.json();
@@ -313,8 +332,18 @@ export interface HealthReport {
     lastError: string | null;
   };
   rpc: {
-    testnet: { ok: boolean; headBlock: number; latencyMs: number; error: string | null };
-    mainnet: { ok: boolean; headBlock: number; latencyMs: number; error: string | null };
+    testnet: {
+      ok: boolean;
+      headBlock: number;
+      latencyMs: number;
+      error: string | null;
+    };
+    mainnet: {
+      ok: boolean;
+      headBlock: number;
+      latencyMs: number;
+      error: string | null;
+    };
   };
   db: { ok: boolean; activeCredentials: number; kycPending: number };
 }
@@ -348,8 +377,12 @@ export interface FreshnessIdentityState {
   postedAt?: number;
 }
 
-export async function apiGetFreshnessState(groupId: number): Promise<FreshnessTreeState> {
-  const res = await fetch(`${apiBase()}/api/freshness/state/${groupId}`, { cache: "no-store" });
+export async function apiGetFreshnessState(
+  groupId: number,
+): Promise<FreshnessTreeState> {
+  const res = await fetch(`${apiBase()}/api/freshness/state/${groupId}`, {
+    cache: "no-store",
+  });
   if (!res.ok) throw new Error(`API ${res.status}`);
   return res.json();
 }
@@ -377,7 +410,9 @@ export interface RegistryGovernanceState {
 
 export async function apiGetRegistryGovernance(): Promise<RegistryGovernanceState | null> {
   try {
-    const res = await fetch(`${apiBase()}/api/registry/governance`, { cache: "no-store" });
+    const res = await fetch(`${apiBase()}/api/registry/governance`, {
+      cache: "no-store",
+    });
     if (!res.ok) return null;
     return res.json();
   } catch {

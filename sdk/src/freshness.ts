@@ -14,10 +14,6 @@
 import { Contract, JsonRpcProvider, Signer } from "ethers";
 import { poseidon1, poseidon2 } from "poseidon-lite";
 
-// snarkjs has no published types; require it at runtime
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const snarkjs = require("snarkjs");
-
 export const FRESHNESS_TREE_DEPTH = 16;
 
 const HSK_PASSPORT_FRESHNESS_ABI = [
@@ -98,7 +94,10 @@ export class FreshnessTree {
     this.zeros = zeroRoots(depth);
   }
 
-  static makeLeaf(identityCommitment: bigint, issuanceTime: bigint | number): bigint {
+  static makeLeaf(
+    identityCommitment: bigint,
+    issuanceTime: bigint | number,
+  ): bigint {
     return poseidon2([identityCommitment, BigInt(issuanceTime)]);
   }
 
@@ -111,7 +110,10 @@ export class FreshnessTree {
   }
 
   /** Populate the tree from an array of leaves in insertion order. */
-  static fromLeaves(leaves: bigint[], depth: number = FRESHNESS_TREE_DEPTH): FreshnessTree {
+  static fromLeaves(
+    leaves: bigint[],
+    depth: number = FRESHNESS_TREE_DEPTH,
+  ): FreshnessTree {
     const tree = new FreshnessTree(depth);
     for (const l of leaves) tree.insert(l);
     return tree;
@@ -145,7 +147,9 @@ export class FreshnessTree {
 
   proof(index: number): FreshnessMerkleProof {
     if (index < 0 || index >= this.leaves.length) {
-      throw new Error(`index ${index} out of range (size=${this.leaves.length})`);
+      throw new Error(
+        `index ${index} out of range (size=${this.leaves.length})`,
+      );
     }
     const pathElements: bigint[] = [];
     const pathIndices: number[] = [];
@@ -153,7 +157,8 @@ export class FreshnessTree {
     let currentIndex = index;
     for (let level = 0; level < this.depth; level++) {
       const siblingIndex = currentIndex ^ 1;
-      const sibling = siblingIndex < layer.length ? layer[siblingIndex] : this.zeros[level];
+      const sibling =
+        siblingIndex < layer.length ? layer[siblingIndex] : this.zeros[level];
       pathElements.push(sibling);
       pathIndices.push(currentIndex & 1);
       const next: bigint[] = [];
@@ -181,7 +186,8 @@ export class FreshnessTree {
 
 /** Create a freshness identity from a secret scalar. */
 export function createFreshnessIdentity(secret: bigint): FreshnessIdentity {
-  if (secret <= 0n) throw new Error("Freshness identity secret must be positive");
+  if (secret <= 0n)
+    throw new Error("Freshness identity secret must be positive");
   return { secret, commitment: FreshnessTree.identityCommitment(secret) };
 }
 
@@ -198,7 +204,9 @@ interface GenerateProofArgs {
   artefacts?: ArtefactUrls;
 }
 
-export async function generateFreshnessProof(args: GenerateProofArgs): Promise<FreshnessProof> {
+export async function generateFreshnessProof(
+  args: GenerateProofArgs,
+): Promise<FreshnessProof> {
   const urls = args.artefacts ?? DEFAULT_ARTEFACTS;
   const input = {
     identitySecret: args.identity.secret.toString(),
@@ -210,9 +218,15 @@ export async function generateFreshnessProof(args: GenerateProofArgs): Promise<F
     scope: BigInt(args.scope).toString(),
   };
 
-  const { proof, publicSignals } = await snarkjs.groth16.fullProve(input, urls.wasm, urls.zkey);
-  const [nullifier, merkleRoot, earliestAcceptable, scope] = publicSignals.map((s: string) =>
-    BigInt(s)
+  // Lazy-load snarkjs so importing the SDK never pulls it in at module top level.
+  const { groth16 } = await import("snarkjs");
+  const { proof, publicSignals } = await groth16.fullProve(
+    input,
+    urls.wasm,
+    urls.zkey,
+  );
+  const [nullifier, merkleRoot, earliestAcceptable, scope] = publicSignals.map(
+    (s: string) => BigInt(s),
   );
 
   return {
@@ -248,8 +262,16 @@ export class HSKPassportFreshnessClient {
 
   constructor(opts: FreshnessClientOptions) {
     const connected = opts.signer ?? opts.provider;
-    this.composer = new Contract(opts.composerAddress, HSK_PASSPORT_FRESHNESS_ABI, connected);
-    this.registry = new Contract(opts.registryAddress, FRESHNESS_REGISTRY_ABI, connected);
+    this.composer = new Contract(
+      opts.composerAddress,
+      HSK_PASSPORT_FRESHNESS_ABI,
+      connected,
+    );
+    this.registry = new Contract(
+      opts.registryAddress,
+      FRESHNESS_REGISTRY_ABI,
+      connected,
+    );
     this.signer = opts.signer;
   }
 
@@ -262,12 +284,18 @@ export class HSKPassportFreshnessClient {
     return await this.registry.isKnownRoot(BigInt(groupId), root);
   }
 
-  async isNullifierConsumed(scope: bigint, nullifier: bigint): Promise<boolean> {
+  async isNullifierConsumed(
+    scope: bigint,
+    nullifier: bigint,
+  ): Promise<boolean> {
     return await this.composer.nullifierConsumed(scope, nullifier);
   }
 
   /** Read-only verification for UX previews. */
-  async previewVerify(groupId: bigint | number, proof: FreshnessProof): Promise<boolean> {
+  async previewVerify(
+    groupId: bigint | number,
+    proof: FreshnessProof,
+  ): Promise<boolean> {
     return await this.composer.previewVerifyFresh(
       BigInt(groupId),
       proof.merkleRoot,
@@ -276,7 +304,7 @@ export class HSKPassportFreshnessClient {
       proof.nullifier,
       proof.proofA,
       proof.proofB,
-      proof.proofC
+      proof.proofC,
     );
   }
 
@@ -291,7 +319,7 @@ export class HSKPassportFreshnessClient {
       proof.nullifier,
       proof.proofA,
       proof.proofB,
-      proof.proofC
+      proof.proofC,
     );
     return await tx.wait();
   }

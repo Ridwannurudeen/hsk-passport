@@ -1,6 +1,6 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
-import { randomUUID } from "crypto";
+import { randomUUID, createHash } from "crypto";
 import { verifyMessage, JsonRpcProvider, Contract } from "ethers";
 import { CONFIG } from "./config.js";
 import {
@@ -24,13 +24,16 @@ import {
   sumsubConfig,
   createApplicant,
   getApplicantByExternalId,
-  getApplicantInfo,
   generateAccessToken,
   verifyWebhookSignature,
   type SumsubApplicant,
 } from "./sumsub.js";
-import { emailConfig, notifyCredentialApproved, notifyCredentialRejected } from "./notify.js";
-import { markKYCNotified } from "./db.js";
+import {
+  emailConfig,
+  notifyCredentialApproved,
+  notifyCredentialRejected,
+} from "./notify.js";
+import { markKYCNotified, recordWebhookEvent } from "./db.js";
 import { getIssuersList, getGovernanceState } from "./issuers.js";
 
 const app = Fastify({ logger: { level: "info" } });
@@ -44,16 +47,23 @@ app.addContentTypeParser(
   (req, body, done) => {
     (req as unknown as { rawBody?: Buffer }).rawBody = body as Buffer;
     try {
-      done(null, body.length === 0 ? {} : JSON.parse((body as Buffer).toString("utf8")));
+      done(
+        null,
+        body.length === 0 ? {} : JSON.parse((body as Buffer).toString("utf8")),
+      );
     } catch (e) {
       done(e as Error, undefined);
     }
-  }
+  },
 );
 
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ||
+const ALLOWED_ORIGINS = (
+  process.env.ALLOWED_ORIGINS ||
   "https://hskpassport.gudman.xyz,http://localhost:3000,http://localhost:3001"
-).split(",").map((s) => s.trim()).filter(Boolean);
+)
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 await app.register(cors, {
   origin: (origin, cb) => {
@@ -143,13 +153,24 @@ app.post("/api/kyc/submit", async (request, reply) => {
     freshnessCommitment?: string;
   };
 
-  if (!body.commitment || !body.wallet || !body.jurisdiction || !body.credentialType) {
+  if (
+    !body.commitment ||
+    !body.wallet ||
+    !body.jurisdiction ||
+    !body.credentialType
+  ) {
     reply.code(400);
-    return { error: "missing required fields: commitment, wallet, jurisdiction, credentialType" };
+    return {
+      error:
+        "missing required fields: commitment, wallet, jurisdiction, credentialType",
+    };
   }
   if (!/^\d+$/.test(body.commitment) || body.commitment.length > 80) {
     reply.code(400);
-    return { error: "commitment must be a numeric string (Semaphore identity commitment)" };
+    return {
+      error:
+        "commitment must be a numeric string (Semaphore identity commitment)",
+    };
   }
   if (!/^0x[a-fA-F0-9]{40}$/.test(body.wallet)) {
     reply.code(400);
@@ -159,14 +180,24 @@ app.post("/api/kyc/submit", async (request, reply) => {
     reply.code(400);
     return { error: "jurisdiction/credentialType too long" };
   }
-  if (body.notifyEmail && (body.notifyEmail.length > 254 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(body.notifyEmail))) {
+  if (
+    body.notifyEmail &&
+    (body.notifyEmail.length > 254 ||
+      !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(body.notifyEmail))
+  ) {
     reply.code(400);
     return { error: "notifyEmail is not a valid email address" };
   }
   if (body.freshnessCommitment !== undefined) {
-    if (!/^\d+$/.test(body.freshnessCommitment) || body.freshnessCommitment.length > 80) {
+    if (
+      !/^\d+$/.test(body.freshnessCommitment) ||
+      body.freshnessCommitment.length > 80
+    ) {
       reply.code(400);
-      return { error: "freshnessCommitment must be a numeric string (Poseidon(secret))" };
+      return {
+        error:
+          "freshnessCommitment must be a numeric string (Poseidon(secret))",
+      };
     }
   }
 
@@ -202,16 +233,25 @@ app.post("/api/kyc/submit", async (request, reply) => {
 // commitment to whatever pending request exists for their Semaphore commitment,
 // or 404 if there is nothing to attach to.
 app.post("/api/kyc/freshness/attach", async (request, reply) => {
-  const body = request.body as { commitment?: string; freshnessCommitment?: string };
+  const body = request.body as {
+    commitment?: string;
+    freshnessCommitment?: string;
+  };
   if (!body.commitment || !/^\d+$/.test(body.commitment)) {
     reply.code(400);
     return { error: "missing or invalid commitment" };
   }
-  if (!body.freshnessCommitment || !/^\d+$/.test(body.freshnessCommitment) || body.freshnessCommitment.length > 80) {
+  if (
+    !body.freshnessCommitment ||
+    !/^\d+$/.test(body.freshnessCommitment) ||
+    body.freshnessCommitment.length > 80
+  ) {
     reply.code(400);
     return { error: "missing or invalid freshnessCommitment" };
   }
-  const existing = getKYCByCommitment(body.commitment) as { id?: string } | undefined;
+  const existing = getKYCByCommitment(body.commitment) as
+    | { id?: string }
+    | undefined;
   if (!existing?.id) {
     reply.code(404);
     return { error: "no KYC request found for that commitment" };
@@ -268,7 +308,9 @@ function gcNonces(now: number) {
  * Signed payload: "HSK Passport issuer read at <nonce>"
  * Each (address, nonce) pair can be used at most once within a 5-minute window.
  */
-async function authenticateIssuer(request: { headers: Record<string, string | string[] | undefined> }): Promise<boolean> {
+async function authenticateIssuer(request: {
+  headers: Record<string, string | string[] | undefined>;
+}): Promise<boolean> {
   const addr = request.headers["x-issuer-addr"] as string | undefined;
   const sig = request.headers["x-issuer-sig"] as string | undefined;
   const nonceRaw = request.headers["x-issuer-nonce"] as string | undefined;
@@ -294,7 +336,11 @@ async function authenticateIssuer(request: { headers: Record<string, string | st
   if (recovered.toLowerCase() !== normalizedAddr) return false;
 
   const provider = new JsonRpcProvider(CONFIG.rpcUrl);
-  const passport = new Contract(CONFIG.hskPassport, PASSPORT_READ_ABI, provider);
+  const passport = new Contract(
+    CONFIG.hskPassport,
+    PASSPORT_READ_ABI,
+    provider,
+  );
   let isApproved: boolean;
   try {
     isApproved = await passport.approvedIssuers(recovered);
@@ -359,7 +405,7 @@ async function verifyIssuerSignature(
   requestId: string,
   action: string,
   signature: string,
-  nonce: number
+  nonce: number,
 ): Promise<boolean> {
   // Signature payload must match exactly what the reviewer signed on the client.
   // Include a nonce (timestamp) to prevent replay.
@@ -376,7 +422,11 @@ async function verifyIssuerSignature(
 
   // Verify recovered address is an approved issuer on-chain
   const provider = new JsonRpcProvider(CONFIG.rpcUrl);
-  const passport = new Contract(CONFIG.hskPassport, PASSPORT_READ_ABI, provider);
+  const passport = new Contract(
+    CONFIG.hskPassport,
+    PASSPORT_READ_ABI,
+    provider,
+  );
   try {
     const isApproved = await passport.approvedIssuers(reviewer);
     return isApproved;
@@ -396,10 +446,17 @@ app.post("/api/kyc/review", async (request, reply) => {
     rejectionReason?: string;
   };
 
-  if (!body.id || !body.reviewer || !body.action || !body.signature || !body.nonce) {
+  if (
+    !body.id ||
+    !body.reviewer ||
+    !body.action ||
+    !body.signature ||
+    !body.nonce
+  ) {
     reply.code(400);
     return {
-      error: "missing required fields: id, reviewer, action, signature, nonce. Reviewer must sign: 'HSK Passport review: <action> request <id> at <nonce>'",
+      error:
+        "missing required fields: id, reviewer, action, signature, nonce. Reviewer must sign: 'HSK Passport review: <action> request <id> at <nonce>'",
     };
   }
 
@@ -409,7 +466,7 @@ app.post("/api/kyc/review", async (request, reply) => {
     body.id,
     body.action,
     body.signature,
-    body.nonce
+    body.nonce,
   );
   if (!ok) {
     reply.code(401);
@@ -428,12 +485,19 @@ app.post("/api/kyc/review", async (request, reply) => {
   }
 
   if (body.action === "approve") {
-    updateKYCStatus(body.id, "approved", body.reviewer, { txHash: body.txHash });
+    updateKYCStatus(body.id, "approved", body.reviewer, {
+      txHash: body.txHash,
+    });
   } else {
-    updateKYCStatus(body.id, "rejected", body.reviewer, { rejectionReason: body.rejectionReason });
+    updateKYCStatus(body.id, "rejected", body.reviewer, {
+      rejectionReason: body.rejectionReason,
+    });
   }
 
-  return { id: body.id, status: body.action === "approve" ? "approved" : "rejected" };
+  return {
+    id: body.id,
+    status: body.action === "approve" ? "approved" : "rejected",
+  };
 });
 
 // ================================================================
@@ -471,16 +535,25 @@ app.post("/api/kyc/sumsub/init", async (request, reply) => {
     reply.code(400);
     return { error: "missing or invalid commitment (must be numeric string)" };
   }
-  if (body.notifyEmail && (body.notifyEmail.length > 254 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(body.notifyEmail))) {
+  if (
+    body.notifyEmail &&
+    (body.notifyEmail.length > 254 ||
+      !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(body.notifyEmail))
+  ) {
     reply.code(400);
     return { error: "notifyEmail is not a valid email address" };
   }
   if (body.country && !/^[A-Z]{3}$/.test(body.country)) {
     reply.code(400);
-    return { error: "country must be a 3-letter uppercase ISO 3166-1 alpha-3 code" };
+    return {
+      error: "country must be a 3-letter uppercase ISO 3166-1 alpha-3 code",
+    };
   }
   if (body.freshnessCommitment !== undefined) {
-    if (!/^\d+$/.test(body.freshnessCommitment) || body.freshnessCommitment.length > 80) {
+    if (
+      !/^\d+$/.test(body.freshnessCommitment) ||
+      body.freshnessCommitment.length > 80
+    ) {
       reply.code(400);
       return { error: "freshnessCommitment must be a numeric string" };
     }
@@ -501,7 +574,9 @@ app.post("/api/kyc/sumsub/init", async (request, reply) => {
     // the commitment after the webhook approves them). If neither, the row will
     // be created in the webhook handler.
     if (body.notifyEmail || body.freshnessCommitment) {
-      const existing = getKYCByCommitment(body.commitment) as { id?: string } | undefined;
+      const existing = getKYCByCommitment(body.commitment) as
+        | { id?: string }
+        | undefined;
       if (!existing) {
         insertKYCRequest({
           id: randomUUID(),
@@ -555,13 +630,14 @@ app.get("/api/kyc/sumsub/status/:commitment", async (request, reply) => {
     applicantId: applicant.id,
     reviewStatus: applicant.review?.reviewStatus || "init",
     reviewAnswer: applicant.review?.reviewResult?.reviewAnswer || null,
-    rejectLabels: applicant.review?.reviewResult?.rejectLabels || [],
   };
 });
 
 /**
- * Return the verified fields extracted by Sumsub for a given commitment.
- * Live proxy — we do not store this data on our side.
+ * Return the verification outcome for a given commitment.
+ * Identity commitments are public (listed by /api/groups/:groupId/members), so
+ * this endpoint is unauthenticated and MUST NOT expose personal data — it only
+ * confirms whether the applicant passed. Raw ID-document fields stay at Sumsub.
  */
 app.get("/api/kyc/sumsub/data/:commitment", async (request, reply) => {
   if (!sumsubConfig.configured) {
@@ -574,21 +650,11 @@ app.get("/api/kyc/sumsub/data/:commitment", async (request, reply) => {
   if (!applicant) return { status: "none" };
 
   const reviewAnswer = applicant.review?.reviewResult?.reviewAnswer || null;
-  if (reviewAnswer !== "GREEN") {
-    return {
-      applicantId: applicant.id,
-      reviewStatus: applicant.review?.reviewStatus || "init",
-      reviewAnswer,
-      idDocs: [],
-    };
-  }
-
-  const info = await getApplicantInfo(applicant.id);
   return {
     applicantId: applicant.id,
-    reviewStatus: applicant.review?.reviewStatus || "completed",
+    reviewStatus: applicant.review?.reviewStatus || "init",
     reviewAnswer,
-    idDocs: info?.idDocs || [],
+    verified: reviewAnswer === "GREEN",
   };
 });
 
@@ -604,11 +670,20 @@ app.post("/api/kyc/sumsub/webhook", async (request, reply) => {
     return { error: "raw body unavailable" };
   }
   const providedSig = (request.headers["x-payload-digest"] as string) || "";
-  const algo = (request.headers["x-payload-digest-alg"] as string) || "HMAC_SHA256_HEX";
+  const algo =
+    (request.headers["x-payload-digest-alg"] as string) || "HMAC_SHA256_HEX";
 
   if (!verifyWebhookSignature(raw, providedSig, algo)) {
     reply.code(401);
     return { error: "invalid webhook signature" };
+  }
+
+  // Replay protection: a captured, validly-signed body can be re-sent. Dedup on
+  // the raw-body digest so each delivery is processed at most once (also makes
+  // Sumsub's own retries idempotent).
+  const digest = createHash("sha256").update(raw).digest("hex");
+  if (!recordWebhookEvent(digest)) {
+    return { ok: true, duplicate: true };
   }
 
   const event = request.body as {
@@ -619,14 +694,26 @@ app.post("/api/kyc/sumsub/webhook", async (request, reply) => {
     reviewResult?: { reviewAnswer?: string };
   };
 
-  console.log("[sumsub] webhook:", event.type, event.externalUserId, event.reviewStatus, event.reviewResult?.reviewAnswer);
+  console.log(
+    "[sumsub] webhook:",
+    event.type,
+    event.externalUserId,
+    event.reviewStatus,
+    event.reviewResult?.reviewAnswer,
+  );
 
   // Handle applicantReviewed: GREEN → auto-issue + email; RED → email rejection
   if (event.type === "applicantReviewed" && event.externalUserId) {
     const applicant = await getApplicantByExternalId(event.externalUserId);
     const answer = applicant?.review?.reviewResult?.reviewAnswer;
     const existing = getKYCByCommitment(event.externalUserId) as
-      | { id?: string; status?: string; notify_email?: string | null; tx_hash?: string | null; credential_type?: string }
+      | {
+          id?: string;
+          status?: string;
+          notify_email?: string | null;
+          tx_hash?: string | null;
+          credential_type?: string;
+        }
       | undefined;
 
     if (answer === "GREEN") {
@@ -652,7 +739,8 @@ app.post("/api/kyc/sumsub/webhook", async (request, reply) => {
           commitment: event.externalUserId,
         });
         if (result.ok && existing.id) markKYCNotified(existing.id);
-        else if (!result.ok) console.warn("[notify] approval email failed:", result.error);
+        else if (!result.ok)
+          console.warn("[notify] approval email failed:", result.error);
       }
     } else if (answer === "RED") {
       const reasons = applicant?.review?.reviewResult?.rejectLabels?.join(", ");
@@ -663,7 +751,8 @@ app.post("/api/kyc/sumsub/webhook", async (request, reply) => {
           reason: reasons,
         });
         if (result.ok && existing.id) markKYCNotified(existing.id);
-        else if (!result.ok) console.warn("[notify] rejection email failed:", result.error);
+        else if (!result.ok)
+          console.warn("[notify] rejection email failed:", result.error);
       }
     }
   }
@@ -671,7 +760,10 @@ app.post("/api/kyc/sumsub/webhook", async (request, reply) => {
   return { ok: true };
 });
 
-app.get("/api/notify/status", async () => ({ enabled: emailConfig.enabled, from: emailConfig.from }));
+app.get("/api/notify/status", async () => ({
+  enabled: emailConfig.enabled,
+  from: emailConfig.from,
+}));
 
 // ================================================================
 // v6 freshness - tree state + per-user identity lookup

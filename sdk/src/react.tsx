@@ -1,6 +1,13 @@
-import { useState, useCallback } from "react";
+"use client";
+
+import { useState, useCallback, useMemo } from "react";
 import type { Signer } from "ethers";
-import { HSKPassport, type HSKPassportProof, type NetworkName, Identity } from "./index";
+import {
+  HSKPassport,
+  type HSKPassportProof,
+  type NetworkName,
+  Identity,
+} from "./index";
 
 interface HSKPassportGateProps {
   /** Network to connect to */
@@ -60,10 +67,17 @@ export function HSKPassportGate({
 
       // Bind proof to caller to prevent front-running
       if (!signer) {
-        throw new Error("HSKPassportGate requires a signer to bind proofs to the caller address");
+        throw new Error(
+          "HSKPassportGate requires a signer to bind proofs to the caller address",
+        );
       }
       const callerAddress = await signer.getAddress();
-      const proof = await passport.generateProof(identity, groupId, scope, BigInt(callerAddress));
+      const proof = await passport.generateProof(
+        identity,
+        groupId,
+        scope,
+        BigInt(callerAddress),
+      );
       setStatus("Proof generated! Verifying...");
 
       const valid = await passport.verifyProof(groupId, proof);
@@ -85,7 +99,10 @@ export function HSKPassportGate({
     <button
       onClick={handleClick}
       disabled={loading}
-      style={{ opacity: loading ? 0.6 : 1, cursor: loading ? "wait" : "pointer" }}
+      style={{
+        opacity: loading ? 0.6 : 1,
+        cursor: loading ? "wait" : "pointer",
+      }}
     >
       {loading ? status || "Verifying..." : children}
     </button>
@@ -104,14 +121,14 @@ export function useHSKPassport(network: NetworkName = "hashkey-testnet") {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const passport = HSKPassport.connect(network);
+  const passport = useMemo(() => HSKPassport.connect(network), [network]);
 
   const generateProofForGroup = useCallback(
     async (
       identitySecret: string,
       groupId: number,
       scope: string | number,
-      callerAddress: string
+      callerAddress: string,
     ) => {
       setLoading(true);
       setError(null);
@@ -121,7 +138,7 @@ export function useHSKPassport(network: NetworkName = "hashkey-testnet") {
           identity,
           groupId,
           scope,
-          BigInt(callerAddress)
+          BigInt(callerAddress),
         );
         return proof;
       } catch (err) {
@@ -131,7 +148,7 @@ export function useHSKPassport(network: NetworkName = "hashkey-testnet") {
         setLoading(false);
       }
     },
-    [passport]
+    [passport],
   );
 
   return { passport, generateProof: generateProofForGroup, loading, error };
