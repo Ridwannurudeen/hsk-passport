@@ -9,6 +9,13 @@ pragma solidity >=0.8.23 <0.9.0;
 contract IssuerRegistry {
     address public owner;
     address public slashingAuthority;
+    /// @dev Fixed at construction. Slashed stake is sent here, never to the
+    ///      mutable owner — so a compromised owner that re-grabs slashing
+    ///      authority still cannot redirect slashed funds to an address it controls.
+    address public immutable treasury;
+    /// @dev Authorised to report issuance/revocation for reputation. Set by owner;
+    ///      defaults to the deployer. Wire this to the backend/HSKPassport reporter.
+    address public reporter;
 
     enum Tier { None, Community, KYCProvider, Institutional }
 
@@ -46,20 +53,28 @@ contract IssuerRegistry {
 
     error NotOwner();
     error NotSlashingAuthority();
+    error NotReporter();
     error InsufficientStake();
     error NothingStaked();
     error CooldownNotElapsed();
     error NotActive();
     error AlreadyActive();
+    error TransferFailed();
+    error ZeroAddress();
+
+    event ReporterUpdated(address indexed reporter);
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();
         _;
     }
 
-    constructor() {
+    constructor(address _treasury) {
+        if (_treasury == address(0)) revert ZeroAddress();
         owner = msg.sender;
         slashingAuthority = msg.sender; // transferred to governance later
+        treasury = _treasury;
+        reporter = msg.sender; // owner reports until a dedicated reporter is set
     }
 
     // ============================================================
@@ -114,7 +129,11 @@ contract IssuerRegistry {
         i.active = false;
         unstakeRequestedAt[msg.sender] = 0;
 
-        payable(msg.sender).transfer(amount);
+        // .call instead of .transfer: a 2300-gas stipend bricks withdrawals for
+        // Safe/contract-wallet issuers. State is already zeroed above (CEI), so
+        // this is not reentrancy-exploitable.
+        (bool ok, ) = payable(msg.sender).call{value: amount}("");
+        if (!ok) revert TransferFailed();
         emit Unstaked(msg.sender, amount);
     }
 
@@ -129,10 +148,12 @@ contract IssuerRegistry {
     // Reputation tracking (called by HSKPassport or by issuers)
     // ============================================================
 
-    /// @notice Issuer self-reports an issuance for reputation. Anyone can call, but
-    ///         non-issuers have no effect. Pull-based because contracts can't push.
+    /// @notice Report an issuance for reputation. Restricted to the authorised
+    ///         reporter so the on-chain reputation counters can't be forged or
+    ///         griefed by arbitrary callers.
     /// @dev In production, wire this to HSKPassport.CredentialIssued events via backend.
     function reportIssuance(address issuer, uint256 groupId) external {
+        if (msg.sender != reporter) revert NotReporter();
         Issuer storage i = issuers[issuer];
         if (!i.active) return;
         i.totalIssued++;
@@ -140,6 +161,7 @@ contract IssuerRegistry {
     }
 
     function reportRevocation(address issuer, uint256 groupId) external {
+        if (msg.sender != reporter) revert NotReporter();
         Issuer storage i = issuers[issuer];
         if (!i.active) return;
         i.totalRevoked++;
@@ -167,13 +189,16 @@ contract IssuerRegistry {
             i.tier = newTier;
         }
 
-        // If below community minimum, deactivate
-        if (i.stake < communityMinStake) {
+        // At or below the community minimum, deactivate. Uses <= so a fully
+        // slashed issuer (stake 0, communityMinStake 0) is deactivated rather
+        // than left active at Community tier.
+        if (i.stake <= communityMinStake) {
             i.active = false;
         }
 
-        // Slashed funds go to owner (could route to treasury/DAO)
-        payable(owner).transfer(slashed);
+        // Slashed funds go to the immutable treasury, never to the mutable owner.
+        (bool ok, ) = payable(treasury).call{value: slashed}("");
+        if (!ok) revert TransferFailed();
         emit IssuerSlashed(issuer, slashed, reason);
     }
 
@@ -222,6 +247,12 @@ contract IssuerRegistry {
 
     function setSlashingAuthority(address addr) external onlyOwner {
         slashingAuthority = addr;
+    }
+
+    function setReporter(address addr) external onlyOwner {
+        if (addr == address(0)) revert ZeroAddress();
+        reporter = addr;
+        emit ReporterUpdated(addr);
     }
 
     function transferOwnership(address newOwner) external onlyOwner {
