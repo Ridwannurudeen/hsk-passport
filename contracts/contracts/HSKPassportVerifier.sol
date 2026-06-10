@@ -42,15 +42,22 @@ abstract contract HSKPassportVerifier {
     }
 
     /// @notice Require the caller to hold a valid credential for the given group
-    /// @dev Read-only verification — does not consume the nullifier
+    /// @dev Read-only verification — does not consume the nullifier. The proof MUST
+    ///      be bound to the caller (`proof.message == uint256(uint160(msg.sender))`),
+    ///      otherwise an observer could lift a valid proof out of historical calldata
+    ///      and replay it to pass the gate as themselves.
     modifier onlyCredentialHolder(uint256 groupId, ISemaphore.SemaphoreProof calldata proof) {
+        if (proof.message != uint256(uint160(msg.sender))) revert InvalidCredential();
         if (!passport.verifyCredential(groupId, proof)) revert InvalidCredential();
         _;
     }
 
     /// @notice Require and consume a credential proof (prevents reuse for same scope)
-    /// @dev Writes to chain — consumes the nullifier
+    /// @dev Writes to chain — consumes the nullifier. Caller-binding is required so a
+    ///      proof cannot be front-run: an attacker who copies the proof from the
+    ///      mempool cannot consume the nullifier as themselves.
     modifier onlyCredentialHolderOnce(uint256 groupId, ISemaphore.SemaphoreProof calldata proof) {
+        if (proof.message != uint256(uint160(msg.sender))) revert InvalidCredential();
         passport.validateCredential(groupId, proof);
         _;
     }
