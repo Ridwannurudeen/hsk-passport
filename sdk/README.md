@@ -185,11 +185,11 @@ Returns:
 
 | Group ID | Name | Description |
 |----------|------|-------------|
-| 15 | `KYC_VERIFIED` | Standard KYC verification |
-| 16 | `ACCREDITED_INVESTOR` | Professional/accredited investor |
-| 17 | `HK_RESIDENT` | Hong Kong SAR resident |
-| 18 | `SG_RESIDENT` | Singapore resident |
-| 19 | `AE_RESIDENT` | UAE resident |
+| 25 | `KYC_VERIFIED` | Standard KYC verification |
+| 26 | `ACCREDITED_INVESTOR` | Professional/accredited investor |
+| 27 | `HK_RESIDENT` | Hong Kong SAR resident |
+| 28 | `SG_RESIDENT` | Singapore resident |
+| 29 | `AE_RESIDENT` | UAE resident |
 
 ## Network Configuration
 

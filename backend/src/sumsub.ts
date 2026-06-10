@@ -8,7 +8,8 @@ const SUMSUB_BASE_URL = process.env.SUMSUB_BASE_URL || "https://api.sumsub.com";
 const SUMSUB_APP_TOKEN = process.env.SUMSUB_APP_TOKEN || "";
 const SUMSUB_SECRET_KEY = process.env.SUMSUB_SECRET_KEY || "";
 const SUMSUB_WEBHOOK_SECRET = process.env.SUMSUB_WEBHOOK_SECRET || "";
-const SUMSUB_LEVEL_NAME = process.env.SUMSUB_LEVEL_NAME || "hsk-passport-basic-kyc";
+const SUMSUB_LEVEL_NAME =
+  process.env.SUMSUB_LEVEL_NAME || "hsk-passport-basic-kyc";
 
 export const sumsubConfig = {
   configured: Boolean(SUMSUB_APP_TOKEN && SUMSUB_SECRET_KEY),
@@ -20,18 +21,30 @@ export const sumsubConfig = {
  * Sign a Sumsub API request using HMAC-SHA256.
  * Signature = HMAC(secret, timestamp + method + uri + body)
  */
-function signRequest(method: string, uri: string, body: string, timestamp: number): string {
+function signRequest(
+  method: string,
+  uri: string,
+  body: string,
+  timestamp: number,
+): string {
   const data = timestamp + method.toUpperCase() + uri + body;
-  return crypto.createHmac("sha256", SUMSUB_SECRET_KEY).update(data).digest("hex");
+  return crypto
+    .createHmac("sha256", SUMSUB_SECRET_KEY)
+    .update(data)
+    .digest("hex");
 }
 
 interface SumsubCallOptions {
   method: "GET" | "POST" | "DELETE" | "PATCH";
-  uri: string;                 // path + query string, e.g. /resources/applicants?foo=bar
+  uri: string; // path + query string, e.g. /resources/applicants?foo=bar
   body?: Record<string, unknown>;
 }
 
-async function callSumsub<T = unknown>({ method, uri, body }: SumsubCallOptions): Promise<T> {
+async function callSumsub<T = unknown>({
+  method,
+  uri,
+  body,
+}: SumsubCallOptions): Promise<T> {
   if (!sumsubConfig.configured) {
     throw new Error("Sumsub not configured on server");
   }
@@ -61,7 +74,7 @@ async function callSumsub<T = unknown>({ method, uri, body }: SumsubCallOptions)
 
   if (!res.ok) {
     throw new Error(
-      `Sumsub API ${method} ${uri} failed: ${res.status} ${JSON.stringify(data).slice(0, 300)}`
+      `Sumsub API ${method} ${uri} failed: ${res.status} ${JSON.stringify(data).slice(0, 300)}`,
     );
   }
 
@@ -91,9 +104,11 @@ export interface SumsubApplicant {
  */
 export async function createApplicant(
   externalUserId: string,
-  country?: string
+  country?: string,
 ): Promise<SumsubApplicant> {
-  const body: { externalUserId: string; fixedInfo?: { country: string } } = { externalUserId };
+  const body: { externalUserId: string; fixedInfo?: { country: string } } = {
+    externalUserId,
+  };
   if (country && /^[A-Z]{3}$/.test(country)) {
     body.fixedInfo = { country };
   }
@@ -105,7 +120,9 @@ export async function createApplicant(
 }
 
 /** Fetch an existing applicant by externalUserId. Returns null if not found. */
-export async function getApplicantByExternalId(externalUserId: string): Promise<SumsubApplicant | null> {
+export async function getApplicantByExternalId(
+  externalUserId: string,
+): Promise<SumsubApplicant | null> {
   try {
     return await callSumsub<SumsubApplicant>({
       method: "GET",
@@ -117,7 +134,9 @@ export async function getApplicantByExternalId(externalUserId: string): Promise<
   }
 }
 
-export async function getApplicantById(applicantId: string): Promise<SumsubApplicant | null> {
+export async function getApplicantById(
+  applicantId: string,
+): Promise<SumsubApplicant | null> {
   try {
     return await callSumsub<SumsubApplicant>({
       method: "GET",
@@ -133,44 +152,14 @@ export async function getApplicantById(applicantId: string): Promise<SumsubAppli
  * Get a short-lived access token for the Sumsub Web SDK.
  * The frontend uses this to initialize the embedded verification widget.
  */
-export async function generateAccessToken(externalUserId: string, ttlSec = 600): Promise<{ token: string; userId: string }> {
+export async function generateAccessToken(
+  externalUserId: string,
+  ttlSec = 600,
+): Promise<{ token: string; userId: string }> {
   return callSumsub<{ token: string; userId: string }>({
     method: "POST",
     uri: `/resources/accessTokens?userId=${encodeURIComponent(externalUserId)}&levelName=${encodeURIComponent(SUMSUB_LEVEL_NAME)}&ttlInSecs=${ttlSec}`,
   });
-}
-
-export interface SumsubIdDoc {
-  idDocType?: string;
-  country?: string;
-  firstName?: string;
-  lastName?: string;
-  middleName?: string;
-  dob?: string;
-  issuedDate?: string;
-  validUntil?: string;
-  number?: string;
-  address?: { formattedAddress?: string };
-}
-
-/**
- * Fetch extracted ID document info for an applicant.
- * Returns the verified fields that Sumsub pulled from the submitted documents.
- */
-export async function getApplicantInfo(applicantId: string): Promise<{ idDocs: SumsubIdDoc[] } | null> {
-  try {
-    return await callSumsub<{ idDocs: SumsubIdDoc[] }>({
-      method: "GET",
-      uri: `/resources/applicants/${applicantId}/one`,
-    }).then((full: unknown) => {
-      const f = full as { info?: { idDocs?: SumsubIdDoc[] }; fixedInfo?: { idDocs?: SumsubIdDoc[] } };
-      const idDocs = f.info?.idDocs || f.fixedInfo?.idDocs || [];
-      return { idDocs };
-    });
-  } catch (e) {
-    if ((e as Error).message.includes("404")) return null;
-    throw e;
-  }
 }
 
 // ============================================================
@@ -182,23 +171,35 @@ export async function getApplicantInfo(applicantId: string): Promise<{ idDocs: S
  * Sumsub sends signature in header `x-payload-digest` (some accounts use `X-Payload-Digest-Alg` for algo).
  * Default algorithm is HMAC-SHA256 of the raw request body using the webhook secret.
  */
-export function verifyWebhookSignature(rawBody: Buffer | string, providedSignature: string, algo: string = "HMAC_SHA256_HEX"): boolean {
+export function verifyWebhookSignature(
+  rawBody: Buffer | string,
+  providedSignature: string,
+  algo: string = "HMAC_SHA256_HEX",
+): boolean {
   if (!SUMSUB_WEBHOOK_SECRET) return false;
   if (!providedSignature) return false;
 
-  const bodyBuf = Buffer.isBuffer(rawBody) ? rawBody : Buffer.from(rawBody, "utf8");
+  const bodyBuf = Buffer.isBuffer(rawBody)
+    ? rawBody
+    : Buffer.from(rawBody, "utf8");
 
   let hashAlgo: "sha1" | "sha256" | "sha512";
   switch (algo.toUpperCase()) {
     case "HMAC_SHA1_HEX":
-      hashAlgo = "sha1"; break;
+      hashAlgo = "sha1";
+      break;
     case "HMAC_SHA512_HEX":
-      hashAlgo = "sha512"; break;
+      hashAlgo = "sha512";
+      break;
     case "HMAC_SHA256_HEX":
     default:
-      hashAlgo = "sha256"; break;
+      hashAlgo = "sha256";
+      break;
   }
-  const hash = crypto.createHmac(hashAlgo, SUMSUB_WEBHOOK_SECRET).update(bodyBuf).digest();
+  const hash = crypto
+    .createHmac(hashAlgo, SUMSUB_WEBHOOK_SECRET)
+    .update(bodyBuf)
+    .digest();
 
   let providedBuf: Buffer;
   try {

@@ -99,26 +99,38 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_freshness_commitment
     ON freshness_leaves(freshness_commitment);
+
+  -- Replay protection for Sumsub webhooks: one row per processed payload,
+  -- keyed by the SHA-256 of the raw signed body. A replayed (byte-identical)
+  -- delivery hashes to the same digest and is rejected before any side effect.
+  CREATE TABLE IF NOT EXISTS webhook_events (
+    digest TEXT PRIMARY KEY,
+    received_at INTEGER NOT NULL
+  );
 `);
 
 export function getSyncState(key: string): string | null {
-  const row = db.prepare("SELECT value FROM sync_state WHERE key = ?").get(key) as { value: string } | undefined;
+  const row = db
+    .prepare("SELECT value FROM sync_state WHERE key = ?")
+    .get(key) as { value: string } | undefined;
   return row?.value ?? null;
 }
 
 export function setSyncState(key: string, value: string) {
-  db.prepare("INSERT OR REPLACE INTO sync_state (key, value) VALUES (?, ?)").run(key, value);
+  db.prepare(
+    "INSERT OR REPLACE INTO sync_state (key, value) VALUES (?, ?)",
+  ).run(key, value);
 }
 
 export function insertCredential(
   groupId: number,
   commitment: string,
   block: number,
-  tx: string
+  tx: string,
 ) {
   db.prepare(
     `INSERT OR IGNORE INTO credentials (group_id, identity_commitment, issued_at_block, issued_tx, active)
-     VALUES (?, ?, ?, ?, 1)`
+     VALUES (?, ?, ?, ?, 1)`,
   ).run(groupId, commitment, block, tx);
 }
 
@@ -126,32 +138,40 @@ export function revokeCredential(
   groupId: number,
   commitment: string,
   block: number,
-  tx: string
+  tx: string,
 ) {
   db.prepare(
     `UPDATE credentials
      SET active = 0, revoked_at_block = ?, revoked_tx = ?
-     WHERE group_id = ? AND identity_commitment = ?`
+     WHERE group_id = ? AND identity_commitment = ?`,
   ).run(block, tx, groupId, commitment);
 }
 
 export function getActiveMembers(groupId: number): string[] {
-  const rows = db.prepare(
-    `SELECT identity_commitment FROM credentials
+  const rows = db
+    .prepare(
+      `SELECT identity_commitment FROM credentials
      WHERE group_id = ? AND active = 1
-     ORDER BY issued_at_block ASC`
-  ).all(groupId) as { identity_commitment: string }[];
+     ORDER BY issued_at_block ASC`,
+    )
+    .all(groupId) as { identity_commitment: string }[];
   return rows.map((r) => r.identity_commitment);
 }
 
 export function getGroupStats(groupId: number) {
-  const row = db.prepare(
-    `SELECT
+  const row = db
+    .prepare(
+      `SELECT
        SUM(CASE WHEN active = 1 THEN 1 ELSE 0 END) AS active_count,
        COUNT(*) AS total_issued,
        SUM(CASE WHEN active = 0 THEN 1 ELSE 0 END) AS total_revoked
-     FROM credentials WHERE group_id = ?`
-  ).get(groupId) as { active_count: number | null; total_issued: number | null; total_revoked: number | null };
+     FROM credentials WHERE group_id = ?`,
+    )
+    .get(groupId) as {
+    active_count: number | null;
+    total_issued: number | null;
+    total_revoked: number | null;
+  };
   return {
     activeCount: row.active_count ?? 0,
     totalIssued: row.total_issued ?? 0,
@@ -160,18 +180,30 @@ export function getGroupStats(groupId: number) {
 }
 
 export function getGroupsForCommitment(commitment: string): number[] {
-  const rows = db.prepare(
-    `SELECT group_id FROM credentials WHERE identity_commitment = ? AND active = 1`
-  ).all(commitment) as { group_id: number }[];
+  const rows = db
+    .prepare(
+      `SELECT group_id FROM credentials WHERE identity_commitment = ? AND active = 1`,
+    )
+    .all(commitment) as { group_id: number }[];
   return rows.map((r) => r.group_id);
 }
 
 export function getGlobalStats() {
-  const active = db.prepare("SELECT COUNT(*) as c FROM credentials WHERE active = 1").get() as { c: number };
-  const total = db.prepare("SELECT COUNT(*) as c FROM credentials").get() as { c: number };
-  const groups = db.prepare("SELECT COUNT(DISTINCT group_id) as c FROM credentials").get() as { c: number };
-  const kyc = db.prepare("SELECT COUNT(*) as c FROM kyc_requests").get() as { c: number };
-  const kycPending = db.prepare("SELECT COUNT(*) as c FROM kyc_requests WHERE status = 'pending'").get() as { c: number };
+  const active = db
+    .prepare("SELECT COUNT(*) as c FROM credentials WHERE active = 1")
+    .get() as { c: number };
+  const total = db.prepare("SELECT COUNT(*) as c FROM credentials").get() as {
+    c: number;
+  };
+  const groups = db
+    .prepare("SELECT COUNT(DISTINCT group_id) as c FROM credentials")
+    .get() as { c: number };
+  const kyc = db.prepare("SELECT COUNT(*) as c FROM kyc_requests").get() as {
+    c: number;
+  };
+  const kycPending = db
+    .prepare("SELECT COUNT(*) as c FROM kyc_requests WHERE status = 'pending'")
+    .get() as { c: number };
   return {
     activeCredentials: active.c,
     totalIssued: total.c,
@@ -194,7 +226,7 @@ export function insertKYCRequest(req: {
   db.prepare(
     `INSERT INTO kyc_requests
      (id, identity_commitment, wallet_address, jurisdiction, credential_type, document_type, status, submitted_at, notify_email, freshness_commitment)
-     VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
   ).run(
     req.id,
     req.commitment,
@@ -204,21 +236,42 @@ export function insertKYCRequest(req: {
     req.documentType || null,
     Date.now(),
     req.notifyEmail || null,
-    req.freshnessCommitment || null
+    req.freshnessCommitment || null,
   );
 }
 
 /** Update the freshness commitment on an existing pending request — the user
  *  may have generated their freshness identity after the initial submission
  *  (e.g. between the Sumsub init call and the Sumsub webhook firing). */
-export function setFreshnessCommitment(id: string, freshnessCommitment: string) {
+export function setFreshnessCommitment(
+  id: string,
+  freshnessCommitment: string,
+) {
   db.prepare(
     "UPDATE kyc_requests SET freshness_commitment = ? WHERE id = ? AND freshness_commitment IS NULL",
   ).run(freshnessCommitment, id);
 }
 
 export function markKYCNotified(id: string) {
-  db.prepare("UPDATE kyc_requests SET notified_at = ? WHERE id = ?").run(Date.now(), id);
+  // Clear notify_email once the notification has been sent — the address is no
+  // longer needed and dropping it minimises PII retained against a commitment.
+  db.prepare(
+    "UPDATE kyc_requests SET notified_at = ?, notify_email = NULL WHERE id = ?",
+  ).run(Date.now(), id);
+}
+
+/**
+ * Record a processed webhook by raw-body digest. Returns true if this is the
+ * first time we've seen it (caller should process), false if it's a replay or
+ * duplicate delivery (caller should skip).
+ */
+export function recordWebhookEvent(digest: string): boolean {
+  const res = db
+    .prepare(
+      "INSERT OR IGNORE INTO webhook_events (digest, received_at) VALUES (?, ?)",
+    )
+    .run(digest, Date.now());
+  return res.changes > 0;
 }
 
 export function getKYCQueue(status?: string) {
@@ -234,28 +287,30 @@ export function getKYCRequest(id: string) {
 }
 
 export function getKYCByCommitment(commitment: string) {
-  return db.prepare(
-    "SELECT * FROM kyc_requests WHERE identity_commitment = ? ORDER BY submitted_at DESC LIMIT 1"
-  ).get(commitment);
+  return db
+    .prepare(
+      "SELECT * FROM kyc_requests WHERE identity_commitment = ? ORDER BY submitted_at DESC LIMIT 1",
+    )
+    .get(commitment);
 }
 
 export function updateKYCStatus(
   id: string,
   status: "approved" | "rejected",
   reviewer: string,
-  extras: { txHash?: string; rejectionReason?: string } = {}
+  extras: { txHash?: string; rejectionReason?: string } = {},
 ) {
   db.prepare(
     `UPDATE kyc_requests
      SET status = ?, reviewed_at = ?, reviewed_by = ?, tx_hash = ?, rejection_reason = ?
-     WHERE id = ?`
+     WHERE id = ?`,
   ).run(
     status,
     Date.now(),
     reviewer.toLowerCase(),
     extras.txHash || null,
     extras.rejectionReason || null,
-    id
+    id,
   );
 }
 
@@ -295,12 +350,12 @@ export function getPendingFreshnessIssuances(): {
        ORDER BY k.reviewed_at ASC`,
     )
     .all() as {
-      id: string;
-      freshness_commitment: string;
-      credential_type: string;
-      reviewed_at: number | null;
-      tx_hash: string | null;
-    }[];
+    id: string;
+    freshness_commitment: string;
+    credential_type: string;
+    reviewed_at: number | null;
+    tx_hash: string | null;
+  }[];
 }
 
 export function insertFreshnessLeaf(row: FreshnessLeafRow) {

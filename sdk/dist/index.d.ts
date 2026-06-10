@@ -107,8 +107,19 @@ export declare class HSKPassport {
     hasCredential(groupId: number, identity: Identity): Promise<boolean>;
     /** Get credential status for all default groups */
     getCredentials(identity: Identity): Promise<CredentialStatus[]>;
+    /** Page queryFilter in fixed block windows — public RPCs reject unbounded eth_getLogs. */
+    private queryFilterPaged;
+    /** Decode the identityCommitment from a CredentialIssued/CredentialRevoked log. */
+    private parseCommitment;
     /** Get all active group members (revocation-aware) */
     getGroupMembers(groupId: number): Promise<bigint[]>;
+    /**
+     * Reconstruct the on-chain Semaphore group: add every commitment ever issued
+     * in insertion order, then zero each revoked leaf via removeMember. Semaphore v4
+     * zeroes leaves in place, so an active-only re-indexed tree would not match the
+     * on-chain Merkle root — this reconstruction does.
+     */
+    private buildGroup;
     /**
      * Generate a zero-knowledge proof of credential ownership
      *

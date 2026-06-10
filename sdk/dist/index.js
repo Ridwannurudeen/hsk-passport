@@ -41,7 +41,9 @@ class HSKPassport {
             this.provider = signerOrProvider.provider;
         }
         else {
-            this.provider = signerOrProvider || new ethers_1.JsonRpcProvider(deployment.rpcUrl);
+            this.provider =
+                signerOrProvider ||
+                    new ethers_1.JsonRpcProvider(deployment.rpcUrl);
         }
         this.passportContract = new ethers_1.Contract(deployment.contracts.hskPassport, abi_1.HSK_PASSPORT_ABI, this.signer || this.provider);
         this.semaphoreContract = new ethers_1.Contract(deployment.contracts.semaphore, abi_1.SEMAPHORE_ABI, this.provider);
@@ -90,31 +92,71 @@ class HSKPassport {
         }
         return results;
     }
+    /** Page queryFilter in fixed block windows — public RPCs reject unbounded eth_getLogs. */
+    async queryFilterPaged(filter, fromBlock) {
+        const PAGE_SIZE = 9000;
+        const latest = await this.provider.getBlockNumber();
+        const events = [];
+        for (let start = fromBlock; start <= latest; start += PAGE_SIZE) {
+            const end = Math.min(start + PAGE_SIZE - 1, latest);
+            const page = await this.passportContract.queryFilter(filter, start, end);
+            events.push(...page);
+        }
+        return events;
+    }
+    /** Decode the identityCommitment from a CredentialIssued/CredentialRevoked log. */
+    parseCommitment(event) {
+        const parsed = this.passportContract.interface.parseLog({
+            topics: [...event.topics],
+            data: event.data,
+        });
+        return parsed?.args?.identityCommitment;
+    }
     /** Get all active group members (revocation-aware) */
     async getGroupMembers(groupId) {
         const issuedFilter = this.passportContract.filters.CredentialIssued(groupId);
         const revokedFilter = this.passportContract.filters.CredentialRevoked(groupId);
         const fromBlock = addresses_1.DEPLOYMENTS[this.network].deployBlock;
         const [issuedEvents, revokedEvents] = await Promise.all([
-            this.passportContract.queryFilter(issuedFilter, fromBlock, "latest"),
-            this.passportContract.queryFilter(revokedFilter, fromBlock, "latest"),
+            this.queryFilterPaged(issuedFilter, fromBlock),
+            this.queryFilterPaged(revokedFilter, fromBlock),
         ]);
-        const revokedSet = new Set(revokedEvents.map((e) => {
-            const parsed = this.passportContract.interface.parseLog({
-                topics: [...e.topics],
-                data: e.data,
-            });
-            return parsed?.args?.identityCommitment?.toString();
-        }).filter(Boolean));
+        const revokedSet = new Set(revokedEvents
+            .map((e) => this.parseCommitment(e)?.toString())
+            .filter(Boolean));
         return issuedEvents
-            .map((e) => {
-            const parsed = this.passportContract.interface.parseLog({
-                topics: [...e.topics],
-                data: e.data,
-            });
-            return parsed?.args?.identityCommitment;
-        })
+            .map((e) => this.parseCommitment(e))
             .filter((m) => m !== undefined && !revokedSet.has(m.toString()));
+    }
+    /**
+     * Reconstruct the on-chain Semaphore group: add every commitment ever issued
+     * in insertion order, then zero each revoked leaf via removeMember. Semaphore v4
+     * zeroes leaves in place, so an active-only re-indexed tree would not match the
+     * on-chain Merkle root — this reconstruction does.
+     */
+    async buildGroup(groupId) {
+        const issuedFilter = this.passportContract.filters.CredentialIssued(groupId);
+        const revokedFilter = this.passportContract.filters.CredentialRevoked(groupId);
+        const fromBlock = addresses_1.DEPLOYMENTS[this.network].deployBlock;
+        const [issuedEvents, revokedEvents] = await Promise.all([
+            this.queryFilterPaged(issuedFilter, fromBlock),
+            this.queryFilterPaged(revokedFilter, fromBlock),
+        ]);
+        const group = new group_1.Group();
+        for (const event of issuedEvents) {
+            const commitment = this.parseCommitment(event);
+            if (commitment !== undefined)
+                group.addMember(commitment);
+        }
+        for (const event of revokedEvents) {
+            const commitment = this.parseCommitment(event);
+            if (commitment === undefined)
+                continue;
+            const index = group.indexOf(commitment);
+            if (index !== -1)
+                group.removeMember(index);
+        }
+        return group;
     }
     /**
      * Generate a zero-knowledge proof of credential ownership
@@ -134,18 +176,21 @@ class HSKPassport {
             throw new Error("generateProof: 'message' is required and should be the caller's address as a bigint. " +
                 "Pass BigInt(await signer.getAddress()) to prevent front-running.");
         }
-        const members = await this.getGroupMembers(groupId);
-        if (members.length === 0) {
+        const group = await this.buildGroup(groupId);
+        if (group.size === 0) {
             throw new Error("Group has no members");
         }
-        if (!members.some((m) => m === identity.commitment)) {
+        if (group.indexOf(identity.commitment) === -1) {
             throw new Error("Identity is not a member of this group");
         }
-        const group = new group_1.Group();
-        for (const member of members) {
-            group.addMember(member);
+        let scopeValue;
+        if (typeof scope === "string") {
+            const hex = Array.from(new TextEncoder().encode(scope), (b) => b.toString(16).padStart(2, "0")).join("");
+            scopeValue = hex === "" ? 0n : BigInt("0x" + hex) % 2n ** 253n;
         }
-        const scopeValue = typeof scope === "string" ? BigInt("0x" + Buffer.from(scope).toString("hex")) % (2n ** 253n) : scope;
+        else {
+            scopeValue = scope;
+        }
         const raw = await (0, proof_1.generateProof)(identity, group, message, scopeValue);
         return {
             merkleTreeDepth: raw.merkleTreeDepth,

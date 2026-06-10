@@ -1,4 +1,5 @@
 "use strict";
+"use client";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.HSKPassportGate = HSKPassportGate;
 exports.useHSKPassport = useHSKPassport;
@@ -52,7 +53,10 @@ function HSKPassportGate({ network = "hashkey-testnet", groupId, scope, signer, 
             setLoading(false);
         }
     }, [network, groupId, scope, signer, identitySecret, onVerified, onError]);
-    return ((0, jsx_runtime_1.jsx)("button", { onClick: handleClick, disabled: loading, style: { opacity: loading ? 0.6 : 1, cursor: loading ? "wait" : "pointer" }, children: loading ? status || "Verifying..." : children }));
+    return ((0, jsx_runtime_1.jsx)("button", { onClick: handleClick, disabled: loading, style: {
+            opacity: loading ? 0.6 : 1,
+            cursor: loading ? "wait" : "pointer",
+        }, children: loading ? status || "Verifying..." : children }));
 }
 /**
  * Hook for HSK Passport proof generation
@@ -65,7 +69,7 @@ function HSKPassportGate({ network = "hashkey-testnet", groupId, scope, signer, 
 function useHSKPassport(network = "hashkey-testnet") {
     const [loading, setLoading] = (0, react_1.useState)(false);
     const [error, setError] = (0, react_1.useState)(null);
-    const passport = index_1.HSKPassport.connect(network);
+    const passport = (0, react_1.useMemo)(() => index_1.HSKPassport.connect(network), [network]);
     const generateProofForGroup = (0, react_1.useCallback)(async (identitySecret, groupId, scope, callerAddress) => {
         setLoading(true);
         setError(null);
