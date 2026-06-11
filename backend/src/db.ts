@@ -107,6 +107,18 @@ db.exec(`
     digest TEXT PRIMARY KEY,
     received_at INTEGER NOT NULL
   );
+
+  -- Blind-issuance voucher sessions (CRITICAL #2). Each row is a Sumsub session
+  -- under a random externalUserId — deliberately NOT linked to any identity
+  -- commitment, so the backend cannot map a credential to an applicant. The
+  -- session is GREEN-gated at Sumsub; this table only enforces one-voucher-per-
+  -- session: signing flips spent_at, and the flip is atomic (UPDATE ... WHERE
+  -- spent_at IS NULL).
+  CREATE TABLE IF NOT EXISTS voucher_sessions (
+    session_id TEXT PRIMARY KEY,
+    created_at INTEGER NOT NULL,
+    spent_at INTEGER
+  );
 `);
 
 export function getSyncState(key: string): string | null {
@@ -312,6 +324,43 @@ export function updateKYCStatus(
     extras.rejectionReason || null,
     id,
   );
+}
+
+// -------------------------------------------------------------------------
+// Blind-issuance voucher sessions
+// -------------------------------------------------------------------------
+
+/** Record a freshly-created voucher session (random sessionId, no commitment). */
+export function createVoucherSession(sessionId: string) {
+  db.prepare(
+    "INSERT OR IGNORE INTO voucher_sessions (session_id, created_at) VALUES (?, ?)",
+  ).run(sessionId, Date.now());
+}
+
+export function getVoucherSession(
+  sessionId: string,
+):
+  | { session_id: string; created_at: number; spent_at: number | null }
+  | undefined {
+  return db
+    .prepare("SELECT * FROM voucher_sessions WHERE session_id = ?")
+    .get(sessionId) as
+    | { session_id: string; created_at: number; spent_at: number | null }
+    | undefined;
+}
+
+/**
+ * Atomically mark a session spent. Returns true only on the transition from
+ * unspent → spent for a session we created — so a second voucher request for
+ * the same session (or an unknown session) returns false and signs nothing.
+ */
+export function spendVoucherSession(sessionId: string): boolean {
+  const res = db
+    .prepare(
+      "UPDATE voucher_sessions SET spent_at = ? WHERE session_id = ? AND spent_at IS NULL",
+    )
+    .run(Date.now(), sessionId);
+  return res.changes > 0;
 }
 
 // -------------------------------------------------------------------------

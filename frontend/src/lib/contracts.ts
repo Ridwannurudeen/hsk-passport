@@ -187,6 +187,32 @@ export const ISSUER_TIER_NAMES: Record<number, string> = {
   3: "Institutional",
 };
 
+// ---------------------------------------------------------------------------
+// Blind-issuance claim delegate (CRITICAL #2, docs/blind-issuance-design.md).
+// Deployed once per group and approved via HSKPassport.approveDelegate(groupId,
+// address). The address is zero until the testnet deploy + delegate approval is
+// run; while zero, the /claim page surfaces the flow as not-yet-deployed.
+// ---------------------------------------------------------------------------
+export const CLAIM_CREDENTIAL = {
+  // ClaimCredential delegate serving the KYC_VERIFIED group.
+  address: "0x0000000000000000000000000000000000000000",
+  groupId: GROUPS.KYC_VERIFIED,
+};
+
+export const CLAIM_CREDENTIAL_ABI = [
+  "function passport() view returns (address)",
+  "function groupId() view returns (uint256)",
+  "function modulus() view returns (bytes)",
+  "function exponent() view returns (bytes)",
+  "function usedNullifier(uint256) view returns (bool)",
+  "function claim(uint256 commitment, bytes sig)",
+  "function verify(uint256 commitment, bytes sig) view returns (bool)",
+  "event Claimed(uint256 indexed commitment, uint256 nullifier)",
+  "error BadSignature()",
+  "error NullifierUsed()",
+  "error BadModulusLength()",
+] as const;
+
 export const ISSUER_REGISTRY_ABI = [
   "function communityMinStake() view returns (uint256)",
   "function kycProviderMinStake() view returns (uint256)",

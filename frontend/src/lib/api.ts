@@ -251,6 +251,62 @@ export async function apiSumsubStatus(commitment: string): Promise<{
   return res.json();
 }
 
+// ============================================================
+// Blind-issuance vouchers (CRITICAL #2)
+// ============================================================
+
+export async function apiGetVoucherPubkey(): Promise<{
+  enabled: boolean;
+  modulus?: string;
+  exponent?: string;
+  modulusBits?: number;
+}> {
+  const res = await fetch(`${apiBase()}/api/kyc/voucher/pubkey`, {
+    cache: "no-store",
+  });
+  if (!res.ok) return { enabled: false };
+  return res.json();
+}
+
+export async function apiCreateVoucherSession(country?: string): Promise<{
+  sessionId: string;
+  accessToken: string;
+  levelName: string;
+}> {
+  const res = await fetch(`${apiBase()}/api/kyc/voucher/session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ country: country || undefined }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    throw new Error(
+      (err as { error?: string }).error ||
+        `Voucher session failed: ${res.status}`,
+    );
+  }
+  return res.json();
+}
+
+/** Redeem a blind voucher. `blinded` is m·r^e mod N — the commitment never leaves the browser. */
+export async function apiRequestVoucher(
+  sessionId: string,
+  blinded: string,
+): Promise<{ blindSig: string }> {
+  const res = await fetch(`${apiBase()}/api/kyc/voucher`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sessionId, blinded }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    throw new Error(
+      (err as { error?: string }).error || `Voucher failed: ${res.status}`,
+    );
+  }
+  return res.json();
+}
+
 // ── IssuerRegistry directory ──────────────────────────────
 
 export interface IssuerMetadata {
