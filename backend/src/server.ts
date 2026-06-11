@@ -33,8 +33,20 @@ import {
   notifyCredentialApproved,
   notifyCredentialRejected,
 } from "./notify.js";
-import { markKYCNotified, recordWebhookEvent } from "./db.js";
+import {
+  markKYCNotified,
+  recordWebhookEvent,
+  createVoucherSession,
+  getVoucherSession,
+  spendVoucherSession,
+} from "./db.js";
 import { getIssuersList, getGovernanceState } from "./issuers.js";
+import {
+  voucherConfig,
+  getVoucherKey,
+  publicKeyHex,
+  blindSign,
+} from "./blind-issuer.js";
 
 const app = Fastify({ logger: { level: "info" } });
 
@@ -758,6 +770,125 @@ app.post("/api/kyc/sumsub/webhook", async (request, reply) => {
   }
 
   return { ok: true };
+});
+
+// ================================================================
+// Blind-issuance vouchers (CRITICAL #2, docs/blind-issuance-design.md)
+//
+// Decouples "passed KYC" from "added my commitment to the group": the user does
+// KYC under a random sessionId (never the commitment), then redeems a blind
+// signature over their commitment. The backend signs only a *blinded* value, so
+// neither this DB nor Sumsub can link the on-chain credential to an applicant.
+// The user submits the on-chain claim themselves via ClaimCredential.
+// ================================================================
+
+// Public RSA key (N, e) the client blinds against and ClaimCredential is
+// deployed with. Unauthenticated — it is public by design.
+app.get("/api/kyc/voucher/pubkey", async () => {
+  if (!voucherConfig.configured) return { enabled: false };
+  const { n, e } = publicKeyHex(getVoucherKey());
+  return { enabled: true, modulus: n, exponent: e, modulusBits: 2048 };
+});
+
+// Start a blind KYC session: a random externalUserId (NOT the commitment) with
+// its own Sumsub access token. We store the sessionId alone — no commitment, no
+// wallet — so the session can never be joined to an on-chain identity.
+app.post("/api/kyc/voucher/session", async (request, reply) => {
+  if (!sumsubConfig.configured) {
+    reply.code(501);
+    return { error: "Sumsub not configured on this server" };
+  }
+  if (!voucherConfig.configured) {
+    reply.code(501);
+    return { error: "Blind-issuance voucher signing not configured" };
+  }
+  const body = request.body as { country?: string };
+  if (body.country && !/^[A-Z]{3}$/.test(body.country)) {
+    reply.code(400);
+    return {
+      error: "country must be a 3-letter uppercase ISO 3166-1 alpha-3 code",
+    };
+  }
+
+  const sessionId = `blind-${randomUUID()}`;
+  try {
+    const applicant = await createApplicant(sessionId, body.country);
+    createVoucherSession(sessionId);
+    const access = await generateAccessToken(sessionId);
+    return {
+      sessionId,
+      applicantId: applicant.id,
+      accessToken: access.token,
+      levelName: sumsubConfig.levelName,
+    };
+  } catch (e) {
+    const msg = (e as Error).message;
+    console.error("[voucher] session init error:", msg);
+    reply.code(500);
+    return { error: msg.slice(0, 300) };
+  }
+});
+
+// Redeem a blind voucher: verify the session is GREEN and unspent, then sign the
+// client's blinded commitment. We see only `blinded` — never the commitment.
+app.post("/api/kyc/voucher", async (request, reply) => {
+  if (!sumsubConfig.configured || !voucherConfig.configured) {
+    reply.code(501);
+    return { error: "Blind-issuance voucher flow not configured" };
+  }
+  const body = request.body as { sessionId?: string; blinded?: string };
+  if (!body.sessionId || typeof body.sessionId !== "string") {
+    reply.code(400);
+    return { error: "missing sessionId" };
+  }
+  // blinded is m·r^e mod N — at most the modulus width (256 bytes = 512 hex).
+  if (
+    !body.blinded ||
+    !/^0x[0-9a-fA-F]+$/.test(body.blinded) ||
+    body.blinded.length > 514
+  ) {
+    reply.code(400);
+    return {
+      error: "blinded must be a 0x hex string within the modulus width",
+    };
+  }
+
+  const session = getVoucherSession(body.sessionId);
+  if (!session) {
+    reply.code(404);
+    return { error: "unknown session" };
+  }
+  if (session.spent_at) {
+    reply.code(409);
+    return { error: "a voucher has already been issued for this session" };
+  }
+
+  // Source of truth for "passed KYC" is Sumsub, keyed by the random sessionId.
+  const applicant = await getApplicantByExternalId(body.sessionId);
+  const answer = applicant?.review?.reviewResult?.reviewAnswer;
+  if (answer !== "GREEN") {
+    reply.code(403);
+    return {
+      error: "session has not been approved (GREEN) yet",
+      reviewAnswer: answer ?? null,
+    };
+  }
+
+  // Sign first so a malformed `blinded` 400s WITHOUT burning the session (the
+  // user can retry). Then spend atomically: if we lose the race, discard the
+  // signature and 409 — exactly one voucher per session is ever returned.
+  let blindSig: string;
+  try {
+    blindSig = blindSign(body.blinded, getVoucherKey());
+  } catch (e) {
+    reply.code(400);
+    return { error: (e as Error).message };
+  }
+  if (!spendVoucherSession(body.sessionId)) {
+    reply.code(409);
+    return { error: "a voucher has already been issued for this session" };
+  }
+  return { blindSig };
 });
 
 app.get("/api/notify/status", async () => ({
