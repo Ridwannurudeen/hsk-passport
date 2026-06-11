@@ -5,6 +5,7 @@ pragma circom 2.1.9;
 // circomlib at the same relative path (or pass -l explicitly).
 include "poseidon.circom";
 include "comparators.circom";
+include "bitify.circom";
 include "mux1.circom";
 
 // ---------------------------------------------------------------------------
@@ -118,7 +119,15 @@ template CredentialFreshness(depth) {
     inclusion.root === merkleRoot;
 
     // 4. Enforce issuanceTime >= earliestAcceptable.
-    //    Both are < 2^64 (unix seconds). Use 64-bit unsigned comparison.
+    //    GreaterEqThan(64) is only sound when both inputs are < 2^64. Pin that
+    //    explicitly with Num2Bits(64) range checks instead of relying on the
+    //    comparator's internal decomposition, so an out-of-range input (e.g. a
+    //    buggy issuer leaf) can never make the comparison pass spuriously.
+    component itBits = Num2Bits(64);
+    itBits.in <== issuanceTime;
+    component eaBits = Num2Bits(64);
+    eaBits.in <== earliestAcceptable;
+
     component freshness = GreaterEqThan(64);
     freshness.in[0] <== issuanceTime;
     freshness.in[1] <== earliestAcceptable;
