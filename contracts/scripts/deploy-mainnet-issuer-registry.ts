@@ -9,6 +9,8 @@
 // HSK gas. Estimated deploy cost ~1.3M gas × 0.001 gwei ~= 0.0000013 HSK.
 
 import { ethers, network } from "hardhat";
+import * as fs from "node:fs";
+import * as path from "node:path";
 
 async function main() {
   if (network.name !== "hashkey-mainnet") {
@@ -20,11 +22,12 @@ async function main() {
 
   const [deployer] = await ethers.getSigners();
   const balance = await ethers.provider.getBalance(deployer.address);
+  const { chainId } = await ethers.provider.getNetwork();
   console.log(
     "Network:        ",
     network.name,
     "(chain",
-    (await ethers.provider.getNetwork()).chainId.toString() + ")",
+    chainId.toString() + ")",
   );
   console.log("Deployer:       ", deployer.address);
   console.log("Balance:        ", ethers.formatEther(balance), "HSK");
@@ -76,6 +79,33 @@ async function main() {
     ethers.formatEther(balance - balanceAfter),
     "HSK",
   );
+
+  // Persist the deployment record (the rewire step + handoff scripts consume it).
+  const recordPath = path.resolve(
+    __dirname,
+    "..",
+    "deployments",
+    `mainnet-issuer-registry-${chainId}.json`,
+  );
+  fs.mkdirSync(path.dirname(recordPath), { recursive: true });
+  fs.writeFileSync(
+    recordPath,
+    JSON.stringify(
+      {
+        network: `chainId-${chainId}`,
+        chainId: Number(chainId),
+        deployedAt: new Date().toISOString(),
+        deployer: deployer.address,
+        issuerRegistry: addr,
+        treasury,
+        deployTx: tx?.hash,
+        supersedes: "0xf109cBe3D8d54D77C85ECF1367Cfcd6f075868e9",
+      },
+      null,
+      2,
+    ),
+  );
+  console.log(`\nDeployment record: ${recordPath}`);
 
   console.log("\n=== Save this for the frontend/backend wiring ===");
   console.log("MAINNET_ISSUER_REGISTRY=" + addr);
