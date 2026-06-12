@@ -37,7 +37,12 @@ issuers" mean something economically.
 | Contract       | Address                                              | Status        |
 |----------------|------------------------------------------------------|---------------|
 | IssuerRegistry | `0xf109cBe3D8d54D77C85ECF1367Cfcd6f075868e9`         | Live          |
-| Timelock       | (not yet deployed — see §5)                          | Pending       |
+| Timelock       | `0xd09e8Aec6B6A36588E7A105f606A9fe9a134CFE9`         | Live (1-of-1, 48h) |
+
+> The mainnet Timelock holds the IssuerRegistry's `slashingAuthority` but is
+> **1-of-1** — the deployer is the sole proposer and executor, and registry
+> ownership still rests with the deployer EOA. The 48h delay is the active
+> safeguard; the 3-of-5 Safe handoff is pending real independent co-signers (§5).
 
 ## 3. Backend env vars
 
