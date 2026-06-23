@@ -195,7 +195,7 @@ export const ISSUER_TIER_NAMES: Record<number, string> = {
 // ---------------------------------------------------------------------------
 export const CLAIM_CREDENTIAL = {
   // ClaimCredential delegate serving the KYC_VERIFIED group.
-  address: "0x0000000000000000000000000000000000000000",
+  address: "0xA5312b448F8d85B8e25f830A696fCFF4277DfAaF",
   groupId: GROUPS.KYC_VERIFIED,
 };
 
