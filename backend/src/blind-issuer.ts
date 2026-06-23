@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import fs from "fs";
 
 // Blind-issuance voucher signer (CRITICAL #2, docs/blind-issuance-design.md).
 //
@@ -88,7 +89,21 @@ export function blindSign(blindedHex: string, key: VoucherKey): string {
 
 // ── env wrapper ───────────────────────────────────────────────────────────
 
-const VOUCHER_RSA_PRIVATE_KEY = process.env.VOUCHER_RSA_PRIVATE_KEY || "";
+// The signing key is a multi-line PEM. Provide it inline via
+// VOUCHER_RSA_PRIVATE_KEY, or — where the host injects env as single lines
+// (e.g. systemd Environment=) — via VOUCHER_RSA_PRIVATE_KEY_FILE pointing to a
+// PEM file kept outside the repo. A missing file leaves the voucher disabled
+// (same as an absent key), so the rest of the service still boots.
+function readVoucherKey(): string {
+  if (process.env.VOUCHER_RSA_PRIVATE_KEY) {
+    return process.env.VOUCHER_RSA_PRIVATE_KEY;
+  }
+  const file = process.env.VOUCHER_RSA_PRIVATE_KEY_FILE;
+  if (file && fs.existsSync(file)) return fs.readFileSync(file, "utf8");
+  return "";
+}
+
+const VOUCHER_RSA_PRIVATE_KEY = readVoucherKey();
 
 export const voucherConfig = {
   configured: Boolean(VOUCHER_RSA_PRIVATE_KEY),
