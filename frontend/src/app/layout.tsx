@@ -104,7 +104,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               </div>
               {[
                 { title: "Product", items: [
-                  ["Get verified", "/kyc"], ["Dashboard", "/user"], ["Policy Composer", "/composer"], ["Interactive demo", "/demo"],
+                  ["Get verified", "/claim"], ["Other credentials", "/kyc"], ["Dashboard", "/user"], ["Policy Composer", "/composer"], ["Interactive demo", "/demo"],
                 ] },
                 { title: "Developers", items: [
                   ["Quickstart", "/developers"], ["Integration docs", "/docs"],
