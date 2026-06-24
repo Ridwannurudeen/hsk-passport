@@ -64,8 +64,8 @@ function Wordmark() {
 
 const LINKS: Array<{ href: string; label: string; highlight?: boolean }> = [
   { href: "/composer", label: "Composer", highlight: true },
-  { href: "/kyc", label: "Get verified" },
-  { href: "/claim", label: "Private claim", highlight: true },
+  { href: "/claim", label: "Get verified", highlight: true },
+  { href: "/kyc", label: "Other credentials" },
   { href: "/demo", label: "Demo" },
   { href: "/demo/fresh", label: "Fresh ZK · v6", highlight: true },
   { href: "/issuers", label: "Issuers" },

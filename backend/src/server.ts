@@ -192,6 +192,16 @@ app.post("/api/kyc/submit", async (request, reply) => {
     reply.code(400);
     return { error: "jurisdiction/credentialType too long" };
   }
+  // KYC-Verified credentials are issued only through the blind /claim flow
+  // (ClaimCredential delegate), which never links commitment to wallet/applicant.
+  // The correlating submit path is closed for this credential type.
+  if (body.credentialType === "KYCVerified") {
+    reply.code(400);
+    return {
+      error:
+        "KYC-Verified credentials are now issued via the private /claim flow",
+    };
+  }
   if (
     body.notifyEmail &&
     (body.notifyEmail.length > 254 ||

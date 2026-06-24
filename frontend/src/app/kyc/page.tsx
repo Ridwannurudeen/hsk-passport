@@ -41,7 +41,6 @@ import { useToast } from "@/components/Toast";
 // Sumsub's fixedInfo.country expects.
 
 const CREDENTIAL_TYPES = [
-  { id: "KYCVerified", name: "Standard KYC", desc: "Basic identity verification" },
   { id: "AccreditedInvestor", name: "Accredited Investor", desc: "Professional investor status" },
   { id: "HKResident", name: "HK Resident", desc: "Hong Kong residency proof" },
 ];
@@ -61,7 +60,7 @@ export default function KYCPage() {
   // the WebSDK surfaces the correct document list regardless of the user's IP.
   const [sumsubCountry, setSumsubCountry] = useState<string>(DEFAULT_COUNTRY);
   const [identity, setIdentity] = useState<Identity | null>(null);
-  const [credentialType, setCredentialType] = useState("KYCVerified");
+  const [credentialType, setCredentialType] = useState("AccreditedInvestor");
 
   // Document state
   const [documentFile, setDocumentFile] = useState<File | null>(null);
@@ -648,6 +647,12 @@ export default function KYCPage() {
       {stage === "identity" && (
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
           <h2 className="text-lg font-semibold mb-3">Create Your Identity</h2>
+          <div className="mb-5 rounded-lg border border-purple-700/50 bg-purple-950/30 p-4 text-sm">
+            <span className="font-medium text-purple-300">Looking for standard KYC verification?</span>{" "}
+            <span className="text-gray-300">It now uses a private, unlinkable flow that never ties your identity to your wallet.</span>{" "}
+            <a href="/claim" className="font-medium text-purple-400 underline hover:text-purple-300">Get verified privately →</a>{" "}
+            <span className="text-gray-500">This page now issues only Accredited Investor and HK Resident credentials.</span>
+          </div>
           <p className="text-sm text-gray-400 mb-4">
             Connect your wallet and sign a message to generate a Semaphore identity. Deterministic from your signature — never leaves your browser.
           </p>
