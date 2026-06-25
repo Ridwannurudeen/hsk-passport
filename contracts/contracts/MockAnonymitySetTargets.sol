@@ -77,6 +77,7 @@ contract MockFreshnessRegistry {
 /// @dev Test-only minimal HSKPassportFreshness surface.
 contract MockHSKPassportFreshness {
     bool public verifyResult = true;
+    error FreshProofRejected();
     function setVerifyResult(bool v) external { verifyResult = v; }
     function previewVerifyFresh(
         uint256,
@@ -89,5 +90,17 @@ contract MockHSKPassportFreshness {
         uint256[2] calldata
     ) external view returns (bool) {
         return verifyResult;
+    }
+    function verifyFresh(
+        uint256,
+        uint256,
+        uint256,
+        uint256,
+        uint256,
+        uint256[2] calldata,
+        uint256[2][2] calldata,
+        uint256[2] calldata
+    ) external view {
+        if (!verifyResult) revert FreshProofRejected();
     }
 }

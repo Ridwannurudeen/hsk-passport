@@ -12,18 +12,13 @@ interface IHSKPassport {
 
 /// @title CredentialReputation — ROADMAP FEATURE, NOT PRODUCTION-READY
 /// @notice Cross-credential reputation scoring. Tracks on-chain reputation per identity commitment.
-/// @dev !!! AUDIT FINDING (April 2026): verifyReputationThreshold does NOT cryptographically
-///      bind the caller's ZK proof to the identityCommitment being checked. Any member of the
-///      group can present someone else's high-reputation commitment and pass.
-///      Additionally, revealing the commitment breaks the privacy claim.
-///
-///      DO NOT use verifyReputationThreshold in production. The correct design requires a
-///      dedicated circuit that proves knowledge of the identity secret AND that its commitment
-///      has reputation >= threshold, WITHOUT revealing which commitment. This is on the
-///      Q3 2026 roadmap pending circuit work.
-///
-///      For now this contract is deployed for tracking/analytics only. Reputation scores are
-///      public on-chain data; no private threshold proof is currently supported.
+/// @dev Reputation scores are public on-chain data and advisory only; nothing here gates access.
+///      The former `verifyReputationThreshold` was REMOVED (audit finding): it did not
+///      cryptographically bind the ZK proof to the identityCommitment, so any member of the
+///      group could present another user's high-reputation commitment and pass, and revealing
+///      the commitment broke the privacy claim. A private threshold proof requires a dedicated
+///      circuit (prove knowledge of the identity secret AND reputation >= threshold WITHOUT
+///      revealing which commitment) — Q3 2026 roadmap pending circuit work.
 contract CredentialReputation {
     IHSKPassport public immutable passport;
     address public owner;
@@ -54,9 +49,6 @@ contract CredentialReputation {
     error NotOwner();
     error NotReporter();
     error AlreadyAwarded();
-    error InsufficientReputation();
-    error InvalidProof();
-    error ThresholdNotEncoded();
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();
@@ -137,29 +129,6 @@ contract CredentialReputation {
     /// @notice Get tier of a user by identity commitment
     function tierOf(uint256 identityCommitment) external view returns (uint8) {
         return getTier(reputationOf[identityCommitment]);
-    }
-
-    /// @notice Prove a user's reputation is ≥ threshold, without revealing the identity.
-    /// @dev The proof must prove membership in `groupId` with message = threshold.
-    ///      The caller (dApp) must have pre-verified the reputation, then submitted this proof
-    ///      to bind it to the action. Used alongside getReputation() in integration flows.
-    /// @param groupId The credential group the user is proving membership in
-    /// @param threshold Minimum reputation required (encoded as proof.message for ZK binding)
-    /// @param identityCommitment User's commitment (looked up separately — NOT revealed in proof)
-    /// @param proof Semaphore proof proving group membership + threshold encoding
-    function verifyReputationThreshold(
-        uint256 groupId,
-        uint256 threshold,
-        uint256 identityCommitment,
-        ISemaphore.SemaphoreProof calldata proof
-    ) external view returns (bool) {
-        // The message must encode the threshold being claimed
-        if (proof.message != threshold) revert ThresholdNotEncoded();
-        // User must have at least threshold reputation
-        if (reputationOf[identityCommitment] < threshold) revert InsufficientReputation();
-        // Proof must verify against the claimed group
-        if (!passport.verifyCredential(groupId, proof)) revert InvalidProof();
-        return true;
     }
 
     function transferOwnership(address newOwner) external onlyOwner {

@@ -42,6 +42,18 @@ interface IHSKPassportFreshness {
         uint256[2][2] calldata proofB,
         uint256[2] calldata proofC
     ) external view returns (bool);
+    /// @dev Consuming verification: reverts on an invalid or already-used proof and
+    ///      marks the (scope, nullifier) consumed. The gate uses this, NOT the preview.
+    function verifyFresh(
+        uint256 groupId,
+        uint256 merkleRoot,
+        uint256 earliestAcceptable,
+        uint256 scope,
+        uint256 nullifier,
+        uint256[2] calldata proofA,
+        uint256[2][2] calldata proofB,
+        uint256[2] calldata proofC
+    ) external;
 }
 
 /// @title AnonymitySetGate — Opt-in floor + warning for credential anonymity-set sizes
@@ -109,6 +121,9 @@ contract AnonymitySetGate {
     ///         for the same group. The freshness anonymity set is the number of leaves
     ///         the registry has accepted for that group, which is the same set the
     ///         circuit's Merkle inclusion runs over.
+    /// @dev Routes through the CONSUMING `verifyFresh` so the (scope, nullifier) is marked
+    ///      used — a freshness proof cannot be replayed. Reverts on an invalid or already-used
+    ///      proof; returns true only on a fresh, valid verification.
     function verifyFreshWithFloor(
         IHSKPassportFreshness composer,
         IFreshnessRegistry registry,
@@ -126,7 +141,7 @@ contract AnonymitySetGate {
         uint256 size = registry.leafCount(groupId);
         if (size < floor) revert AnonymitySetTooSmall(groupId, size, floor);
         if (size < WARN_BELOW_MEMBERS) emit LowAnonymitySet(groupId, size, WARN_BELOW_MEMBERS);
-        return composer.previewVerifyFresh(
+        composer.verifyFresh(
             groupId,
             merkleRoot,
             earliestAcceptable,
@@ -136,6 +151,7 @@ contract AnonymitySetGate {
             proofB,
             proofC
         );
+        return true;
     }
 
     /// @notice Pure-read variant — returns (size, hardOk, soft) without emitting or
