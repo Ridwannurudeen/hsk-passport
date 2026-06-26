@@ -84,4 +84,57 @@ describe("IssuerRegistry — slashing via Timelock authority", () => {
       registry.connect(attacker).reportIssuance(issuer.address, 25),
     ).to.be.revertedWithCustomError(registry, "NotReporter");
   });
+
+  it("a deactivated issuer with residual stake can recover it (no locked funds)", async () => {
+    const { registry, issuer, other, owner } = await setup();
+    // Non-zero community minimum so a partial slash deactivates while leaving residual.
+    await registry
+      .connect(owner)
+      .setStakeRequirements(
+        ethers.parseEther("2"),
+        ethers.parseEther("1000"),
+        ethers.parseEther("10000"),
+      );
+    // Slash 4 of 5 -> residual 1 (<= communityMin 2) -> deactivated but funded.
+    await registry
+      .connect(other)
+      .slash(issuer.address, ethers.parseEther("4"), "partial");
+    expect(await registry.isActiveIssuer(issuer.address)).to.equal(false);
+    expect((await registry.issuers(issuer.address)).stake).to.equal(
+      ethers.parseEther("1"),
+    );
+
+    // Previously this reverted NotActive, locking the residual. Now it works.
+    await registry.connect(issuer).requestUnstake();
+    await ethers.provider.send("evm_increaseTime", [7 * 24 * 60 * 60 + 1]);
+    await ethers.provider.send("evm_mine", []);
+    await expect(registry.connect(issuer).withdrawStake())
+      .to.emit(registry, "Unstaked")
+      .withArgs(issuer.address, ethers.parseEther("1"));
+    expect((await registry.issuers(issuer.address)).stake).to.equal(0n);
+  });
+
+  it("a deactivated issuer with residual stake is still slashable", async () => {
+    const { registry, issuer, other, owner, treasury } = await setup();
+    await registry
+      .connect(owner)
+      .setStakeRequirements(
+        ethers.parseEther("2"),
+        ethers.parseEther("1000"),
+        ethers.parseEther("10000"),
+      );
+    await registry
+      .connect(other)
+      .slash(issuer.address, ethers.parseEther("4"), "partial");
+    expect(await registry.isActiveIssuer(issuer.address)).to.equal(false);
+
+    // Residual 1 ether is still slashable (was blocked by the old active check).
+    const before = await ethers.provider.getBalance(treasury.address);
+    await registry
+      .connect(other)
+      .slash(issuer.address, ethers.parseEther("1"), "residual");
+    const after = await ethers.provider.getBalance(treasury.address);
+    expect(after - before).to.equal(ethers.parseEther("1"));
+    expect((await registry.issuers(issuer.address)).stake).to.equal(0n);
+  });
 });
