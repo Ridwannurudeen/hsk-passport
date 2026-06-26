@@ -36,6 +36,7 @@ abstract contract HSKPassportVerifier {
     IHSKPassport public immutable passport;
 
     error InvalidCredential();
+    error WrongScope();
 
     constructor(address _passport) {
         passport = IHSKPassport(_passport);
@@ -52,12 +53,17 @@ abstract contract HSKPassportVerifier {
         _;
     }
 
-    /// @notice Require and consume a credential proof (prevents reuse for same scope)
-    /// @dev Writes to chain — consumes the nullifier. Caller-binding is required so a
-    ///      proof cannot be front-run: an attacker who copies the proof from the
-    ///      mempool cannot consume the nullifier as themselves.
+    /// @notice Require and consume a credential proof — once per identity per dApp.
+    /// @dev Writes to chain — consumes the nullifier. Two bindings are enforced:
+    ///      (1) caller-binding (`proof.message == msg.sender`) so a copied proof cannot be
+    ///      front-run, and (2) scope-binding (`proof.scope == uint256(uint160(address(this)))`)
+    ///      so the one-time guarantee cannot be bypassed by re-proving under a fresh scope —
+    ///      the Semaphore nullifier is hash(scope, secret). Generate the proof with the
+    ///      inheriting dApp's own address as the scope. Note: every `onlyCredentialHolderOnce`
+    ///      function on a dApp shares this scope, so an identity acts once per dApp.
     modifier onlyCredentialHolderOnce(uint256 groupId, ISemaphore.SemaphoreProof calldata proof) {
         if (proof.message != uint256(uint160(msg.sender))) revert InvalidCredential();
+        if (proof.scope != uint256(uint160(address(this)))) revert WrongScope();
         passport.validateCredential(groupId, proof);
         _;
     }
