@@ -31,6 +31,7 @@ contract GatedRWA {
     error NullifierAlreadyUsed();
     error NotOwner();
     error ProofNotBoundToCaller();
+    error WrongScope();
 
     constructor(ISemaphore _semaphore, uint256 _requiredGroupId, uint256 _mintAmount) {
         semaphore = _semaphore;
@@ -41,10 +42,16 @@ contract GatedRWA {
 
     /// @notice Mint tokens by proving KYC credential via ZK proof
     /// @param proof Semaphore proof proving membership in the required KYC group.
-    ///        proof.message MUST equal uint256(uint160(msg.sender)) to prevent front-running.
+    ///        proof.message MUST equal uint256(uint160(msg.sender)) to prevent front-running,
+    ///        and proof.scope MUST equal uint256(uint160(address(this))) so the one-time
+    ///        nullifier cannot be bypassed by re-proving under a different scope.
     function kycMint(ISemaphore.SemaphoreProof calldata proof) external {
         // Caller binding: proof must be generated with msg.sender as message
         if (proof.message != uint256(uint160(msg.sender))) revert ProofNotBoundToCaller();
+        // Scope binding: the nullifier is hash(scope, secret), so without pinning the scope
+        // a holder could re-mint forever by re-proving under a fresh scope. Pin it to this
+        // token — one mint per identity per token.
+        if (proof.scope != uint256(uint160(address(this)))) revert WrongScope();
         if (usedNullifiers[proof.nullifier]) revert NullifierAlreadyUsed();
 
         bool valid = semaphore.verifyProof(requiredGroupId, proof);

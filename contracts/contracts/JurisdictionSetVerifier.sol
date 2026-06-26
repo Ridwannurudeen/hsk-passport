@@ -95,6 +95,7 @@ contract JurisdictionGatedPool {
     error ProofNotBoundToCaller();
     error NullifierAlreadyUsed();
     error NotInAllowedJurisdiction();
+    error WrongScope();
 
     constructor(address _passport, uint256[] memory _allowedGroups, string memory _name) {
         passport = IHSKPassport(_passport);
@@ -105,6 +106,9 @@ contract JurisdictionGatedPool {
     /// @notice Deposit into the pool — requires proof of membership in ANY allowed jurisdiction.
     function deposit(ISemaphore.SemaphoreProof calldata proof) external payable {
         if (proof.message != uint256(uint160(msg.sender))) revert ProofNotBoundToCaller();
+        // Scope binding: pin the nullifier's scope to this pool so a holder cannot deposit
+        // repeatedly by re-proving under a fresh scope (nullifier = hash(scope, secret)).
+        if (proof.scope != uint256(uint160(address(this)))) revert WrongScope();
         if (usedNullifiers[proof.nullifier]) revert NullifierAlreadyUsed();
 
         if (!JurisdictionSetVerifier.isProofInAnyJurisdiction(passport, allowedGroups, proof)) {

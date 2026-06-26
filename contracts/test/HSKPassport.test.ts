@@ -282,7 +282,7 @@ describe("HSK Passport Protocol", function () {
 
       // Bind proof to owner's address
       const callerAddr = BigInt(owner.address);
-      const proof = await generateProof(mintIdentity, group, callerAddr, 99);
+      const proof = await generateProof(mintIdentity, group, callerAddr, BigInt(await gatedRWA.getAddress()));
 
       await gatedRWA.kycMint({
         merkleTreeDepth: proof.merkleTreeDepth,
@@ -339,7 +339,7 @@ describe("HSK Passport Protocol", function () {
       for (const m of members) group.addMember(m);
 
       // Same scope=99 as first successful mint → same nullifier
-      const proof = await generateProof(mintIdentity, group, BigInt(owner.address), 99);
+      const proof = await generateProof(mintIdentity, group, BigInt(owner.address), BigInt(await gatedRWA.getAddress()));
 
       await expect(
         gatedRWA.kycMint({
