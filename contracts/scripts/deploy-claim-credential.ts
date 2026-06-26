@@ -105,6 +105,38 @@ async function main() {
   }
   console.log(`HSKPassport: ${passportAddress}`);
 
+  // H1 guardrail (audit finding): every group's ClaimCredential MUST be pinned to a
+  // DISTINCT RSA voucher key. The backend blind-signs an opaque value, so two instances
+  // sharing one (N, e) let a voucher minted for one group be replayed at the other
+  // (cross-group claim). Refuse to deploy a group whose modulus is already recorded for
+  // a different group on this chain.
+  const outDir = path.resolve(__dirname, "..", "deployments");
+  fs.mkdirSync(outDir, { recursive: true });
+  for (const f of fs.readdirSync(outDir)) {
+    if (!/^claim-credential-.*\.json$/.test(f)) continue;
+    let prior: { chainId?: number; groupId?: number; issuer?: { modulus?: string } };
+    try {
+      prior = JSON.parse(fs.readFileSync(path.join(outDir, f), "utf8")) as {
+        chainId?: number;
+        groupId?: number;
+        issuer?: { modulus?: string };
+      };
+    } catch {
+      continue;
+    }
+    if (
+      prior.chainId === Number(net.chainId) &&
+      prior.groupId !== groupId &&
+      prior.issuer?.modulus?.toLowerCase() === modulus.toLowerCase()
+    ) {
+      throw new Error(
+        `H1: this RSA modulus is already used by group ${prior.groupId} on chain ` +
+          `${Number(net.chainId)} (record ${f}). Each group's ClaimCredential must use a ` +
+          `DISTINCT voucher key — generate a per-group key before deploying group ${groupId}.`,
+      );
+    }
+  }
+
   console.log("\n--- Deploying ClaimCredential ---");
   const Claim = await ethers.getContractFactory("ClaimCredential");
   const claim = await Claim.deploy(passportAddress, groupId, modulus, exponent);
@@ -145,9 +177,10 @@ async function main() {
     delegateApproved: approved,
     issuer: { modulus, exponent },
   };
-  const outDir = path.resolve(__dirname, "..", "deployments");
-  fs.mkdirSync(outDir, { recursive: true });
-  const outFile = path.join(outDir, `claim-credential-${net.chainId}.json`);
+  const outFile = path.join(
+    outDir,
+    `claim-credential-${net.chainId}-g${groupId}.json`,
+  );
   fs.writeFileSync(outFile, JSON.stringify(record, null, 2));
   console.log(`\nDeployment record: ${outFile}`);
 
