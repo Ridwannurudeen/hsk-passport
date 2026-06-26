@@ -137,4 +137,57 @@ describe("IssuerRegistry — slashing via Timelock authority", () => {
     expect(after - before).to.equal(ethers.parseEther("1"));
     expect((await registry.issuers(issuer.address)).stake).to.equal(0n);
   });
+
+  it("requestUnstake freezes the issuer (slash-escape defense)", async () => {
+    const { registry, issuer } = await setup();
+    await registry.connect(issuer).requestUnstake();
+    expect(await registry.isActiveIssuer(issuer.address)).to.equal(false);
+  });
+
+  it("re-staking reactivates and ADDS to stake without duplicating the issuer", async () => {
+    const { registry, issuer } = await setup(); // staked 5, active
+    await registry.connect(issuer).requestUnstake(); // frozen + 7d clock
+    expect(await registry.isActiveIssuer(issuer.address)).to.equal(false);
+
+    await registry
+      .connect(issuer)
+      .stakeAndRegister("ipfs://issuer", { value: ethers.parseEther("3") });
+    const info = await registry.issuers(issuer.address);
+    expect(info.stake).to.equal(ethers.parseEther("8")); // 5 + 3, not overwritten
+    expect(info.active).to.equal(true); // reactivated
+    expect(await registry.unstakeRequestedAt(issuer.address)).to.equal(0n); // exit cancelled
+    expect(await registry.issuerCount()).to.equal(1n); // not duplicated
+  });
+
+  it("re-staking cancels a pending unstake so it cannot be pre-armed", async () => {
+    const { registry, issuer } = await setup();
+    await registry.connect(issuer).requestUnstake();
+    await registry
+      .connect(issuer)
+      .stakeAndRegister("ipfs://issuer", { value: ethers.parseEther("1") });
+    await expect(
+      registry.connect(issuer).withdrawStake(),
+    ).to.be.revertedWithCustomError(registry, "CooldownNotElapsed");
+  });
+
+  it("slash resets a pending unstake clock (no instant residual escape)", async () => {
+    const { registry, issuer, other, owner } = await setup();
+    await registry
+      .connect(owner)
+      .setStakeRequirements(
+        ethers.parseEther("2"),
+        ethers.parseEther("1000"),
+        ethers.parseEther("10000"),
+      );
+    await registry.connect(issuer).requestUnstake(); // clock armed
+    await ethers.provider.send("evm_increaseTime", [7 * 24 * 60 * 60 + 1]);
+    await ethers.provider.send("evm_mine", []);
+    // Cooldown elapsed — but a slash lands first and cancels the withdrawal.
+    await registry
+      .connect(other)
+      .slash(issuer.address, ethers.parseEther("1"), "caught");
+    await expect(
+      registry.connect(issuer).withdrawStake(),
+    ).to.be.revertedWithCustomError(registry, "CooldownNotElapsed");
+  });
 });

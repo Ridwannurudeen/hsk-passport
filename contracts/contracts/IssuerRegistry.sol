@@ -41,6 +41,11 @@ contract IssuerRegistry {
     uint256 public unstakeCooldown = 7 days;
     mapping(address => uint256) public unstakeRequestedAt;
 
+    /// @dev True once an address has ever staked. Distinguishes a returning issuer
+    ///      (top up + reactivate) from a brand-new one, so re-staking after a
+    ///      requestUnstake or slash never overwrites residual stake or double-lists.
+    mapping(address => bool) public registered;
+
     event IssuerStaked(address indexed issuer, uint256 amount, Tier tier);
     event IssuerUpgraded(address indexed issuer, Tier from, Tier to);
     event UnstakeRequested(address indexed issuer, uint256 availableAt);
@@ -85,10 +90,14 @@ contract IssuerRegistry {
     /// @param metadataURI URI to issuer metadata (name, contact, jurisdictions)
     function stakeAndRegister(string calldata metadataURI) external payable {
         Issuer storage i = issuers[msg.sender];
+        // Re-committing stake cancels any pending exit (and the freeze it caused).
+        unstakeRequestedAt[msg.sender] = 0;
 
-        if (i.active) {
-            // Already active — treat as additional stake
+        if (registered[msg.sender]) {
+            // Returning issuer (possibly deactivated by a prior unstake request or
+            // slash) — top up and reactivate. Never re-push to issuerList.
             i.stake += msg.value;
+            i.active = true;
             Tier newTier = _tierForStake(i.stake);
             if (newTier != i.tier) {
                 emit IssuerUpgraded(msg.sender, i.tier, newTier);
@@ -96,6 +105,7 @@ contract IssuerRegistry {
             }
         } else {
             // New issuer
+            registered[msg.sender] = true;
             i.stake = msg.value;
             i.tier = _tierForStake(msg.value);
             i.stakedAt = block.timestamp;
@@ -114,6 +124,10 @@ contract IssuerRegistry {
         // residual stake (when communityMinStake > 0) must still be able to start
         // withdrawing those funds — otherwise the residual is locked forever.
         if (i.stake == 0) revert NothingStaked();
+        // Freeze the issuer on exit: requesting a withdrawal deactivates it, so an
+        // issuer cannot keep operating while a withdrawal is armed (slash-escape
+        // defense). It stays slashable — slash gates on stake, not active.
+        i.active = false;
         unstakeRequestedAt[msg.sender] = block.timestamp;
         emit UnstakeRequested(msg.sender, block.timestamp + unstakeCooldown);
     }
@@ -187,6 +201,9 @@ contract IssuerRegistry {
         uint256 slashed = amount > i.stake ? i.stake : amount;
         i.stake -= slashed;
         i.slashedAmount += slashed;
+        // A slash cancels any pending unstake: a slashed issuer must re-request and
+        // re-wait, so it cannot withdraw residual the instant a slash is queued.
+        unstakeRequestedAt[issuer] = 0;
 
         // Downgrade tier if stake fell below threshold
         Tier newTier = _tierForStake(i.stake);
