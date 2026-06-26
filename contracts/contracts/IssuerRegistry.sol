@@ -110,7 +110,10 @@ contract IssuerRegistry {
     /// @notice Request unstake (7-day cooldown before withdrawal)
     function requestUnstake() external {
         Issuer storage i = issuers[msg.sender];
-        if (!i.active) revert NotActive();
+        // Gate on stake, not active: an issuer deactivated by a slash that left
+        // residual stake (when communityMinStake > 0) must still be able to start
+        // withdrawing those funds — otherwise the residual is locked forever.
+        if (i.stake == 0) revert NothingStaked();
         unstakeRequestedAt[msg.sender] = block.timestamp;
         emit UnstakeRequested(msg.sender, block.timestamp + unstakeCooldown);
     }
@@ -176,7 +179,10 @@ contract IssuerRegistry {
     function slash(address issuer, uint256 amount, string calldata reason) external {
         if (msg.sender != slashingAuthority) revert NotSlashingAuthority();
         Issuer storage i = issuers[issuer];
-        if (!i.active) revert NotActive();
+        // Slashable while funded, even if already deactivated by a prior slash — so
+        // residual stake left after a deactivating slash (communityMinStake > 0) can
+        // still be punished rather than sitting untouchable.
+        if (i.stake == 0) revert NothingStaked();
 
         uint256 slashed = amount > i.stake ? i.stake : amount;
         i.stake -= slashed;
