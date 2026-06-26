@@ -173,7 +173,7 @@ describe("AnonymitySetGate", function () {
       ).to.emit(gate, "LowAnonymitySet");
     });
 
-    it("forwards composer return value when size adequate", async function () {
+    it("returns true when the composer verifies a fresh proof", async function () {
       await mockRegistry.set(25, 5000);
       await mockComposer.setVerifyResult(true);
       const ok = await gate.verifyFreshWithFloor.staticCall(
@@ -190,6 +190,26 @@ describe("AnonymitySetGate", function () {
         1000,
       );
       expect(ok).to.equal(true);
+    });
+
+    it("reverts when the composer rejects the proof (consuming path, no replay)", async function () {
+      await mockRegistry.set(25, 5000);
+      await mockComposer.setVerifyResult(false);
+      await expect(
+        gate.verifyFreshWithFloor(
+          await mockComposer.getAddress(),
+          await mockRegistry.getAddress(),
+          25,
+          0,
+          0,
+          0,
+          0,
+          ZERO_2,
+          ZERO_2_2,
+          ZERO_2,
+          1000,
+        ),
+      ).to.be.revertedWithCustomError(mockComposer, "FreshProofRejected");
     });
   });
 
