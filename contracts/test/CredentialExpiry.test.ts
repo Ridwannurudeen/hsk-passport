@@ -105,3 +105,37 @@ describe("HSKPassport — credential expiry", () => {
     expect(await passport.verifyCredential(groupId, proof)).to.be.true;
   });
 });
+
+describe("CredentialExpiry module", () => {
+  async function setup() {
+    const Expiry = await ethers.getContractFactory("CredentialExpiry");
+    const expiry = await Expiry.deploy(ethers.ZeroAddress);
+    await expiry.waitForDeployment();
+    return { expiry };
+  }
+
+  it("isFresh fails closed for unrecorded credentials", async () => {
+    const { expiry } = await setup();
+
+    expect(await expiry.isFresh(1, 12345)).to.equal(false);
+  });
+
+  it("isFresh accepts recorded credentials with no validity period", async () => {
+    const { expiry } = await setup();
+
+    await expiry.markIssued(1, 12345);
+
+    expect(await expiry.isFresh(1, 12345)).to.equal(true);
+  });
+
+  it("isFresh returns false after a recorded credential expires", async () => {
+    const { expiry } = await setup();
+
+    await expiry.setValidityPeriod(1, 3600);
+    await expiry.markIssued(1, 12345);
+    expect(await expiry.isFresh(1, 12345)).to.equal(true);
+
+    await time.increase(3601);
+    expect(await expiry.isFresh(1, 12345)).to.equal(false);
+  });
+});

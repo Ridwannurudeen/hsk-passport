@@ -8,9 +8,9 @@ pragma solidity >=0.8.23 <0.9.0;
 ///      on-chain in the current release. Additionally, privately binding an identity
 ///      commitment to a ZK proof for expiry lookup requires a circuit extension.
 ///
-///      Current behavior: lookups (isExpired, expiresAt, timeUntilExpiry) return data,
-///      but a dApp must integrate them explicitly to honor expiry. The base
-///      verifyCredential() does not reject expired credentials.
+///      Current behavior: lookups (isExpired, isFresh, expiresAt, timeUntilExpiry)
+///      return data, but a dApp must integrate them explicitly to honor expiry.
+///      The base verifyCredential() does not reject expired credentials.
 ///
 ///      Q3 2026 roadmap: integrate into verify path with ZK circuit support.
 contract CredentialExpiry {
@@ -90,6 +90,16 @@ contract CredentialExpiry {
         uint256 period = validityPeriod[groupId];
         if (period == 0) return false; // no expiry configured
         return block.timestamp > issued + period;
+    }
+
+    /// @notice Fail-closed freshness check for dApps that require recorded issuance
+    /// @return True only when issuance is recorded and the credential is inside its validity window
+    function isFresh(uint256 groupId, uint256 identityCommitment) external view returns (bool) {
+        uint256 issued = issuedAt[groupId][identityCommitment];
+        if (issued == 0) return false;
+        uint256 period = validityPeriod[groupId];
+        if (period == 0) return true;
+        return block.timestamp <= issued + period;
     }
 
     /// @notice Get expiry timestamp (0 = no expiry)
