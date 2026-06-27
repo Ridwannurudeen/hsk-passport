@@ -16,6 +16,7 @@ contract IssuerRegistry {
     /// @dev Authorised to report issuance/revocation for reputation. Set by owner;
     ///      defaults to the deployer. Wire this to the backend/HSKPassport reporter.
     address public reporter;
+    uint256 public pendingTreasuryWithdrawals;
 
     enum Tier { None, Community, KYCProvider, Institutional }
 
@@ -55,6 +56,8 @@ contract IssuerRegistry {
     event RevocationReported(address indexed issuer, uint256 indexed groupId);
     event MetadataUpdated(address indexed issuer, string uri);
     event StakeRequirementsUpdated(uint256 community, uint256 kycProvider, uint256 institutional);
+    event TreasuryWithdrawalQueued(uint256 amount, uint256 pendingTotal);
+    event TreasuryWithdrawalPaid(address indexed treasury, uint256 amount);
 
     error NotOwner();
     error NotSlashingAuthority();
@@ -66,6 +69,7 @@ contract IssuerRegistry {
     error AlreadyActive();
     error TransferFailed();
     error ZeroAddress();
+    error NoTreasuryWithdrawal();
 
     event ReporterUpdated(address indexed reporter);
 
@@ -219,10 +223,20 @@ contract IssuerRegistry {
             i.active = false;
         }
 
-        // Slashed funds go to the immutable treasury, never to the mutable owner.
-        (bool ok, ) = payable(treasury).call{value: slashed}("");
-        if (!ok) revert TransferFailed();
+        pendingTreasuryWithdrawals += slashed;
+        emit TreasuryWithdrawalQueued(slashed, pendingTreasuryWithdrawals);
         emit IssuerSlashed(issuer, slashed, reason);
+    }
+
+    /// @notice Pay queued slashed funds to the immutable treasury.
+    /// @dev Anyone can trigger payout; funds always go to `treasury`.
+    function withdrawTreasury() external {
+        uint256 amount = pendingTreasuryWithdrawals;
+        if (amount == 0) revert NoTreasuryWithdrawal();
+        pendingTreasuryWithdrawals = 0;
+        (bool ok, ) = payable(treasury).call{value: amount}("");
+        if (!ok) revert TransferFailed();
+        emit TreasuryWithdrawalPaid(treasury, amount);
     }
 
     // ============================================================

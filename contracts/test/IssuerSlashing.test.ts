@@ -2,12 +2,12 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 
 describe("IssuerRegistry — slashing via Timelock authority", () => {
-  async function setup() {
+  async function setup(treasuryOverride?: string) {
     const [owner, issuer, other, attacker, treasury] =
       await ethers.getSigners();
 
     const Registry = await ethers.getContractFactory("IssuerRegistry");
-    const registry = await Registry.deploy(treasury.address);
+    const registry = await Registry.deploy(treasuryOverride ?? treasury.address);
     await registry.waitForDeployment();
 
     // Simulate governance-gated slashing by designating a separate authority.
@@ -60,14 +60,33 @@ describe("IssuerRegistry — slashing via Timelock authority", () => {
       .withArgs(issuer.address, ethers.parseEther("1"), "doc forgery");
   });
 
-  it("sends slashed funds to the immutable treasury, not the owner", async () => {
+  it("queues slashed funds for the immutable treasury, not the owner", async () => {
     const { registry, issuer, other, treasury } = await setup();
     const before = await ethers.provider.getBalance(treasury.address);
     await registry
       .connect(other)
       .slash(issuer.address, ethers.parseEther("2"), "misissuance");
+    expect(await registry.pendingTreasuryWithdrawals()).to.equal(ethers.parseEther("2"));
+    expect(await ethers.provider.getBalance(treasury.address)).to.equal(before);
+
+    await registry.withdrawTreasury();
     const after = await ethers.provider.getBalance(treasury.address);
     expect(after - before).to.equal(ethers.parseEther("2"));
+  });
+
+  it("does not brick slashing when the treasury cannot receive ETH", async () => {
+    const MockDID = await ethers.getContractFactory("MockHashKeyDID");
+    const rejectingTreasury = await MockDID.deploy();
+    await rejectingTreasury.waitForDeployment();
+    const { registry, issuer, other } = await setup(await rejectingTreasury.getAddress());
+
+    await expect(
+      registry.connect(other).slash(issuer.address, ethers.parseEther("1"), "bad treasury")
+    ).to.emit(registry, "IssuerSlashed");
+    expect(await registry.pendingTreasuryWithdrawals()).to.equal(ethers.parseEther("1"));
+    await expect(registry.withdrawTreasury())
+      .to.be.revertedWithCustomError(registry, "TransferFailed");
+    expect(await registry.pendingTreasuryWithdrawals()).to.equal(ethers.parseEther("1"));
   });
 
   it("deactivates a fully slashed issuer", async () => {
@@ -115,7 +134,7 @@ describe("IssuerRegistry — slashing via Timelock authority", () => {
   });
 
   it("a deactivated issuer with residual stake is still slashable", async () => {
-    const { registry, issuer, other, owner, treasury } = await setup();
+    const { registry, issuer, other, owner } = await setup();
     await registry
       .connect(owner)
       .setStakeRequirements(
@@ -129,11 +148,11 @@ describe("IssuerRegistry — slashing via Timelock authority", () => {
     expect(await registry.isActiveIssuer(issuer.address)).to.equal(false);
 
     // Residual 1 ether is still slashable (was blocked by the old active check).
-    const before = await ethers.provider.getBalance(treasury.address);
+    const before = await registry.pendingTreasuryWithdrawals();
     await registry
       .connect(other)
       .slash(issuer.address, ethers.parseEther("1"), "residual");
-    const after = await ethers.provider.getBalance(treasury.address);
+    const after = await registry.pendingTreasuryWithdrawals();
     expect(after - before).to.equal(ethers.parseEther("1"));
     expect((await registry.issuers(issuer.address)).stake).to.equal(0n);
   });
