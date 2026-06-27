@@ -53,6 +53,8 @@ contract HSKPassport {
 
     /// @dev groupId => delegate address => whether approved for that group
     mapping(uint256 => mapping(address => bool)) public groupDelegates;
+    mapping(uint256 => address[]) private groupDelegateList;
+    mapping(uint256 => mapping(address => bool)) private groupDelegateKnown;
 
     event IssuerApproved(address indexed issuer);
     event IssuerRevoked(address indexed issuer);
@@ -156,6 +158,13 @@ contract HSKPassport {
     function revokeIssuer(address issuer) external onlyOwner {
         approvedIssuers[issuer] = false;
         emit IssuerRevoked(issuer);
+
+        for (uint256 i = 0; i < groupIds.length; i++) {
+            uint256 groupId = groupIds[i];
+            if (credentialGroups[groupId].issuer == issuer) {
+                _clearGroupDelegates(groupId);
+            }
+        }
     }
 
     /// @notice Approve a delegate contract for a specific group
@@ -167,6 +176,10 @@ contract HSKPassport {
         whenNotPaused
         whenIssuerNotPaused(msg.sender)
     {
+        if (!groupDelegateKnown[groupId][delegate]) {
+            groupDelegateKnown[groupId][delegate] = true;
+            groupDelegateList[groupId].push(delegate);
+        }
         groupDelegates[groupId][delegate] = true;
         emit DelegateApproved(groupId, delegate);
     }
@@ -273,7 +286,14 @@ contract HSKPassport {
         uint256 groupId,
         uint256 identityCommitment,
         uint256[] calldata merkleProofSiblings
-    ) external onlyGroupIssuerOrDelegate(groupId) {
+    ) external {
+        address groupIssuer = credentialGroups[groupId].issuer;
+        if (msg.sender != owner) {
+            if (!approvedIssuers[groupIssuer]) revert NotApprovedIssuer();
+            if (groupIssuer != msg.sender && !groupDelegates[groupId][msg.sender]) {
+                revert NotGroupIssuerOrDelegate();
+            }
+        }
         if (!credentials[groupId][identityCommitment]) revert CredentialNotIssued();
 
         semaphore.removeMember(groupId, identityCommitment, merkleProofSiblings);
@@ -353,6 +373,7 @@ contract HSKPassport {
         bool isAuthorizedIssuer = (msg.sender == groupIssuer) && approvedIssuers[msg.sender];
         if (!isAuthorizedIssuer && msg.sender != owner) revert NotGroupIssuerOrDelegate();
         credentialGroups[groupId].active = false;
+        _clearGroupDelegates(groupId);
     }
 
     /// @notice Get all credential group IDs
@@ -425,5 +446,18 @@ contract HSKPassport {
         if (!issuerPaused[issuer]) revert NotPausedError();
         issuerPaused[issuer] = false;
         emit IssuerUnpaused(issuer);
+    }
+
+    function _clearGroupDelegates(uint256 groupId) internal {
+        address[] storage delegates = groupDelegateList[groupId];
+        for (uint256 i = 0; i < delegates.length; i++) {
+            address delegate = delegates[i];
+            groupDelegateKnown[groupId][delegate] = false;
+            if (groupDelegates[groupId][delegate]) {
+                groupDelegates[groupId][delegate] = false;
+                emit DelegateRevoked(groupId, delegate);
+            }
+        }
+        delete groupDelegateList[groupId];
     }
 }

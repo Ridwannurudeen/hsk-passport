@@ -386,6 +386,60 @@ describe("HSK Passport Protocol", function () {
     });
   });
 
+  describe("HSKPassport — Audit Revocation Controls", function () {
+    let p: any;
+    let groupId: number;
+    let issuer: any;
+    let delegate: any;
+
+    beforeEach(async function () {
+      [owner, issuer, delegate] = await ethers.getSigners();
+      const HSKPassport = await ethers.getContractFactory("HSKPassport");
+      p = await HSKPassport.connect(owner).deploy(await semaphore.getAddress());
+      await p.connect(owner).approveIssuer(issuer.address);
+      const tx = await p.connect(issuer).createCredentialGroup("Issuer Group", ethers.ZeroHash);
+      const rc = await tx.wait();
+      const ev = rc.logs.find((l: any) => l.fragment?.name === "CredentialGroupCreated");
+      groupId = Number(ev.args.groupId);
+    });
+
+    it("owner can revoke a credential after the group issuer is revoked", async function () {
+      const id = new Identity("owner-revoke-after-issuer-revoked");
+      await p.connect(issuer).issueCredential(groupId, id.commitment);
+      await p.connect(owner).revokeIssuer(issuer.address);
+
+      await expect(p.connect(owner).revokeCredential(groupId, id.commitment, []))
+        .to.emit(p, "CredentialRevoked")
+        .withArgs(groupId, id.commitment);
+      expect(await p.hasCredential(groupId, id.commitment)).to.equal(false);
+    });
+
+    it("clears group delegates when an issuer is revoked", async function () {
+      await p.connect(issuer).approveDelegate(groupId, delegate.address);
+      expect(await p.groupDelegates(groupId, delegate.address)).to.equal(true);
+
+      await expect(p.connect(owner).revokeIssuer(issuer.address))
+        .to.emit(p, "DelegateRevoked")
+        .withArgs(groupId, delegate.address);
+      expect(await p.groupDelegates(groupId, delegate.address)).to.equal(false);
+
+      await p.connect(owner).approveIssuer(issuer.address);
+      const id = new Identity("stale-delegate-after-reapproval");
+      await expect(
+        p.connect(delegate).issueCredential(groupId, id.commitment)
+      ).to.be.revertedWithCustomError(p, "NotGroupIssuerOrDelegate");
+    });
+
+    it("clears group delegates when a group is deactivated", async function () {
+      await p.connect(issuer).approveDelegate(groupId, delegate.address);
+
+      await expect(p.connect(owner).deactivateGroup(groupId))
+        .to.emit(p, "DelegateRevoked")
+        .withArgs(groupId, delegate.address);
+      expect(await p.groupDelegates(groupId, delegate.address)).to.equal(false);
+    });
+  });
+
   describe("HSKPassport — Pause Logic", function () {
     let p: any;
     let groupId: number;
