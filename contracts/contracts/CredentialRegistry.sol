@@ -3,7 +3,12 @@ pragma solidity >=0.8.23 <0.9.0;
 
 /// @title CredentialRegistry — On-chain schema registry for HSK Passport credential types
 /// @notice Issuers register credential schemas (W3C VC aligned). Credentials can be individually revoked.
-/// @dev This is the protocol layer that gives HSK Passport structured credential types beyond named groups.
+/// @dev Advisory registry for structured credential metadata beyond named groups.
+///      HSKPassport.verifyCredential does not consult this registry: anonymous
+///      proof verification cannot bind a per-commitment registry revocation
+///      without revealing the commitment or adding a dedicated ZK circuit.
+///      Integrators that rely on schema `active` or `revocations` must check
+///      this registry explicitly outside the base passport proof path.
 contract CredentialRegistry {
     struct CredentialType {
         bytes32 schemaHash;
