@@ -40,6 +40,7 @@ contract HSKPassport {
 
     /// @dev issuer address => whether they're an approved issuer
     mapping(address => bool) public approvedIssuers;
+    mapping(address => uint256) public issuerEpoch;
 
     /// @dev Pause state. Asymmetric governance: a fast `pauser` role can pause
     ///      to halt new issuance during an incident, but only `owner` can
@@ -53,8 +54,7 @@ contract HSKPassport {
 
     /// @dev groupId => delegate address => whether approved for that group
     mapping(uint256 => mapping(address => bool)) public groupDelegates;
-    mapping(uint256 => address[]) private groupDelegateList;
-    mapping(uint256 => mapping(address => bool)) private groupDelegateKnown;
+    mapping(uint256 => mapping(address => uint256)) public groupDelegateEpoch;
 
     event IssuerApproved(address indexed issuer);
     event IssuerRevoked(address indexed issuer);
@@ -133,7 +133,13 @@ contract HSKPassport {
         // The group issuer must still be approved — if they're revoked, the entire group freezes,
         // including any delegates they previously approved.
         if (!approvedIssuers[groupIssuer]) revert NotApprovedIssuer();
-        if (groupIssuer != msg.sender && !groupDelegates[groupId][msg.sender]) {
+        if (
+            groupIssuer != msg.sender &&
+            (
+                !groupDelegates[groupId][msg.sender] ||
+                groupDelegateEpoch[groupId][msg.sender] != issuerEpoch[groupIssuer]
+            )
+        ) {
             revert NotGroupIssuerOrDelegate();
         }
         _;
@@ -157,14 +163,8 @@ contract HSKPassport {
     /// @notice Revoke an issuer's approval
     function revokeIssuer(address issuer) external onlyOwner {
         approvedIssuers[issuer] = false;
+        issuerEpoch[issuer]++;
         emit IssuerRevoked(issuer);
-
-        for (uint256 i = 0; i < groupIds.length; i++) {
-            uint256 groupId = groupIds[i];
-            if (credentialGroups[groupId].issuer == issuer) {
-                _clearGroupDelegates(groupId);
-            }
-        }
     }
 
     /// @notice Approve a delegate contract for a specific group
@@ -176,11 +176,8 @@ contract HSKPassport {
         whenNotPaused
         whenIssuerNotPaused(msg.sender)
     {
-        if (!groupDelegateKnown[groupId][delegate]) {
-            groupDelegateKnown[groupId][delegate] = true;
-            groupDelegateList[groupId].push(delegate);
-        }
         groupDelegates[groupId][delegate] = true;
+        groupDelegateEpoch[groupId][delegate] = issuerEpoch[credentialGroups[groupId].issuer];
         emit DelegateApproved(groupId, delegate);
     }
 
@@ -190,6 +187,7 @@ contract HSKPassport {
         address groupIssuer = credentialGroups[groupId].issuer;
         if (msg.sender != groupIssuer && msg.sender != owner) revert NotGroupIssuerOrDelegate();
         groupDelegates[groupId][delegate] = false;
+        delete groupDelegateEpoch[groupId][delegate];
         emit DelegateRevoked(groupId, delegate);
     }
 
@@ -290,7 +288,13 @@ contract HSKPassport {
         address groupIssuer = credentialGroups[groupId].issuer;
         if (msg.sender != owner) {
             if (!approvedIssuers[groupIssuer]) revert NotApprovedIssuer();
-            if (groupIssuer != msg.sender && !groupDelegates[groupId][msg.sender]) {
+            if (
+                groupIssuer != msg.sender &&
+                (
+                    !groupDelegates[groupId][msg.sender] ||
+                    groupDelegateEpoch[groupId][msg.sender] != issuerEpoch[groupIssuer]
+                )
+            ) {
                 revert NotGroupIssuerOrDelegate();
             }
         }
@@ -367,13 +371,13 @@ contract HSKPassport {
 
     /// @notice Deactivate a credential group. Only the issuer (still approved) or protocol owner.
     /// @dev Delegates cannot deactivate. Owner can deactivate for emergency offboarding even
-    ///      after revoking the issuer.
+    ///      after revoking the issuer. No delegate clearing is needed here: inactive groups
+    ///      cannot issue or verify, and there is no reactivation path.
     function deactivateGroup(uint256 groupId) external {
         address groupIssuer = credentialGroups[groupId].issuer;
         bool isAuthorizedIssuer = (msg.sender == groupIssuer) && approvedIssuers[msg.sender];
         if (!isAuthorizedIssuer && msg.sender != owner) revert NotGroupIssuerOrDelegate();
         credentialGroups[groupId].active = false;
-        _clearGroupDelegates(groupId);
     }
 
     /// @notice Get all credential group IDs
@@ -448,16 +452,4 @@ contract HSKPassport {
         emit IssuerUnpaused(issuer);
     }
 
-    function _clearGroupDelegates(uint256 groupId) internal {
-        address[] storage delegates = groupDelegateList[groupId];
-        for (uint256 i = 0; i < delegates.length; i++) {
-            address delegate = delegates[i];
-            groupDelegateKnown[groupId][delegate] = false;
-            if (groupDelegates[groupId][delegate]) {
-                groupDelegates[groupId][delegate] = false;
-                emit DelegateRevoked(groupId, delegate);
-            }
-        }
-        delete groupDelegateList[groupId];
-    }
 }

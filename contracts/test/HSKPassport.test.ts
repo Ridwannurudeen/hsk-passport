@@ -391,9 +391,10 @@ describe("HSK Passport Protocol", function () {
     let groupId: number;
     let issuer: any;
     let delegate: any;
+    let other: any;
 
     beforeEach(async function () {
-      [owner, issuer, delegate] = await ethers.getSigners();
+      [owner, issuer, delegate, other] = await ethers.getSigners();
       const HSKPassport = await ethers.getContractFactory("HSKPassport");
       p = await HSKPassport.connect(owner).deploy(await semaphore.getAddress());
       await p.connect(owner).approveIssuer(issuer.address);
@@ -414,29 +415,101 @@ describe("HSK Passport Protocol", function () {
       expect(await p.hasCredential(groupId, id.commitment)).to.equal(false);
     });
 
-    it("clears group delegates when an issuer is revoked", async function () {
-      await p.connect(issuer).approveDelegate(groupId, delegate.address);
-      expect(await p.groupDelegates(groupId, delegate.address)).to.equal(true);
+    it("rejects credential revocation from a random address", async function () {
+      const id = new Identity("random-address-revoke-rejected");
+      await p.connect(issuer).issueCredential(groupId, id.commitment);
 
-      await expect(p.connect(owner).revokeIssuer(issuer.address))
-        .to.emit(p, "DelegateRevoked")
-        .withArgs(groupId, delegate.address);
-      expect(await p.groupDelegates(groupId, delegate.address)).to.equal(false);
-
-      await p.connect(owner).approveIssuer(issuer.address);
-      const id = new Identity("stale-delegate-after-reapproval");
       await expect(
-        p.connect(delegate).issueCredential(groupId, id.commitment)
+        p.connect(other).revokeCredential(groupId, id.commitment, [])
       ).to.be.revertedWithCustomError(p, "NotGroupIssuerOrDelegate");
     });
 
-    it("clears group delegates when a group is deactivated", async function () {
+    it("rejects credential revocation from a delegate after the issuer is revoked", async function () {
+      const id = new Identity("revoked-issuer-delegate-revoke-rejected");
+      await p.connect(issuer).issueCredential(groupId, id.commitment);
+      await p.connect(issuer).approveDelegate(groupId, delegate.address);
+      expect(await p.groupDelegates(groupId, delegate.address)).to.equal(true);
+
+      await p.connect(owner).revokeIssuer(issuer.address);
+
+      await expect(
+        p.connect(delegate).revokeCredential(groupId, id.commitment, [])
+      ).to.be.revertedWithCustomError(p, "NotApprovedIssuer");
+    });
+
+    it("rejects a group A delegate revoking credentials in group B", async function () {
+      await p.connect(issuer).approveDelegate(groupId, delegate.address);
+      const tx = await p.connect(issuer).createCredentialGroup("Issuer Group B", ethers.ZeroHash);
+      const rc = await tx.wait();
+      const ev = rc.logs.find((l: any) => l.fragment?.name === "CredentialGroupCreated");
+      const secondGroupId = Number(ev.args.groupId);
+      const id = new Identity("group-b-revoke-isolation");
+      await p.connect(issuer).issueCredential(secondGroupId, id.commitment);
+
+      await expect(
+        p.connect(delegate).revokeCredential(secondGroupId, id.commitment, [])
+      ).to.be.revertedWithCustomError(p, "NotGroupIssuerOrDelegate");
+    });
+
+    it("invalidates stale delegates across revoke and re-approve until the issuer re-approves them", async function () {
+      await p.connect(issuer).approveDelegate(groupId, delegate.address);
+      expect(await p.groupDelegateEpoch(groupId, delegate.address)).to.equal(0n);
+
+      const first = new Identity("epoch-delegate-before-revoke");
+      await expect(p.connect(delegate).issueCredential(groupId, first.commitment))
+        .to.emit(p, "CredentialIssued")
+        .withArgs(groupId, first.commitment);
+
+      await p.connect(owner).revokeIssuer(issuer.address);
+      expect(await p.issuerEpoch(issuer.address)).to.equal(1n);
+      expect(await p.groupDelegates(groupId, delegate.address)).to.equal(true);
+      await p.connect(owner).approveIssuer(issuer.address);
+
+      const stale = new Identity("epoch-stale-delegate");
+      await expect(
+        p.connect(delegate).issueCredential(groupId, stale.commitment)
+      ).to.be.revertedWithCustomError(p, "NotGroupIssuerOrDelegate");
+
+      await p.connect(issuer).approveDelegate(groupId, delegate.address);
+      expect(await p.groupDelegateEpoch(groupId, delegate.address)).to.equal(1n);
+      const current = new Identity("epoch-current-delegate");
+      await expect(p.connect(delegate).issueCredential(groupId, current.commitment))
+        .to.emit(p, "CredentialIssued")
+        .withArgs(groupId, current.commitment);
+    });
+
+    it("deactivates a group without clearing delegates because inactive groups cannot issue", async function () {
       await p.connect(issuer).approveDelegate(groupId, delegate.address);
 
-      await expect(p.connect(owner).deactivateGroup(groupId))
-        .to.emit(p, "DelegateRevoked")
-        .withArgs(groupId, delegate.address);
-      expect(await p.groupDelegates(groupId, delegate.address)).to.equal(false);
+      await p.connect(owner).deactivateGroup(groupId);
+      expect(await p.groupDelegates(groupId, delegate.address)).to.equal(true);
+
+      const id = new Identity("inactive-group-delegate");
+      await expect(
+        p.connect(delegate).issueCredential(groupId, id.commitment)
+      ).to.be.revertedWithCustomError(p, "GroupNotActive");
+    });
+
+    it("keeps issuer revocation bounded after many groups and delegates exist", async function () {
+      this.timeout(120000);
+      const signers = await ethers.getSigners();
+      const delegates = signers.slice(3, 9).map((s: any) => s.address);
+
+      for (let i = 0; i < 16; i++) {
+        const tx = await p.connect(issuer).createCredentialGroup(`Spam Group ${i}`, ethers.ZeroHash);
+        const rc = await tx.wait();
+        const ev = rc.logs.find((l: any) => l.fragment?.name === "CredentialGroupCreated");
+        const spamGroupId = Number(ev.args.groupId);
+
+        for (const delegateAddress of delegates) {
+          await p.connect(issuer).approveDelegate(spamGroupId, delegateAddress);
+        }
+      }
+
+      const tx = await p.connect(owner).revokeIssuer(issuer.address);
+      await expect(tx).to.emit(p, "IssuerRevoked").withArgs(issuer.address);
+      const rc = await tx.wait();
+      expect(rc.gasUsed < 100000n).to.equal(true);
     });
   });
 
