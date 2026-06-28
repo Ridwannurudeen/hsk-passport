@@ -306,6 +306,16 @@ contract HSKPassport {
         return block.timestamp > issuedAt + validity;
     }
 
+    /// @notice Fail-closed check that a credential was issued and is still inside its validity window.
+    /// @dev Returns false for never-issued credentials. A validity period of 0 means issued credentials never expire.
+    function isCredentialFresh(uint256 groupId, uint256 identityCommitment) public view returns (bool) {
+        uint256 issuedAt = credentialIssuedAt[groupId][identityCommitment];
+        if (issuedAt == 0) return false;
+        uint256 validity = credentialGroups[groupId].validityPeriod;
+        if (validity == 0) return true;
+        return block.timestamp <= issuedAt + validity;
+    }
+
     /// @notice Verify a ZK proof AND check the prover's credential hasn't expired.
     /// @dev IMPORTANT: This proves the GROUP's issuance window is still fresh, NOT the
     ///      individual prover's credential freshness. Because the prover is anonymous, we

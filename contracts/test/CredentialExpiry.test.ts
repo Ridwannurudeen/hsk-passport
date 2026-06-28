@@ -69,6 +69,52 @@ describe("HSKPassport — credential expiry", () => {
     expect(await passport.isCredentialExpired(groupId, identity.commitment)).to.be.true;
   });
 
+  it("isCredentialFresh fails closed for unrecorded credentials", async () => {
+    const { passport, groupId } = await setup();
+    const identity = new Identity();
+
+    expect(await passport.isCredentialFresh(groupId, identity.commitment)).to.equal(false);
+  });
+
+  it("isCredentialFresh accepts issued credentials with no validity period", async () => {
+    const { passport, issuer, groupId } = await setup();
+    const identity = new Identity();
+    await passport.connect(issuer).issueCredential(groupId, identity.commitment);
+
+    expect(await passport.isCredentialFresh(groupId, identity.commitment)).to.equal(true);
+  });
+
+  it("isCredentialFresh returns true inside the validity window", async () => {
+    const { passport, issuer, groupId } = await setup();
+    const identity = new Identity();
+    await passport.connect(issuer).setValidityPeriod(groupId, 3600);
+    await passport.connect(issuer).issueCredential(groupId, identity.commitment);
+    await time.increase(3599);
+
+    expect(await passport.isCredentialFresh(groupId, identity.commitment)).to.equal(true);
+  });
+
+  it("isCredentialFresh returns true at the exact expiry boundary", async () => {
+    const { passport, issuer, groupId } = await setup();
+    const identity = new Identity();
+    await passport.connect(issuer).setValidityPeriod(groupId, 3600);
+    await passport.connect(issuer).issueCredential(groupId, identity.commitment);
+    const issuedAt = await passport.credentialIssuedAt(groupId, identity.commitment);
+    await time.increaseTo(issuedAt + 3600n);
+
+    expect(await passport.isCredentialFresh(groupId, identity.commitment)).to.equal(true);
+  });
+
+  it("isCredentialFresh returns false after the validity window", async () => {
+    const { passport, issuer, groupId } = await setup();
+    const identity = new Identity();
+    await passport.connect(issuer).setValidityPeriod(groupId, 3600);
+    await passport.connect(issuer).issueCredential(groupId, identity.commitment);
+    await time.increase(3601);
+
+    expect(await passport.isCredentialFresh(groupId, identity.commitment)).to.equal(false);
+  });
+
   it("verifyCredentialWithExpiry reverts when proof is older than validity window", async () => {
     const { passport, issuer, groupId } = await setup();
     const identity = new Identity();
