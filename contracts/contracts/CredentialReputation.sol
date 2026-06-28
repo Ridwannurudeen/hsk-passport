@@ -1,13 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.23 <0.9.0;
 
-import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphore.sol";
-
 interface IHSKPassport {
-    function verifyCredential(
-        uint256 groupId,
-        ISemaphore.SemaphoreProof calldata proof
-    ) external view returns (bool);
+    function hasCredential(uint256 groupId, uint256 identityCommitment) external view returns (bool);
 }
 
 /// @title CredentialReputation — ROADMAP FEATURE, NOT PRODUCTION-READY
@@ -32,6 +27,9 @@ contract CredentialReputation {
     /// @dev identityCommitment => groupId => whether points already awarded (prevents double-counting)
     mapping(uint256 => mapping(uint256 => bool)) public awarded;
 
+    /// @dev identityCommitment => groupId => exact points awarded at issuance time
+    mapping(uint256 => mapping(uint256 => uint256)) public awardedPoints;
+
     /// @dev authorized contracts that can report issuances (HSKPassport issuers, bridges, etc.)
     mapping(address => bool) public reporters;
 
@@ -49,6 +47,7 @@ contract CredentialReputation {
     error NotOwner();
     error NotReporter();
     error AlreadyAwarded();
+    error CredentialNotFound();
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();
@@ -97,10 +96,12 @@ contract CredentialReputation {
     /// @param groupId Credential group
     function recordIssuance(uint256 identityCommitment, uint256 groupId) external onlyReporter {
         if (awarded[identityCommitment][groupId]) revert AlreadyAwarded();
+        if (!passport.hasCredential(groupId, identityCommitment)) revert CredentialNotFound();
         uint256 points = pointsPerGroup[groupId];
         if (points == 0) return;
 
         awarded[identityCommitment][groupId] = true;
+        awardedPoints[identityCommitment][groupId] = points;
         reputationOf[identityCommitment] += points;
         emit ReputationGained(identityCommitment, groupId, points, reputationOf[identityCommitment]);
     }
@@ -108,8 +109,9 @@ contract CredentialReputation {
     /// @notice Record revocation and burn reputation
     function recordRevocation(uint256 identityCommitment, uint256 groupId) external onlyReporter {
         if (!awarded[identityCommitment][groupId]) return;
-        uint256 points = pointsPerGroup[groupId];
+        uint256 points = awardedPoints[identityCommitment][groupId];
         awarded[identityCommitment][groupId] = false;
+        awardedPoints[identityCommitment][groupId] = 0;
         if (reputationOf[identityCommitment] >= points) {
             reputationOf[identityCommitment] -= points;
         } else {
